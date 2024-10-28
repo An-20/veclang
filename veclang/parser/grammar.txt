@@ -1,0 +1,251 @@
+ASSIGNMENT: "="
+PLUS: "\+"
+MINUS: "-"
+TIMES: "\*"
+DIVIDE: "/"
+MODULUS: "%"
+
+INTEGER_DIVIDE: "//"
+EXPONENTIATION: "\*\*"
+
+PLUS_ASSIGNMENT: "\+="
+MINUS_ASSIGNMENT: "-="
+TIMES_ASSIGNMENT: "\*="
+DIVIDE_ASSIGNMENT: "/="
+MODULUS_ASSIGNMENT: "%="
+
+TYPE: "(int|uint|long|ulong|real|complex|vec2|vec3|vec4|mat2|mat3|mat4)"
+IMAGINARY_UNIT: "i"
+
+RIGHT_ARROW: "-\>"
+
+EQUAL_TO: "=="
+NOT_EQUAL_TO: "!="
+LEFT_ANGLE_BRACKET: "\<"
+LESS_THAN_OR_EQUAL: "\<="
+RIGHT_ANGLE_BRACKET: "\>"
+GREATER_THAN_OR_EQUAL: "\>="
+
+BOOLEAN_AND: "(&&|and)"
+BOOLEAN_OR: "(\|\||or)"
+BOOLEAN_NOT: "(!|not)"
+
+BITWISE_AND = "&"
+BITWISE_OR = "\|"
+BITWISE_XOR = "\^"
+BITWISE_NOT = "~"
+BITWISE_LEFT_SHIFT = "\<\<"
+BITWISE_RIGHT_SHIFT = "\>\>"
+
+LEFT_PARENTHESIS: "\("
+RIGHT_PARENTHESIS: "\)"
+LEFT_SQUARE_BRACKET: "\["
+RIGHT_SQUARE_BRACKET: "\]"
+LEFT_CURLY_BRACKET: "\{"
+RIGHT_CURLY_BRACKET: "\}"
+
+DOT: "\."
+COMMA: "\,"
+COLON: "\:"
+SEMICOLON: ";"
+
+IMPORT: "import"
+LET: "let"
+CONST: "const"
+IN: "in"
+
+FN: "fn"
+IF: "if"
+ELIF: "elif"
+ELSE: "else"
+FOR: "for"
+WHILE: "while"
+BREAK: "break"
+CONTINUE: "continue"
+RETURN: "return"
+ignore: "	 "
+
+IDENTIFIER: "\b(?!import\b|let\b|const\b|fn\b|if\b|elif\b|else\b|for\b|while\b|break\b|continue\b|return\b|i\b|true\b|false\b|null\b|int\b|uint\b|long\b|ulong\b|real\b|complex\b|vec2\b|vec3\b|vec4\b|mat2\b|mat3\b|mat4\b)[a-zA-Z_][a-zA-Z_0-9]*"
+COMMENT: "(\/\*(.|\s)*?\*\/|\/\/.*)"
+
+start : program
+
+comment : COMMENT
+type : TYPE
+
+program : stmts
+
+stmts : stmt
+      | stmts stmt
+
+block : LEFT_CURLY_BRACKET stmts RIGHT_CURLY_BRACKET
+
+stmt : function_declaration_stmt
+     | variable_declaration_stmt
+     | constant_declaration_stmt
+     | assignment_stmt
+     | binary_operation_assignment_stmt
+     | expr_stmt
+     | if_stmt
+     | elif_stmt
+     | else_stmt
+     | for_stmt
+     | while_stmt
+     | break_stmt
+     | continue_stmt
+     | return_stmt
+     | COMMENT
+
+
+attribute_tags : attribute_tags attribute_tag
+               | attribute_tag
+               |
+
+attribute_tag : LEFT_ANGLE_BRACKET IDENTIFIER COLON attribute_tag_values RIGHT_ANGLE_BRACKET
+              | LEFT_ANGLE_BRACKET IDENTIFIER RIGHT_ANGLE_BRACKET
+
+attribute_tag_values : attribute_tag_values COMMA simple_literal
+                     | simple_literal
+
+function_declaration_parameter : IDENTIFIER COLON type
+function_declaration_parameters : function_declaration_parameter
+                                | function_declaration_parameters COMMA function_declaration_parameter
+                                |
+
+function_declaration_stmt : attribute_tags FN IDENTIFIER LEFT_PARENTHESIS function_declaration_parameters RIGHT_PARENTHESIS RIGHT_ARROW type block
+
+
+variable_declaration_stmt : LET IDENTIFIER COLON type ASSIGN expr SEMICOLON
+constant_declaration_stmt : CONST IDENTIFIER COLON type ASSIGN expr SEMICOLON
+
+assignment_stmt : IDENTIFIER ASSIGNMENT expr SEMICOLON
+binary_assignment_operation_stmt : IDENTIFIER binary_assignment_operator expr SEMICOLON
+
+expr_stmt : expr SEMICOLON
+
+
+if_stmt : IF LEFT_PARENTHESIS expr RIGHT_PARENTHESIS block
+elif_stmt : ELIF LEFT_PARENTHESIS expr RIGHT_PARENTHESIS block
+else_stmt : ELSE block
+
+for_initialisation_stmt : IDENTIFIER COLON type IN range
+for_stmt : FOR LEFT_PARENTHESIS for_initialisation_stmt RIGHT_PARENTHESIS block
+while_stmt : WHILE LEFT_PARENTHESIS expr RIGHT_PARENTHESIS block
+
+
+break_stmt : BREAK SEMICOLON
+continue_stmt : CONTINUE SEMICOLON
+return_stmt : RETURN expr SEMICOLON
+
+
+binary_assignment_operator : PLUS_ASSIGNMENT
+                           | MINUS_ASSIGNMENT
+                           | TIMES_ASSIGNMENT
+                           | DIVIDE_ASSIGNMENT
+                           | MODULUS_ASSIGNMENT
+
+comparison_operator : EQUAL_TO
+                    | NOT_EQUAL_TO
+                    | LESS_THAN
+                    | LESS_THAN_OR_EQUAL
+                    | GREATER_THAN
+                    | GREATER_THAN_OR_EQUAL
+
+
+// Operators, in order of precedence from lowest to highest
+disjunction_prec_expr : conjunction_prec_expr BOOLEAN_OR conjunction_prec_expr
+                      | conjunction_prec_expr
+
+conjunction_prec_expr : inversion_prec_expr BOOLEAN_AND inversion_prec_expr
+                      | inversion_prec_expr
+
+inversion_prec_expr : BOOLEAN_NOT inversion_prec_expr
+                    | comparison_prec_expr
+
+comparison_prec_expr : bitwise_or_prec_expr comparison_operator bitwise_or_prec_expr
+                     | bitwise_or_prec_expr
+
+bitwise_or_prec_expr : bitwise_or_prec_expr BITWISE_OR bitwise_xor_prec_expr
+                     | bitwise_xor_prec_expr
+
+bitwise_xor_prec_expr : bitwise_xor_prec_expr BITWISE_XOR bitwise_and_prec_expr
+                      | bitwise_and_prec_expr
+
+bitwise_and_prec_expr : bitwise_and_prec_expr BITWISE_AND bitwise_shift_prec_expr
+                      | bitwise_shift_prec_expr
+
+bitwise_shift_prec_expr : bitwise_shift_prec_expr BITWISE_LEFT_SHIFT addition_prec_expr
+                        | bitwise_shift_prec_expr BITWISE_RIGHT_SHIFT addition_prec_expr
+                        | addition_prec_expr
+
+addition_prec_expr : addition_prec_expr PLUS multiplication_prec_expr
+                   | addition_prec_expr MINUS multiplication_prec_expr
+                   | multiplication_prec_expr
+
+multiplication_prec_expr : multiplication_prec_expr TIMES unary_prec_expr
+                         | multiplication_prec_expr DIVIDE unary_prec_expr
+                         | multiplication_prec_expr INTEGER_DIVIDE unary_prec_expr
+                         | multiplication_prec_expr MODULUS unary_prec_expr
+                         | unary_prec_expr
+
+unary_prec_expr : PLUS unary_prec_expr
+                | MINUS unary_prec_expr
+                | BITWISE_NOT unary_prec_expr
+                | exponentiation_prec_expr
+
+exponentiation_prec_expr : primary_expr EXPONENTIATION exponentiation_prec_expr
+                         | primary_expr
+
+
+// Literal expressions
+int_literal : INT_LITERAL
+bool_literal : BOOL_LITERAL
+real_literal : REAL_LITERAL
+str_literal : STR_LITERAL
+
+num_literal : int_literal
+            | real_literal
+
+simple_literal : num_literal
+               | bool_literal
+               | str_literal
+
+imaginary_literal : num_literal IMAGINARY_UNIT
+
+range_literal : LEFT_PARENTHESIS expr COLON expr RIGHT_PARENTHESIS
+              | LEFT_PARENTHESIS expr COLON expr COLON expr RIGHT_PARENTHESIS
+
+array_literal_elements : expr
+                       | array_literal_elements COMMA expr
+
+array_literal : LEFT_SQUARE_BRACKET array_literal_elements RIGHT_SQUARE_BRACKET
+
+identifier : IDENTIFIER
+
+atomic_expr : simple_literal
+            | imaginary_literal
+            | range_literal
+            | array_literal
+            | identifier
+
+
+function_call_arguments : expr
+                        | function_call_arguments COMMA expr
+                        |
+function_call_expr : primary_expr LEFT_PARENTHESIS function_call_arguments RIGHT_PARENTHESIS
+
+member_access_expr : primary_expr DOT identifier
+
+index_elements : expr
+               | index_elements COMMA expr
+index_expr : primary_expr LEFT_SQUARE_BRACKET index_elements RIGHT_SQUARE_BRACKET
+
+parenthesised_expr : LEFT_PARENTHESIS expr RIGHT_PARENTHESIS
+
+primary_expr : atomic_expr
+             | member_access_expr
+             | function_call_expr
+             | index_expr
+             | parenthesised_expr
+
+expr : disjunction_prec_expr

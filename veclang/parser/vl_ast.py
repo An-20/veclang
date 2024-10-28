@@ -2,7 +2,6 @@
 
 import abc
 import typing
-from abc import ABC
 
 # Definitions for operators
 BinaryAssignmentOperatorType = typing.Literal[
@@ -11,15 +10,6 @@ BinaryAssignmentOperatorType = typing.Literal[
     "TIMES_ASSIGNMENT",
     "DIVIDE_ASSIGNMENT",
     "MODULUS_ASSIGNMENT",
-]
-
-ComparisonOperatorType = typing.Literal[
-    "EQUAL_TO",
-    "NOT_EQUAL_TO",
-    "LESS_THAN",
-    "LESS_THAN_OR_EQUAL",
-    "GREATER_THAN",
-    "GREATER_THAN_OR_EQUAL",
 ]
 
 BinaryOperatorType = typing.Literal[
@@ -37,6 +27,12 @@ BinaryOperatorType = typing.Literal[
     "BITWISE_XOR",
     "BITWISE_LEFT_SHIFT",
     "BITWISE_RIGHT_SHIFT",
+    "EQUAL_TO",
+    "NOT_EQUAL_TO",
+    "LESS_THAN",
+    "LESS_THAN_OR_EQUAL",
+    "GREATER_THAN",
+    "GREATER_THAN_OR_EQUAL",
 ]
 
 UnaryOperatorType = typing.Literal[
@@ -601,44 +597,6 @@ class UnaryOperatorExprNode(ExprNode):
     ) -> "ASTNode":
         return cls(
             expr_from_dict(input_dict["operand"]),
-            input_dict["operator"],
-            ast_position_info,
-        )
-
-
-class ComparativeOperatorExprNode(ExprNode):
-    """An AST node for a comparative operation"""
-
-    def __init__(
-        self,
-        left: ExprNode,
-        right: ExprNode,
-        operator: ComparisonOperatorType,
-        ast_position_info: ASTPositionInfo,
-    ) -> None:
-        super().__init__(ast_position_info)
-        self.left = left
-        self.right = right
-        self.operator = operator
-
-    @staticmethod
-    def get_node_type_str() -> str:
-        return "ComparativeOperatorExprNode"
-
-    def _to_dict(self) -> dict:
-        return {
-            "left": self.left.to_dict(),
-            "right": self.right.to_dict(),
-            "operator": self.operator,
-        }
-
-    @classmethod
-    def _from_dict(
-        cls, input_dict: dict, ast_position_info: ASTPositionInfo
-    ) -> "ASTNode":
-        return cls(
-            expr_from_dict(input_dict["left"]),
-            expr_from_dict(input_dict["right"]),
             input_dict["operator"],
             ast_position_info,
         )

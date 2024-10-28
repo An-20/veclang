@@ -7,7 +7,6 @@ import veclang.parser.ply.yacc as yacc
 from veclang.parser.lexer import LEXER_TOKEN_SPEC_STR, LEXER_FUNCTION_SPEC, lexer
 from veclang.parser.vl_ast import (
     BinaryAssignmentOperatorType,
-    ComparisonOperatorType,
     BinaryOperatorType,
     UnaryOperatorType,
     ASTPositionInfo,
@@ -28,7 +27,6 @@ from veclang.parser.vl_ast import (
     FunctionCallExprNode,
     BinaryOperationExprNode,
     UnaryOperatorExprNode,
-    ComparativeOperatorExprNode,
     ConstantValue,
     ConstantExprNode,
     AttributeTagValuesNode,
@@ -417,7 +415,7 @@ def p_comparison_prec_expr(p):
     if len(p) == 2:
         p[0] = p[1]
     else:
-        operator: ComparisonOperatorType
+        operator: BinaryOperatorType
         if p[2] == "==":
             operator = "EQUAL_TO"
         elif p[2] == "!=":
@@ -432,7 +430,7 @@ def p_comparison_prec_expr(p):
             operator = "GREATER_THAN_OR_EQUAL"
         else:
             raise ValueError(f"Unknown operator '{p[2]}'")
-        p[0] = ComparativeOperatorExprNode(p[1], p[3], operator, get_ast_pos_info(p))
+        p[0] = BinaryOperationExprNode(p[1], p[3], operator, get_ast_pos_info(p))
 
 
 def p_bitwise_or_prec_expr(p):

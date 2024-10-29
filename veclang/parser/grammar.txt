@@ -101,25 +101,25 @@ attribute_tags : attribute_tags attribute_tag
                | attribute_tag
                |
 
-attribute_tag : LEFT_ANGLE_BRACKET IDENTIFIER COLON attribute_tag_values RIGHT_ANGLE_BRACKET
-              | LEFT_ANGLE_BRACKET IDENTIFIER RIGHT_ANGLE_BRACKET
+attribute_tag : LEFT_ANGLE_BRACKET identifier COLON attribute_tag_values RIGHT_ANGLE_BRACKET
+              | LEFT_ANGLE_BRACKET identifier RIGHT_ANGLE_BRACKET
 
 attribute_tag_values : attribute_tag_values COMMA simple_literal
                      | simple_literal
 
-function_declaration_parameter : IDENTIFIER COLON type
+function_declaration_parameter : identifier COLON type
 function_declaration_parameters : function_declaration_parameter
                                 | function_declaration_parameters COMMA function_declaration_parameter
                                 |
 
-function_declaration_stmt : attribute_tags FN IDENTIFIER LEFT_PARENTHESIS function_declaration_parameters RIGHT_PARENTHESIS RIGHT_ARROW type block
+function_declaration_stmt : attribute_tags FN identifier LEFT_PARENTHESIS function_declaration_parameters RIGHT_PARENTHESIS RIGHT_ARROW type block
 
 
-variable_declaration_stmt : LET IDENTIFIER COLON type ASSIGN expr SEMICOLON
-constant_declaration_stmt : CONST IDENTIFIER COLON type ASSIGN expr SEMICOLON
+variable_declaration_stmt : LET identifier COLON type ASSIGN expr SEMICOLON
+constant_declaration_stmt : CONST identifier COLON type ASSIGN expr SEMICOLON
 
-assignment_stmt : IDENTIFIER ASSIGNMENT expr SEMICOLON
-binary_assignment_operation_stmt : IDENTIFIER binary_assignment_operator expr SEMICOLON
+assignment_stmt : identifier ASSIGNMENT expr SEMICOLON
+binary_assignment_operation_stmt : identifier binary_assignment_operator expr SEMICOLON
 
 expr_stmt : expr SEMICOLON
 
@@ -128,7 +128,7 @@ if_stmt : IF LEFT_PARENTHESIS expr RIGHT_PARENTHESIS block
 elif_stmt : ELIF LEFT_PARENTHESIS expr RIGHT_PARENTHESIS block
 else_stmt : ELSE block
 
-for_initialisation_stmt : IDENTIFIER COLON type IN range
+for_initialisation_stmt : identifier COLON type IN range
 for_stmt : FOR LEFT_PARENTHESIS for_initialisation_stmt RIGHT_PARENTHESIS block
 while_stmt : WHILE LEFT_PARENTHESIS expr RIGHT_PARENTHESIS block
 

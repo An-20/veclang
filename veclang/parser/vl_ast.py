@@ -250,7 +250,7 @@ class FunctionDeclarationParametersNode(ASTNode):
         self.parameters = []
         if parameters:
             self.parameters.extend(parameters.parameters)
-        if parameters:
+        if parameter:
             self.parameters.append(parameter)
 
     @staticmethod

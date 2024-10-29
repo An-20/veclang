@@ -154,20 +154,39 @@ class InterpreterState(typing.TypedDict):
     fns: list[FunctionDeclarationStmtNode]
 
     in_function: bool
+
     if_elif_stack_sc: bool | None
+
+    in_loop: bool
+    loop_break: bool
 
     stdout_buffer: list[str]
 
 
+def create_new_state():
+    return {
+        "global_vars": {},
+        "local_vars": {},
+        "global_consts": {},
+        "local_consts": {},
+        "fns": [],
+        "in_function": False,
+        "in_loop": False,
+        "loop_break": False,
+        "if_elif_stack_sc": None,
+        "stdout_buffer": [],
+    }
+
+
 def resolve_var(identifier_name: str, state: InterpreterState) -> VlTypeABC:
-    if identifier_name in state["global_vars"]:
-        return state["global_vars"][identifier_name]
-    elif identifier_name in state["local_vars"]:
+    if identifier_name in state["local_vars"]:
+        return state["local_vars"][identifier_name]
+    elif identifier_name in state["local_consts"]:
+        return state["local_consts"][identifier_name]
+    elif identifier_name in state["global_vars"]:
         return state["global_vars"][identifier_name]
     elif identifier_name in state["global_consts"]:
         return state["global_consts"][identifier_name]
-    elif identifier_name in state["global_vars"]:
-        return state["global_vars"][identifier_name]
     else:
         raise ValueError(f"Identifier {identifier_name} could not be resolved")
 
@@ -192,8 +211,27 @@ def eval_vl(node: ASTNode, state: InterpreterState) -> VlTypeABC | None:
 
     elif isinstance(node, StmtsNode):
         for stmt in node.stmts:
+            if isinstance(stmt, BreakStmtNode):
+                if state["in_loop"]:
+                    state["loop_break"] = True
+                    return
+                else:
+                    raise ValueError(f"Break used outside of loop")
+
+            elif isinstance(stmt, ContinueStmtNode):
+                if state["in_loop"]:
+                    return
+                else:
+                    raise ValueError(f"Continue used outside of loop")
+
+            elif isinstance(stmt, ReturnStmtNode):
+                if state["in_function"]:
+                    return eval_vl(stmt.value, state)
+                else:
+                    raise ValueError(f"Return used outside of function")
+
             eval_vl(stmt, state)
-            return
+        return
 
     elif isinstance(node, IdentifierNode):
         return resolve_var(node.name, state)
@@ -242,21 +280,23 @@ def eval_vl(node: ASTNode, state: InterpreterState) -> VlTypeABC | None:
         fn = resolve_fn(node.callee.name, state)
         expected_parameters = len(fn.parameters.parameters)
         actual_parameters = len(node.arguments.arguments)
-        if expected_parameters == actual_parameters:
+        if expected_parameters != actual_parameters:
             raise ValueError(f"Expected {expected_parameters}, got {actual_parameters}")
 
         new_locals = {}
         for parameter, argument in zip(
             fn.parameters.parameters, node.arguments.arguments
         ):
+            parameter: FunctionDeclarationParameterNode
+
             argument_val = eval_vl(argument, state)
-            expected_type = parameter._type.name
+            expected_type = parameter.type.name
             actual_type = argument_val.get_type_name()
             if expected_type != actual_type:
                 raise ValueError(
                     f"Expected parameter '{parameter.name}' to be of type {expected_type}, not {actual_type}"
                 )
-            new_locals[parameter.name] = argument_val
+            new_locals[parameter.name.name] = argument_val
 
         state["in_function"] = True
         state["local_vars"].update(new_locals)
@@ -266,6 +306,12 @@ def eval_vl(node: ASTNode, state: InterpreterState) -> VlTypeABC | None:
             del state["local_vars"][local_var]
 
         state["in_function"] = False
+
+        if return_val.get_type_name() != fn.return_type.name:
+            raise ValueError(
+                f"Expected return type of function to be '{fn.return_type.get_node_type_str()}', got '{return_val.get_type_name()}'"
+            )
+
         return return_val
 
     elif isinstance(node, BinaryOperationExprNode):
@@ -414,19 +460,83 @@ def eval_vl(node: ASTNode, state: InterpreterState) -> VlTypeABC | None:
             eval_vl(node.stmts, state)
         state["if_elif_stack_sc"] = None
 
+    elif isinstance(node, ForInitialisationStmtNode):
+        return None
+
+    elif isinstance(node, ForStmtNode):
+        identifier = node.init_stmt.target.name
+        try:
+            resolve_var(identifier, state)
+            raise ValueError(
+                f"Identifier {identifier} is already in use, cannot be used for for loop"
+            )
+        except Exception:
+            pass
+
+        rg = node.init_stmt.value
+        if not isinstance(rg, RangeLiteralExprNode):
+            raise ValueError(f"For loop expected RangeLiteralExpr, got {type(rg)}")
+
+        start = eval_vl(rg.start, state)
+        end = eval_vl(rg.end, state)
+        step = eval_vl(rg.step, state)
+
+        if not isinstance(start, VlInt):
+            raise ValueError(
+                f"Start for range literal must be int, got {start.get_type_name()}"
+            )
+        if not isinstance(end, VlInt):
+            raise ValueError(
+                f"End for range literal must be int, got {end.get_type_name()}"
+            )
+        if not isinstance(step, VlInt):
+            raise ValueError(
+                f"Step for range literal must be int, got {step.get_type_name()}"
+            )
+
+        for val in range(start.value, end.value, step.value):
+            if state["in_function"]:
+                state["local_vars"][identifier] = VlInt(val)
+            else:
+                state["global_vars"][identifier] = VlInt(val)
+
+            state["in_loop"] = True
+            eval_vl(node.stmts, state)
+            if state["loop_break"]:
+                state["loop_break"] = False
+                break
+
+            state["in_loop"] = False
+
+    elif isinstance(node, WhileStmtNode):
+        while True:
+            condition = eval_vl(node.condition, state)
+            if not isinstance(condition, VlBool):
+                raise ValueError(
+                    f"Expected condition to be bool, not '{condition.get_type_name()}'"
+                )
+            if not condition.value:
+                break
+
+            state["in_loop"] = True
+            eval_vl(node.stmts, state)
+            if state["loop_break"]:
+                state["loop_break"] = False
+                break
+
+        state["in_loop"] = False
+
+    elif isinstance(node, (ReturnStmtNode, BreakStmtNode, ContinueStmtNode)):
+        pass
+        # these are all handled along with statements
+
+    else:
+        raise ValueError(f"Unknown node type {type(node)}")
+
 
 def eval_full(ast_node: ProgramNode, state: InterpreterState | None = None):
     if state is None:
-        state = {
-            "global_vars": {},
-            "local_vars": {},
-            "global_consts": {},
-            "local_consts": {},
-            "fns": [],
-            "in_function": False,
-            "if_elif_stack_sc": None,
-            "stdout_buffer": [],
-        }
+        state = create_new_state()
     return eval_vl(ast_node, state), state
 
 
@@ -439,25 +549,47 @@ def eval_all(input_str: str):
     print("\n".join(state["stdout_buffer"]))
 
 
-eval_all("let a: int = 1 + 1;")
+def eval_exp(s: str, state: InterpreterState) -> str:
+    out_s: str = ""
+    try:
+        ast_node = parse(s)
+        out, state = eval_full(ast_node, state)
+        if out:
+            out_s = out
+        out_s += "\n".join(state["stdout_buffer"])
+        state["stdout_buffer"].clear()
 
-print("\n" * 10, "VECLANG 2.0 REPL")
-state = {
-    "global_vars": {},
-    "local_vars": {},
-    "global_consts": {},
-    "local_consts": {},
-    "fns": [],
-    "in_function": False,
-    "if_elif_stack_sc": None,
-    "stdout_buffer": [],
-}
-while True:
-    s = input(">>> ")
-    ast_node = parse(s)
-    # print(pretty_print_ast(ast_node))
-    out, state = eval_full(ast_node, state)
-    if out:
-        print(f"{out}")
-    print("\n".join(state["stdout_buffer"]))
-    state["stdout_buffer"].clear()
+    except Exception as e:
+        out_s += f"Error during execution: {e}"
+
+        # reset state
+        state["in_function"] = False
+        state["in_loop"] = False
+        state["loop_break"] = False
+
+    return out_s
+
+
+if __name__ == "__main__":
+    eval_all("fn a(b: int, c: int) -> int { return b + c; } a(1, 2);")
+
+    print("\n" * 10, "VECLANG 2.0 REPL")
+    state: InterpreterState = create_new_state()
+    # while True:
+    #     try:
+    #         s = input(">>> ")
+    #         ast_node = parse(s)
+    #         # print(pretty_print_ast(ast_node))
+    #         out, state = eval_full(ast_node, state)
+    #         if out:
+    #             print(f"{out}")
+    #         print("\n".join(state["stdout_buffer"]))
+    #         state["stdout_buffer"].clear()
+    #
+    #     except Exception as e:
+    #         print(f"Error during execution: {e}")
+    #
+    #         # reset state
+    #         state["in_function"] = False
+    #         state["in_loop"] = False
+    #         state["loop_break"] = False

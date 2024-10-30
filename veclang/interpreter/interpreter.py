@@ -54,6 +54,9 @@ from veclang.parser.vl_ast_io import pretty_print_ast
 
 import abc
 
+import numpy as np
+from PIL import Image
+
 
 VlTypeStr = typing.Literal[
     "bool",
@@ -83,7 +86,9 @@ class VlTypeABC(abc.ABC):
         pass
 
     @abc.abstractmethod
-    def get_type_into(self) -> dict[str, typing.Callable[["VlTypeABC"], "VlTypeABC"]]:
+    def get_type_into(
+        self,
+    ) -> dict[VlTypeStr, typing.Callable[["VlTypeABC"], "VlTypeABC"]]:
         pass
 
     def __str__(self):
@@ -107,7 +112,61 @@ class VlInt(VlTypeABC):
         return "int"
 
     def get_type_into(self) -> dict[str, typing.Callable[["VlTypeABC"], "VlTypeABC"]]:
+        return {
+            "real": lambda x: VlReal(float(x.value)),
+            "complex": lambda x: VlComplex(complex(float(x.value))),
+        }
+
+
+class VlReal(VlTypeABC):
+
+    @staticmethod
+    def get_type_name() -> VlTypeStr:
+        return "real"
+
+    def get_type_into(self) -> dict[str, typing.Callable[["VlTypeABC"], "VlTypeABC"]]:
+        return {
+            "complex": lambda x: VlComplex(complex(float(x.value))),
+        }
+
+
+class VlComplex(VlTypeABC):
+
+    @staticmethod
+    def get_type_name() -> VlTypeStr:
+        return "complex"
+
+    def get_type_into(self) -> dict[str, typing.Callable[["VlTypeABC"], "VlTypeABC"]]:
         return {}
+
+
+class VlVecABC(VlTypeABC, abc.ABC):
+    def get_type_into(self) -> dict[str, typing.Callable[["VlTypeABC"], "VlTypeABC"]]:
+        return {}
+
+    def __str__(self):
+        return f"[{', '.join([str(v) for v in self.value])}]: {self.get_type_name()}"
+
+
+class VlVec2(VlVecABC):
+
+    @staticmethod
+    def get_type_name() -> VlTypeStr:
+        return "vec2"
+
+
+class VlVec3(VlVecABC):
+
+    @staticmethod
+    def get_type_name() -> VlTypeStr:
+        return "vec3"
+
+
+class VlVec4(VlVecABC):
+
+    @staticmethod
+    def get_type_name() -> VlTypeStr:
+        return "vec4"
 
 
 # dictionary (left_type, operator, right_type): (return_type, fn[left_type, right_type] -> return_type)
@@ -115,19 +174,89 @@ BINARY_OPERATIONS: dict[
     tuple[VlTypeStr, BinaryOperatorType, VlTypeStr],
     tuple[VlTypeStr, typing.Callable[[VlTypeABC, VlTypeABC], VlTypeABC]],
 ] = {
+    # integers
+    # ====================
     ("int", "PLUS", "int"): ("int", lambda x, y: VlInt(x.value + y.value)),
     ("int", "MINUS", "int"): ("int", lambda x, y: VlInt(x.value - y.value)),
     ("int", "TIMES", "int"): ("int", lambda x, y: VlInt(x.value * y.value)),
-    ("int", "DIVIDE", "int"): ("int", lambda x, y: VlInt(x.value / y.value)),
+    ("int", "DIVIDE", "int"): ("real", lambda x, y: VlReal(x.value / y.value)),
     ("int", "MODULUS", "int"): ("int", lambda x, y: VlInt(x.value % y.value)),
     ("int", "INTEGER_DIVIDE", "int"): ("int", lambda x, y: VlInt(x.value // y.value)),
     ("int", "EXPONENTIATION", "int"): ("real", lambda x, y: VlInt(x.value**y.value)),
-    ("bool", "EQUAL_TO", "bool"): ("bool", lambda x, y: VlBool(x == y)),
-    ("bool", "NOT_EQUAL_TO", "bool"): ("bool", lambda x, y: VlBool(x != y)),
-    ("bool", "LESS_THAN", "bool"): ("bool", lambda x, y: VlBool(x < y)),
-    ("bool", "LESS_THAN_OR_EQUAL", "bool"): ("bool", lambda x, y: VlBool(x <= y)),
-    ("bool", "GREATER_THAN", "bool"): ("bool", lambda x, y: VlBool(x > y)),
-    ("bool", "GREATER_THAN_OR_EQUAL", "bool"): ("bool", lambda x, y: VlBool(x >= y)),
+    ("int", "EQUAL_TO", "int"): ("bool", lambda x, y: VlBool(x.value == y.value)),
+    ("int", "NOT_EQUAL_TO", "int"): ("bool", lambda x, y: VlBool(x.value != y.value)),
+    ("int", "LESS_THAN", "int"): ("bool", lambda x, y: VlBool(x.value < y.value)),
+    ("int", "LESS_THAN_OR_EQUAL", "int"): (
+        "bool",
+        lambda x, y: VlBool(x.value <= y.value),
+    ),
+    ("int", "GREATER_THAN", "int"): ("bool", lambda x, y: VlBool(x.value > y.value)),
+    ("int", "GREATER_THAN_OR_EQUAL", "int"): (
+        "bool",
+        lambda x, y: VlBool(x.value >= y.value),
+    ),
+    # reals
+    # ====================
+    ("real", "PLUS", "real"): ("real", lambda x, y: VlReal(x.value + y.value)),
+    ("real", "MINUS", "real"): ("real", lambda x, y: VlReal(x.value - y.value)),
+    ("real", "TIMES", "real"): ("real", lambda x, y: VlReal(x.value * y.value)),
+    ("real", "DIVIDE", "real"): ("real", lambda x, y: VlReal(x.value / y.value)),
+    ("real", "MODULUS", "real"): ("real", lambda x, y: VlReal(x.value % y.value)),
+    ("real", "INTEGER_DIVIDE", "real"): (
+        "real",
+        lambda x, y: VlReal(x.value // y.value),
+    ),
+    ("real", "EXPONENTIATION", "real"): ("real", lambda x, y: VlReal(x.value**y.value)),
+    ("real", "EQUAL_TO", "real"): ("real", lambda x, y: VlBool(x.value == y.value)),
+    ("real", "NOT_EQUAL_TO", "real"): ("real", lambda x, y: VlBool(x.value != y.value)),
+    ("real", "LESS_THAN", "real"): ("bool", lambda x, y: VlBool(x.value < y.value)),
+    ("real", "LESS_THAN_OR_EQUAL", "real"): (
+        "bool",
+        lambda x, y: VlBool(x.value <= y.value),
+    ),
+    ("real", "GREATER_THAN", "real"): ("bool", lambda x, y: VlBool(x.value > y.value)),
+    ("real", "GREATER_THAN_OR_EQUAL", "real"): (
+        "bool",
+        lambda x, y: VlBool(x.value >= y.value),
+    ),
+    # complexes
+    # ====================
+    ("complex", "PLUS", "complex"): (
+        "complex",
+        lambda x, y: VlComplex(x.value + y.value),
+    ),
+    ("complex", "MINUS", "complex"): (
+        "complex",
+        lambda x, y: VlComplex(x.value - y.value),
+    ),
+    ("complex", "TIMES", "complex"): (
+        "complex",
+        lambda x, y: VlComplex(x.value * y.value),
+    ),
+    ("complex", "DIVIDE", "complex"): (
+        "complex",
+        lambda x, y: VlComplex(x.value / y.value),
+    ),
+    ("complex", "EXPONENTIATION", "complex"): (
+        "complex",
+        lambda x, y: VlComplex(x.value**y.value),
+    ),
+    ("complex", "EQUAL_TO", "complex"): ("complex", lambda x, y: VlBool(x == y)),
+    ("complex", "NOT_EQUAL_TO", "complex"): ("complex", lambda x, y: VlBool(x != y)),
+    # vectors
+    # ====================
+    ("vec2", "PLUS", "vec2"): (
+        "vec2",
+        lambda x, y: VlVec2([a + b for a, b in zip(x.value, y.value)]),
+    ),
+    ("vec2", "MINUS", "vec2"): (
+        "vec2",
+        lambda x, y: VlVec2([a - b for a, b in zip(x.value, y.value)]),
+    ),
+    ("float", "TIMES", "vec2"): (
+        "vec2",
+        lambda x, y: VlVec2([a - b for a, b in zip(x.value, y.value)]),
+    ),
 }
 
 
@@ -154,6 +283,7 @@ class InterpreterState(typing.TypedDict):
     fns: list[FunctionDeclarationStmtNode]
 
     in_function: bool
+    function_ret_val: VlTypeABC | None
 
     if_elif_stack_sc: bool | None
 
@@ -163,7 +293,7 @@ class InterpreterState(typing.TypedDict):
     stdout_buffer: list[str]
 
 
-def create_new_state():
+def create_new_state() -> InterpreterState:
     return {
         "global_vars": {},
         "local_vars": {},
@@ -171,6 +301,7 @@ def create_new_state():
         "local_consts": {},
         "fns": [],
         "in_function": False,
+        "function_ret_val": None,
         "in_loop": False,
         "loop_break": False,
         "if_elif_stack_sc": None,
@@ -226,11 +357,17 @@ def eval_vl(node: ASTNode, state: InterpreterState) -> VlTypeABC | None:
 
             elif isinstance(stmt, ReturnStmtNode):
                 if state["in_function"]:
-                    return eval_vl(stmt.value, state)
+                    val = eval_vl(stmt.value, state)
+                    state["function_ret_val"] = val
                 else:
                     raise ValueError(f"Return used outside of function")
 
             eval_vl(stmt, state)
+            if state["function_ret_val"]:
+                return
+            if state["loop_break"]:
+                return
+
         return
 
     elif isinstance(node, IdentifierNode):
@@ -249,12 +386,29 @@ def eval_vl(node: ASTNode, state: InterpreterState) -> VlTypeABC | None:
         return
 
     elif isinstance(node, ArrayLiteralElementsNode):
-        return
+        exprs = node.exprs
+        if len(exprs) == 2:
+            c = VlVec2
+        elif len(exprs) == 3:
+            c = VlVec3
+        elif len(exprs) == 4:
+            c = VlVec4
+        else:
+            raise ValueError("Expected array literal to have length 2, 3, or 4")
+        exprs = [eval_vl(n, state) for n in exprs]
+        return c(exprs)
 
     elif isinstance(node, ArrayLiteralExprNode):
-        return
+        return eval_vl(node.elements, state)
 
     elif isinstance(node, MemberAccessExprNode):
+        node_val = eval_vl(node.target, state)
+        if isinstance(node_val, VlComplex):
+            if node.name.name == "im":
+                return VlReal(node_val.value.imag)
+            elif node.name.name == "re":
+                return VlReal(node_val.value.real)
+
         raise ValueError("Feature not implemented")
 
     elif isinstance(node, IndexElementsNode):
@@ -301,11 +455,13 @@ def eval_vl(node: ASTNode, state: InterpreterState) -> VlTypeABC | None:
         state["in_function"] = True
         state["local_vars"].update(new_locals)
 
-        return_val = eval_vl(fn.stmts, state)
+        eval_vl(fn.stmts, state)
+        return_val = state["function_ret_val"]
         for local_var in new_locals:
             del state["local_vars"][local_var]
 
         state["in_function"] = False
+        state["function_ret_val"] = None
 
         if return_val.get_type_name() != fn.return_type.name:
             raise ValueError(
@@ -322,14 +478,31 @@ def eval_vl(node: ASTNode, state: InterpreterState) -> VlTypeABC | None:
         left_t = left.get_type_name()
         right_t = right.get_type_name()
 
+        exec_fn = None
         # resolve internal function
-        key = (left_t, operator, right_t)
-        if key not in BINARY_OPERATIONS:
+        if (left_t, operator, right_t) in BINARY_OPERATIONS:
+            _, exec_fn = BINARY_OPERATIONS[(left_t, operator, right_t)]
+        else:
+            # try casting right hand side
+            for right_into_t in right.get_type_into():
+                if (left_t, operator, right_into_t) in BINARY_OPERATIONS:
+                    right = right.get_type_into()[right_into_t](right)
+                    _, exec_fn = BINARY_OPERATIONS[(left_t, operator, right_into_t)]
+                    break
+
+            if not exec_fn:
+                # try casting left hand side
+                for left_into_t in left.get_type_into():
+                    if (left_into_t, operator, right_t) in BINARY_OPERATIONS:
+                        left = left.get_type_into()[left_into_t](left)
+                        _, exec_fn = BINARY_OPERATIONS[(left_into_t, operator, right_t)]
+                        break
+
+        if not exec_fn:
             raise ValueError(
-                f"Operator '{operator}' not supported between instances of '{left_t}' and '{right_t}'"
+                f"Operator '{operator}' not supported between instances of '{left_t}' and '{right_t}' (exhausted possible casts)"
             )
 
-        _, exec_fn = BINARY_OPERATIONS[key]
         return exec_fn(left, right)
 
     elif isinstance(node, UnaryOperatorExprNode):
@@ -353,6 +526,10 @@ def eval_vl(node: ASTNode, state: InterpreterState) -> VlTypeABC | None:
             return VlBool(node.value.value)
         elif isinstance(node.value.value, int):
             return VlInt(node.value.value)
+        elif isinstance(node.value.value, float):
+            return VlReal(node.value.value)
+        elif isinstance(node.value.value, complex):
+            return VlComplex(node.value.value)
         else:
             raise ValueError(f"Constant type '{node.value.type}' not implemented yet")
 
@@ -372,8 +549,11 @@ def eval_vl(node: ASTNode, state: InterpreterState) -> VlTypeABC | None:
         expr_t = expr.get_type_name()
         expected_t = node._type.name
 
-        if expr_t != expected_t:
-            raise ValueError(f"Expected type '{expected_t}', got type '{expr_t}'")
+        if expected_t != expr_t:
+            if expected_t in expr.get_type_into():
+                expr = expr.get_type_into()[expected_t](expr)
+            else:
+                raise ValueError(f"Expected type '{expected_t}', got type '{expr_t}'")
 
         if state["in_function"]:
             state["local_vars"][node.target.name] = expr
@@ -385,8 +565,11 @@ def eval_vl(node: ASTNode, state: InterpreterState) -> VlTypeABC | None:
         expr_t = expr.get_type_name()
         expected_t = node._type.name
 
-        if expr_t != expected_t:
-            raise ValueError(f"Expected type '{expected_t}', got type '{expr_t}'")
+        if expected_t != expr_t:
+            if expected_t in expr.get_type_into():
+                expr = expr.get_type_into()[expected_t](expr)
+            else:
+                raise ValueError(f"Expected type '{expected_t}', got type '{expr_t}'")
 
         if state["in_function"]:
             state["local_consts"][node.target.name] = expr
@@ -409,13 +592,25 @@ def eval_vl(node: ASTNode, state: InterpreterState) -> VlTypeABC | None:
         if state["in_function"] and identifier in state["local_vars"]:
             expected_t = state["local_vars"][identifier].get_type_name()
             if expected_t != expr_t:
-                raise ValueError(f"Expected type '{expected_t}', got type '{expr_t}'")
+                # attempt cast
+                if expected_t in expr.get_type_into():
+                    expr = expr.get_type_into()[expected_t](expr)
+                else:
+                    raise ValueError(
+                        f"Expected type '{expected_t}', got type '{expr_t}'"
+                    )
             state["local_vars"][identifier] = expr
 
         else:
             expected_t = state["global_vars"][identifier].get_type_name()
             if expected_t != expr_t:
-                raise ValueError(f"Expected type '{expected_t}', got type '{expr_t}'")
+                # attempt cast
+                if expected_t in expr.get_type_into():
+                    expr = expr.get_type_into()[expected_t](expr)
+                else:
+                    raise ValueError(
+                        f"Expected type '{expected_t}', got type '{expr_t}'"
+                    )
             state["global_vars"][identifier] = expr
 
         return
@@ -502,11 +697,12 @@ def eval_vl(node: ASTNode, state: InterpreterState) -> VlTypeABC | None:
 
             state["in_loop"] = True
             eval_vl(node.stmts, state)
-            if state["loop_break"]:
+            if state["loop_break"] or state["function_ret_val"]:
                 state["loop_break"] = False
                 break
 
-            state["in_loop"] = False
+        state["in_loop"] = False
+        state["loop_break"] = False
 
     elif isinstance(node, WhileStmtNode):
         while True:
@@ -520,11 +716,12 @@ def eval_vl(node: ASTNode, state: InterpreterState) -> VlTypeABC | None:
 
             state["in_loop"] = True
             eval_vl(node.stmts, state)
-            if state["loop_break"]:
+            if state["loop_break"] or state["function_ret_val"]:
                 state["loop_break"] = False
                 break
 
         state["in_loop"] = False
+        state["loop_break"] = False
 
     elif isinstance(node, (ReturnStmtNode, BreakStmtNode, ContinueStmtNode)):
         pass
@@ -541,9 +738,9 @@ def eval_full(ast_node: ProgramNode, state: InterpreterState | None = None):
 
 
 def eval_all(input_str: str):
-    print(input_str)
+    # print(input_str)
     ast_node = parse(input_str)
-    print(pretty_print_ast(ast_node))
+    # print(pretty_print_ast(ast_node))
     out, state = eval_full(ast_node)
     print(f"Output: {out}")
     print("\n".join(state["stdout_buffer"]))
@@ -555,7 +752,7 @@ def eval_exp(s: str, state: InterpreterState) -> str:
         ast_node = parse(s)
         out, state = eval_full(ast_node, state)
         if out:
-            out_s = out
+            out_s = str(out)
         out_s += "\n".join(state["stdout_buffer"])
         state["stdout_buffer"].clear()
 
@@ -570,26 +767,133 @@ def eval_exp(s: str, state: InterpreterState) -> str:
     return out_s
 
 
-if __name__ == "__main__":
-    eval_all("fn a(b: int, c: int) -> int { return b + c; } a(1, 2);")
+def eval_img(res_x: int, res_y: int, state: InterpreterState, output_fp: str) -> bool:
+    arr = np.zeros(shape=(res_x, res_y, 3))
 
+    for fn in state["fns"]:
+        if (
+            fn.attribute_tags.tags
+            and fn.attribute_tags.tags[0]
+            and fn.attribute_tags.tags[0].key.name == "generate_img"
+        ):
+            for y in range(res_y):
+                print(y)
+                for x in range(res_x):
+                    try:
+                        bp_info = ASTPositionInfo(0, 0)
+                        function_call_arguments = FunctionCallArgumentsNode(
+                            None, None, bp_info
+                        )
+                        function_call_arguments.arguments = [
+                            ConstantExprNode(ConstantValue(x, "int"), bp_info),
+                            ConstantExprNode(ConstantValue(y, "int"), bp_info),
+                            ConstantExprNode(ConstantValue(res_x, "int"), bp_info),
+                            ConstantExprNode(ConstantValue(res_y, "int"), bp_info),
+                        ]
+                        out = eval_vl(
+                            FunctionCallExprNode(
+                                IdentifierNode(fn.identifier.name, bp_info),
+                                function_call_arguments,
+                                bp_info,
+                            ),
+                            state,
+                        )
+                        if not isinstance(out, VlVec3):
+                            raise ValueError(
+                                "Image generating function should return type Vec3"
+                            )
+                        r = max(min(out.value[0].value, 255), 0)
+                        g = max(min(out.value[1].value, 255), 0)
+                        b = max(min(out.value[2].value, 255), 0)
+                        arr[y][x] = [r, g, b]
+
+                    except Exception as e:
+                        print(f"Error during execution: {e}")
+
+            image = Image.fromarray(arr.astype("uint8"), "RGB")
+            image.save(output_fp)
+            return True
+
+    return False
+
+
+if __name__ == "__main__":
     print("\n" * 10, "VECLANG 2.0 REPL")
     state: InterpreterState = create_new_state()
-    # while True:
-    #     try:
-    #         s = input(">>> ")
-    #         ast_node = parse(s)
-    #         # print(pretty_print_ast(ast_node))
-    #         out, state = eval_full(ast_node, state)
-    #         if out:
-    #             print(f"{out}")
-    #         print("\n".join(state["stdout_buffer"]))
-    #         state["stdout_buffer"].clear()
-    #
-    #     except Exception as e:
-    #         print(f"Error during execution: {e}")
-    #
-    #         # reset state
-    #         state["in_function"] = False
-    #         state["in_loop"] = False
-    #         state["loop_break"] = False
+
+    eval_full(
+        parse(
+            """
+<generate_img>
+fn mandlebrot(
+    x: int,
+    y: int,
+    res_x: int,
+    res_y: int
+) -> vec3 {
+    const ITERATIONS: int = 50;
+    const THRESHOLD: real = 10.0;
+    let c: complex = x / res_x + (y / res_y) * 1i;
+    let z: complex = 0;
+    for (_: int in (0:ITERATIONS)) {
+        if (z.re * z.re + z.im * z.im > THRESHOLD) {
+            return [0, 0, 0];
+        }
+        z = z * z + c;
+    }
+    return [255, 255, 255];
+}
+    """
+        ),
+        state,
+    )
+
+    while True:
+        try:
+            s = input(">>> ")
+
+            if s == "exit":
+                break
+
+            ast_node = parse(s)
+            # print(pretty_print_ast(ast_node))
+            out, state = eval_full(ast_node, state)
+            if out:
+                print(f"{out}")
+            print("\n".join(state["stdout_buffer"]))
+            state["stdout_buffer"].clear()
+
+        except Exception as e:
+            print(f"Error during execution: {e}")
+
+            # reset state
+            state["in_function"] = False
+            state["in_loop"] = False
+            state["loop_break"] = False
+
+    eval_img(255, 255, state, "out.png")
+
+"""
+<generate_img>
+fn main(x: int, y: int, res_x: int, res_y: int) -> vec3 { return [255, 255, 255]; }
+
+<generate_img>
+fn mandlebrot(
+    x: int,
+    y: int,
+    res_x: int,
+    res_y: int
+) -> vec3 {
+    const ITERATIONS: int = 50;
+    const THRESHOLD: real = 100;
+    let c: complex = x / res_x + (y / res_y) * 1i;
+    let z: complex = 0;
+    for (_: int in (0:ITERATIONS)) {
+        if (z.re * z.re + z.im * z.im > THRESHOLD) {
+            return [0, 0, 0];
+        }
+        z = z * z + c;
+    }
+    return [255, 255, 255];
+}
+"""

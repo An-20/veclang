@@ -87,6 +87,7 @@ RESERVED_KEYWORDS = [
     "break",
     "continue",
     "return",
+    "i",
     "true",
     "false",
     "null",

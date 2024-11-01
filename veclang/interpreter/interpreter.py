@@ -757,7 +757,16 @@ def eval_all(input_str: str):
 def eval_exp(s: str, state: InterpreterState) -> str:
     out_s: str = ""
     try:
-        ast_node = parse(s)
+        with io.StringIO() as buf, redirect_stdout(buf):
+            ast_node = parse(s)
+            output = buf.getvalue()
+
+        if ast_node is None:
+            ast_node = parse(s + ";")
+
+        if ast_node is None:
+            raise ValueError(f"Syntax error: {output}")
+
         out, state = eval_full(ast_node, state)
         if out:
             out_s = str(out)

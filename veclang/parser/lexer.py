@@ -2,6 +2,8 @@ import veclang.parser.ply.lex as lex
 from veclang.parser.vl_ast import ConstantValue
 
 
+DEBUG: bool = False
+
 LEXER_TOKEN_SPEC_STR = """
 ASSIGNMENT: "="
 PLUS: "\\+"
@@ -200,7 +202,7 @@ LEXER_FUNCTION_SPEC = {
 }
 
 
-lexer = lex.lex(LEXER_TOKEN_SPEC_STR, LEXER_FUNCTION_SPEC, debug=True)
+lexer = lex.lex(LEXER_TOKEN_SPEC_STR, LEXER_FUNCTION_SPEC, debug=DEBUG)
 
 
 if __name__ == "__main__":

@@ -1,5 +1,9 @@
 import typing
 
+import io
+from contextlib import redirect_stdout
+
+
 from veclang.parser.vl_ast import (
     BinaryAssignmentOperatorType,
     BinaryOperatorType,
@@ -341,6 +345,10 @@ def eval_vl(node: ASTNode, state: InterpreterState) -> VlTypeABC | None:
         return eval_vl(node.stmts, state)
 
     elif isinstance(node, StmtsNode):
+        if len(node.stmts) == 1 and isinstance(node.stmts[0], ExprStmtNode):
+            # convenience for when exprs are entered in the REPL
+            return eval_vl(node.stmts[0].expr, state)
+
         for stmt in node.stmts:
             if isinstance(stmt, BreakStmtNode):
                 if state["in_loop"]:
@@ -818,7 +826,7 @@ def eval_img(res_x: int, res_y: int, state: InterpreterState, output_fp: str) ->
 
 
 if __name__ == "__main__":
-    print("\n" * 10, "VECLANG 2.0 REPL")
+    print("\n" * 10, "VECLANG 2.0 REPL ('exit' to exit)")
     state: InterpreterState = create_new_state()
 
     eval_full(
@@ -855,8 +863,17 @@ fn mandlebrot(
             if s == "exit":
                 break
 
-            ast_node = parse(s)
-            # print(pretty_print_ast(ast_node))
+            with io.StringIO() as buf, redirect_stdout(buf):
+                ast_node = parse(s)
+                output = buf.getvalue()
+
+            if ast_node is None:
+                ast_node = parse(s + ";")
+
+            if ast_node is None:
+                print(output)
+                continue
+
             out, state = eval_full(ast_node, state)
             if out:
                 print(f"{out}")

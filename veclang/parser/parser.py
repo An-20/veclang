@@ -51,6 +51,8 @@ from veclang.parser.vl_ast import (
 from veclang.parser.vl_ast_io import pretty_print_ast
 
 
+DEBUG: bool = False
+
 PARSER_SPEC_STR = """
 start : program
 
@@ -542,7 +544,7 @@ def p_str_literal(p):
 
 
 def p_imaginary_literal(p):
-    value = ConstantValue(complex(0, 1), "complex")
+    value = ConstantValue(complex(0, p[1].value.value), "complex")
     p[0] = ConstantExprNode(value, get_ast_pos_info(p))
 
 
@@ -692,7 +694,7 @@ parser = yacc.yacc(
     PARSER_FUNCTION_SPEC,
     lex.get_tokens(LEXER_TOKEN_SPEC_STR, LEXER_FUNCTION_SPEC),
     (),
-    debug=True,
+    debug=DEBUG,
 )
 parser.lexer = lexer
 

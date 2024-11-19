@@ -3,6 +3,8 @@ import typing
 import io
 from contextlib import redirect_stdout
 
+import math
+
 
 from veclang.parser.vl_ast import (
     BinaryAssignmentOperatorType,
@@ -95,8 +97,43 @@ class VlTypeABC(abc.ABC):
     ) -> dict[VlTypeStr, typing.Callable[["VlTypeABC"], "VlTypeABC"]]:
         pass
 
+    @abc.abstractmethod
+    def get_attributes(self) -> dict[str, typing.Callable[["VlTypeABC"], "VlTypeABC"]]:
+        pass
+
+    @abc.abstractmethod
+    def get_methods(self) -> dict[str, "VlFunction"]:
+        pass
+
     def __str__(self):
         return f"{self.value}: {self.get_type_name()}"
+
+
+class VlFunction(VlTypeABC):
+
+    def __init__(
+        self,
+        param_types: list[VlTypeStr],
+        ret_type: VlTypeStr,
+        fn: typing.Callable[[list["VlTypeABC"]], "VlTypeABC"],
+    ):
+        super().__init__(None)
+        self.arg_types = param_types
+        self.ret_type = ret_type
+        self.fn = fn
+
+    @staticmethod
+    def get_type_name() -> VlTypeStr:
+        return "VlFunction"
+
+    def get_type_into(self) -> dict[str, typing.Callable[["VlTypeABC"], "VlTypeABC"]]:
+        return {}
+
+    def get_attributes(self) -> dict[str, typing.Callable[["VlTypeABC"], "VlTypeABC"]]:
+        return {}
+
+    def get_methods(self) -> dict[str, "VlFunction"]:
+        return {}
 
 
 class VlBool(VlTypeABC):
@@ -106,6 +143,12 @@ class VlBool(VlTypeABC):
         return "bool"
 
     def get_type_into(self) -> dict[str, typing.Callable[["VlTypeABC"], "VlTypeABC"]]:
+        return {}
+
+    def get_attributes(self) -> dict[str, typing.Callable[["VlTypeABC"], "VlTypeABC"]]:
+        return {}
+
+    def get_methods(self) -> dict[str, VlFunction]:
         return {}
 
 
@@ -121,6 +164,12 @@ class VlInt(VlTypeABC):
             "complex": lambda x: VlComplex(complex(float(x.value))),
         }
 
+    def get_attributes(self) -> dict[str, typing.Callable[["VlTypeABC"], "VlTypeABC"]]:
+        return {}
+
+    def get_methods(self) -> dict[str, VlFunction]:
+        return {}
+
 
 class VlReal(VlTypeABC):
 
@@ -133,6 +182,12 @@ class VlReal(VlTypeABC):
             "complex": lambda x: VlComplex(complex(float(x.value))),
         }
 
+    def get_attributes(self) -> dict[str, typing.Callable[["VlTypeABC"], "VlTypeABC"]]:
+        return {}
+
+    def get_methods(self) -> dict[str, VlFunction]:
+        return {}
+
 
 class VlComplex(VlTypeABC):
 
@@ -143,13 +198,35 @@ class VlComplex(VlTypeABC):
     def get_type_into(self) -> dict[str, typing.Callable[["VlTypeABC"], "VlTypeABC"]]:
         return {}
 
+    def get_attributes(self) -> dict[str, typing.Callable[["VlTypeABC"], "VlTypeABC"]]:
+        return {
+            "re": lambda x: VlReal(x.value.real),
+            "im": lambda x: VlReal(x.value.imag),
+            "mod": lambda x: VlReal(abs(x.value)),
+            "arg": lambda x: VlReal(math.atan2(x.value.imag, x.value.real)),
+        }
+
+    def get_methods(self) -> dict[str, VlFunction]:
+        return {}
+
 
 class VlVecABC(VlTypeABC, abc.ABC):
+
+    def __init__(self, value: typing.Any):
+        stripped = [x.value for x in value]
+        super().__init__(stripped)
+
     def get_type_into(self) -> dict[str, typing.Callable[["VlTypeABC"], "VlTypeABC"]]:
         return {}
 
     def __str__(self):
         return f"[{', '.join([str(v) for v in self.value])}]: {self.get_type_name()}"
+
+    def get_attributes(self) -> dict[str, typing.Callable[["VlTypeABC"], "VlTypeABC"]]:
+        return {}
+
+    def get_methods(self) -> dict[str, VlFunction]:
+        return {}
 
 
 class VlVec2(VlVecABC):
@@ -157,6 +234,20 @@ class VlVec2(VlVecABC):
     @staticmethod
     def get_type_name() -> VlTypeStr:
         return "vec2"
+
+    def get_attributes(self) -> dict[str, typing.Callable[["VlTypeABC"], "VlTypeABC"]]:
+        return {"x": lambda x: VlReal(x.value[0]), "y": lambda x: VlReal(x.value[1])}
+
+    def get_methods(self) -> dict[str, VlFunction]:
+        return {
+            "dot": VlFunction(
+                ["vec2"],
+                "real",
+                lambda x: VlReal(
+                    self.value[0] * x.value[0] + self.value[1] * x.value[1]
+                ),
+            )
+        }
 
 
 class VlVec3(VlVecABC):
@@ -411,13 +502,14 @@ def eval_vl(node: ASTNode, state: InterpreterState) -> VlTypeABC | None:
 
     elif isinstance(node, MemberAccessExprNode):
         node_val = eval_vl(node.target, state)
-        if isinstance(node_val, VlComplex):
-            if node.name.name == "im":
-                return VlReal(node_val.value.imag)
-            elif node.name.name == "re":
-                return VlReal(node_val.value.real)
+        if node.name.name in node_val.get_attributes():
+            attr_val = node_val.get_attributes()[node.name.name](node_val)
+            return attr_val
+        if node.name.name in node_val.get_methods():
+            return node_val.get_methods()[node.name.name]
 
-        raise ValueError("Feature not implemented")
+        else:
+            raise ValueError("Feature not implemented")
 
     elif isinstance(node, IndexElementsNode):
         return None
@@ -435,6 +527,21 @@ def eval_vl(node: ASTNode, state: InterpreterState) -> VlTypeABC | None:
                 out += str(eval_vl(argument, state)) + " "
             state["stdout_buffer"].append(out)
             return
+
+        callee_val = eval_vl(node.callee, state)
+        if isinstance(callee_val, VlFunction):
+            arg_vals = []
+            for param_t, argument in zip(
+                callee_val.arg_types, node.arguments.arguments
+            ):
+                argument_val = eval_vl(argument, state)
+                actual_type = argument_val.get_type_name()
+                if param_t != actual_type:
+                    raise ValueError(
+                        f"Expected parameter to be of type {param_t}, not {actual_type}"
+                    )
+                arg_vals.append(argument_val)
+            return callee_val.fn(*arg_vals)
 
         if state["in_function"]:
             raise ValueError("Nested functions are not supported")

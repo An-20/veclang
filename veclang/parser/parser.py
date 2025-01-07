@@ -705,15 +705,15 @@ def parse(input_str: str) -> ProgramNode:
     return result
 
 
-def t(input_str: str):
-    result = parser.parse(input_str)
-    print(pretty_print_ast(result))
+if __name__ == "__main__":
+    def t(input_str: str):
+        result = parser.parse(input_str)
+        print(pretty_print_ast(result))
 
-
-t(
+    t(
+        """
+    fn main() -> int {
+        return 0;
+    }
     """
-fn main() -> int {
-    return 0;
-}
-"""
-)
+    )

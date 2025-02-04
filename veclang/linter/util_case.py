@@ -43,7 +43,7 @@ def check_variable_name_descriptiveness(input_str: str) -> bool:
     :param input_str: A string
     :return: Returns a bool of if the string is descriptive
     """
-    if len(input_str) == 1 and input_str not in "abcijxyz":
+    if len(input_str) == 1 and input_str not in "abcdijwxyz":
         return False
     if len(input_str) == 2 and not any([x in input_str for x in "1234567890"]):
         return False

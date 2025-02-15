@@ -1,19 +1,27 @@
 import typing
 
 
+Opcode = typing.Literal[0x00, 0x01, 0x02, 0x03, 0x10, 0x11, 0x12, 0x13]
+
+
 OpcodeMap = {
-    0x00: "OP_CONSTANT",
-    0x01: "OP_TRUE",
-    0x02: "OP_FALSE",
-    0x03: "OP_POP",
-    0x10: "OP_GET_LOCAL",
-    0x11: "OP_SET_LOCAL",
-    0x12: "OP_GET_GLOBAL",
-    0x13: "OP_SET_GLOBAL",
+    0x00: "OP_CONSTANT_VAL_DIRECT",
+    0x01: "OP_CONSTANT_OBJ_DIRECT",
+    0x02: "OP_CONSTANT_VAL_TABLE",
+    0x03: "OP_CONSTANT_OBJ_TABLE",
+    0x04: "OP_POP",
+    0x10: "OP_GET_LOCAL_VAL",
+    0x11: "OP_SET_LOCAL_VAL",
+    0x12: "OP_GET_GLOBAL_VAL",
+    0x13: "OP_SET_GLOBAL_VAL",
+    0x14: "OP_GET_LOCAL_OBJ",
+    0x15: "OP_SET_LOCAL_OBJ",
+    0x16: "OP_GET_GLOBAL_OBJ",
+    0x17: "OP_SET_GLOBAL_OBJ",
     # ========================================
     # 0x80 - 0xDF - OPERATIONS
     # ========================================
-    # 0x80 - 0x9F - INTEGER OPERATIONS
+    # 0x80 - 0x9F - INTEGER OPERATIONS AND BOOLEAN OPERATIONS
     0x80: "OP_INT_EQUAL",
     0x81: "OP_INT_NOT_EQUAL",
     0x82: "OP_INT_GREATER",
@@ -33,6 +41,15 @@ OpcodeMap = {
     0x90: "OP_INT_NOT",
     0x91: "OP_INT_LEFT_SHIFT",
     0x92: "OP_INT_RIGHT_SHIFT",
+    0x93: "OP_INT_JMP_IF_EQUAL",
+    0x94: "OP_INT_JMP_IF_NOT_EQUAL",
+    0x95: "OP_INT_JMP_IF_GREATER",
+    0x96: "OP_INT_JMP_IF_GREATER_OR_EQUAL",
+    0x97: "OP_INT_JMP_IF_LESS",
+    0x98: "OP_INT_JMP_IF_LESS_OR_EQUAL",
+    0x9C: "OP_BOOLEAN_AND",
+    0x9D: "OP_BOOLEAN_OR",
+    0x9E: "OP_BOOLEAN_NOT",
     # 0xA0 - 0xAF - REAL OPERATIONS
     0xA0: "OP_REAL_EQUAL",
     0xA1: "OP_REAL_NOT_EQUAL",
@@ -47,19 +64,21 @@ OpcodeMap = {
     0xAA: "OP_REAL_MOD",
     0xAB: "OP_REAL_EXP",
     0xAC: "OP_REAL_NEG",
-    # 0xB0 - 0xBF - COMPLEX OPERATIONS
+    # 0xB0 - 0xBF - COMPLEX OPERATIONS AND EXTENDED REAL COMPARISONS
     0xB0: "OP_COMPLEX_EQUAL",
     0xB1: "OP_COMPLEX_NOT_EQUAL",
-    0xB2: "OP_COMPLEX_GREATER",
-    0xB3: "OP_COMPLEX_GREATER_OR_EQUAL",
-    0xB4: "OP_COMPLEX_LESS",
-    0xB5: "OP_COMPLEX_LESS_OR_EQUAL",
-    0xB6: "OP_COMPLEX_ADD",
-    0xB7: "OP_COMPLEX_SUB",
-    0xB8: "OP_COMPLEX_MUL",
-    0xB9: "OP_COMPLEX_DIV",
-    0xBA: "OP_COMPLEX_EXP",
-    0xBB: "OP_COMPLEX_NEG",
+    0xB2: "OP_COMPLEX_ADD",
+    0xB3: "OP_COMPLEX_SUB",
+    0xB4: "OP_COMPLEX_MUL",
+    0xB5: "OP_COMPLEX_DIV",
+    0xB6: "OP_COMPLEX_EXP",
+    0xB7: "OP_COMPLEX_NEG",
+    0xBA: "OP_REAL_EQUAL",
+    0xBB: "OP_REAL_NOT_EQUAL",
+    0xBC: "OP_REAL_JMP_IF_GREATER",
+    0xBD: "OP_REAL_JMP_IF_GREATER_OR_EQUAL",
+    0xBE: "OP_REAL_JMP_IF_LESS",
+    0xBF: "OP_REAL_JMP_IF_LESS_OR_EQUAL",
     # 0xC0 - 0xCF - VECTOR AND MATRIX OPERATIONS
     0xC0: "OP_VECTOR_ADD",
     0xC1: "OP_VECTOR_SUB",
@@ -77,11 +96,7 @@ OpcodeMap = {
     0xCD: "OP_MATRIX_TRA",
     0xCE: "OP_MATRIX_DET",
     0xCF: "OP_MATRIX_INV",
-    # 0xD0 - 0xDF - BOOLEAN OPERATIONS
-    0xD0: "OP_BOOLEAN_AND",
-    0xD1: "OP_BOOLEAN_OR",
-    0xD2: "OP_BOOLEAN_NOT",
     # ========================================
-    # 0xE0 - 0xFF - RESERVED (likely for lists)
+    # 0xD0 - 0xFF - RESERVED
     # ========================================
 }

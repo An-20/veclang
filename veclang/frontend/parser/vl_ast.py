@@ -1,4 +1,9 @@
-"""AST classes"""
+"""
+AST classes
+
+Side-note: why do we even support serializing and deserializing the AST to JSON?
+Next time this file is re-written, maybe just drop that...
+"""
 
 import abc
 import typing
@@ -184,9 +189,6 @@ class IdentifierNode(ASTNode):
     def __init__(self, name: str, ast_position_info: ASTPositionInfo) -> None:
         super().__init__(ast_position_info)
         self.name = name
-
-    def name(self) -> str:
-        return self.name
 
     @staticmethod
     def get_node_type_str() -> str:

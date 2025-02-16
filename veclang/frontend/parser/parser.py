@@ -1,11 +1,15 @@
 """Parser for Veclang"""
 
-import veclang.parser.ply.lex as lex
-import veclang.parser.ply.yacc as yacc
+import veclang.frontend.ply.lex as lex
+import veclang.frontend.ply.yacc as yacc
 
 
-from veclang.parser.lexer import LEXER_TOKEN_SPEC_STR, LEXER_FUNCTION_SPEC, lexer
-from veclang.parser.vl_ast import (
+from veclang.frontend.parser.lexer import (
+    LEXER_TOKEN_SPEC_STR,
+    LEXER_FUNCTION_SPEC,
+    lexer,
+)
+from veclang.frontend.parser.vl_ast import (
     AugmentedAssignmentOperatorType,
     BinaryOperatorType,
     UnaryOperatorType,
@@ -48,7 +52,7 @@ from veclang.parser.vl_ast import (
     BreakStmtNode,
     ContinueStmtNode,
 )
-from veclang.parser.vl_ast_io import pretty_print_ast
+from veclang.frontend.parser.vl_ast_io import pretty_print_ast
 
 
 DEBUG: bool = False

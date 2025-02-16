@@ -1,6 +1,6 @@
 import typing
-import veclang.parser.ply.lex as lex
-import veclang.parser.ply.yacc as yacc
+import veclang.frontend.ply.lex as lex
+import veclang.frontend.ply.yacc as yacc
 
 
 class ASTPositionInfo(typing.NamedTuple):

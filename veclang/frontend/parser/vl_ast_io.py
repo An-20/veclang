@@ -1,6 +1,6 @@
 """Input/output functions for AST"""
 
-from veclang.parser.vl_ast import ASTNode, ConstantValue
+from veclang.frontend.parser.vl_ast import ASTNode, ConstantValue
 
 
 def pretty_print_ast(ast_node: ASTNode, depth: int = 0) -> str:

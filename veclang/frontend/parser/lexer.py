@@ -1,5 +1,5 @@
-import veclang.parser.ply.lex as lex
-from veclang.parser.vl_ast import ConstantValue
+import veclang.frontend.ply.lex as lex
+from veclang.frontend.parser.vl_ast import ConstantValue
 
 
 DEBUG: bool = False

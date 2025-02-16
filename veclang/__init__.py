@@ -1,2 +1,3 @@
-import veclang.parser
-import veclang.interpreter
+import veclang.frontend
+import veclang.midend
+import veclang.backend

@@ -1,4 +1,4 @@
-import veclang.parser.ply.lex as lex
+import veclang.frontend.ply.lex as lex
 
 # is this a slightly unergonomic solution because i want to escape the tab? yes.
 spec = """

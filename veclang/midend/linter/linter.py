@@ -3,7 +3,7 @@
 import typing
 import warnings
 
-import veclang.parser.vl_ast as ast
+import veclang.frontend.vl_ast as ast
 
 from veclang.linter.util_types import (
     TypeProfile,

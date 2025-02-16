@@ -6,7 +6,7 @@ from contextlib import redirect_stdout
 import math
 
 
-from veclang.parser.vl_ast import (
+from veclang.frontend.parser.vl_ast import (
     AugmentedAssignmentOperatorType,
     BinaryOperatorType,
     UnaryOperatorType,
@@ -55,8 +55,8 @@ from veclang.parser.vl_ast import (
     ContinueStmtNode,
 )
 
-from veclang.parser.parser import parse
-from veclang.parser.vl_ast_io import pretty_print_ast
+from veclang.frontend.parser.parser import parse
+from veclang.frontend.parser.vl_ast_io import pretty_print_ast
 
 import abc
 

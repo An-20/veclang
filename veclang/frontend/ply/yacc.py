@@ -77,7 +77,7 @@ import typing
 
 from typing import Optional
 
-from veclang.parser.ply.lex import PlyLogger
+from veclang.frontend.ply.lex import PlyLogger
 
 # -----------------------------------------------------------------------------
 #                     === User configurable parameters ===

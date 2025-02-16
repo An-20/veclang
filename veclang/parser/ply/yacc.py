@@ -2333,7 +2333,11 @@ class ParserReflect:
             elif rule_identifier not in self.rule_spec:
                 self.log.error(
                     f"{file}:{line}: Rule {rule_func.__name__} is not in the rule specification "
-                    f"but has associated function"
+                    f"but has associated function."
+                )
+                self.log.warning(
+                    f"{file}:{line}: The previous error occurred when handling rule '{rule_identifier}', which is likely"
+                    f"the cause of the issue."
                 )
                 self.error = True
             else:

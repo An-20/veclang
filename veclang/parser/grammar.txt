@@ -68,11 +68,11 @@ ignore: "	 "
 IDENTIFIER: "\b(?!import\b|let\b|const\b|fn\b|if\b|elif\b|else\b|for\b|while\b|break\b|continue\b|return\b|i\b|true\b|false\b|null\b|int\b|uint\b|long\b|ulong\b|real\b|complex\b|vec2\b|vec3\b|vec4\b|mat2\b|mat3\b|mat4\b)[a-zA-Z_][a-zA-Z_0-9]*"
 COMMENT: "(\/\*(.|\s)*?\*\/|\/\/.*)"
 
-start : program
 
 comment : COMMENT
 type : TYPE
 
+start : program
 program : stmts
 
 stmts : stmt
@@ -80,11 +80,13 @@ stmts : stmt
 
 block : LEFT_CURLY_BRACKET stmts RIGHT_CURLY_BRACKET
 
-stmt : function_declaration_stmt
-     | variable_declaration_stmt
-     | constant_declaration_stmt
+decl : function_decl
+     | variable_decl
+     | constant_decl
+
+stmt : decl
      | assignment_stmt
-     | binary_operation_assignment_stmt
+     | augmented_assignment_stmt
      | expr_stmt
      | if_stmt
      | elif_stmt
@@ -94,7 +96,7 @@ stmt : function_declaration_stmt
      | break_stmt
      | continue_stmt
      | return_stmt
-     | COMMENT
+     | comment
 
 
 attribute_tags : attribute_tags attribute_tag
@@ -107,19 +109,19 @@ attribute_tag : LEFT_ANGLE_BRACKET identifier COLON attribute_tag_values RIGHT_A
 attribute_tag_values : attribute_tag_values COMMA simple_literal
                      | simple_literal
 
-function_declaration_parameter : identifier COLON type
-function_declaration_parameters : function_declaration_parameter
-                                | function_declaration_parameters COMMA function_declaration_parameter
-                                |
+function_decl_parameter : identifier COLON type
+function_decl_parameters : function_decl_parameter
+                         | function_decl_parameters COMMA function_decl_parameter
+                         |
 
-function_declaration_stmt : attribute_tags FN identifier LEFT_PARENTHESIS function_declaration_parameters RIGHT_PARENTHESIS RIGHT_ARROW type block
+function_decl : attribute_tags FN identifier LEFT_PARENTHESIS function_decl_parameters RIGHT_PARENTHESIS RIGHT_ARROW type block
 
 
-variable_declaration_stmt : LET identifier COLON type ASSIGN expr SEMICOLON
-constant_declaration_stmt : CONST identifier COLON type ASSIGN expr SEMICOLON
+variable_decl : LET identifier COLON type ASSIGNMENT expr SEMICOLON
+constant_decl : CONST identifier COLON type ASSIGNMENT expr SEMICOLON
 
 assignment_stmt : identifier ASSIGNMENT expr SEMICOLON
-binary_assignment_operation_stmt : identifier binary_assignment_operator expr SEMICOLON
+augmented_assignment_stmt : identifier augmented_assignment_operator expr SEMICOLON
 
 expr_stmt : expr SEMICOLON
 
@@ -128,7 +130,7 @@ if_stmt : IF LEFT_PARENTHESIS expr RIGHT_PARENTHESIS block
 elif_stmt : ELIF LEFT_PARENTHESIS expr RIGHT_PARENTHESIS block
 else_stmt : ELSE block
 
-for_initialisation_stmt : identifier COLON type IN range
+for_initialisation_stmt : identifier COLON type IN range_literal
 for_stmt : FOR LEFT_PARENTHESIS for_initialisation_stmt RIGHT_PARENTHESIS block
 while_stmt : WHILE LEFT_PARENTHESIS expr RIGHT_PARENTHESIS block
 
@@ -138,17 +140,17 @@ continue_stmt : CONTINUE SEMICOLON
 return_stmt : RETURN expr SEMICOLON
 
 
-binary_assignment_operator : PLUS_ASSIGNMENT
-                           | MINUS_ASSIGNMENT
-                           | TIMES_ASSIGNMENT
-                           | DIVIDE_ASSIGNMENT
-                           | MODULUS_ASSIGNMENT
+augmented_assignment_operator : PLUS_ASSIGNMENT
+                              | MINUS_ASSIGNMENT
+                              | TIMES_ASSIGNMENT
+                              | DIVIDE_ASSIGNMENT
+                              | MODULUS_ASSIGNMENT
 
 comparison_operator : EQUAL_TO
                     | NOT_EQUAL_TO
-                    | LESS_THAN
+                    | LEFT_ANGLE_BRACKET
                     | LESS_THAN_OR_EQUAL
-                    | GREATER_THAN
+                    | RIGHT_ANGLE_BRACKET
                     | GREATER_THAN_OR_EQUAL
 
 

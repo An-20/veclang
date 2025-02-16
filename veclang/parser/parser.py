@@ -6,7 +6,7 @@ import veclang.parser.ply.yacc as yacc
 
 from veclang.parser.lexer import LEXER_TOKEN_SPEC_STR, LEXER_FUNCTION_SPEC, lexer
 from veclang.parser.vl_ast import (
-    BinaryAssignmentOperatorType,
+    AugmentedAssignmentOperatorType,
     BinaryOperatorType,
     UnaryOperatorType,
     ASTPositionInfo,
@@ -14,8 +14,8 @@ from veclang.parser.vl_ast import (
     StmtsNode,
     IdentifierNode,
     TypeNode,
-    FunctionDeclarationParameterNode,
-    FunctionDeclarationParametersNode,
+    FunctionDeclParameterNode,
+    FunctionDeclParametersNode,
     CommentNode,
     RangeLiteralExprNode,
     ArrayLiteralElementsNode,
@@ -32,11 +32,11 @@ from veclang.parser.vl_ast import (
     AttributeTagValuesNode,
     AttributeTagNode,
     AttributeTagsNode,
-    FunctionDeclarationStmtNode,
-    VariableDeclarationStmtNode,
-    ConstantDeclarationStmtNode,
+    FunctionDeclNode,
+    VariableDeclNode,
+    ConstantDeclNode,
     AssignmentStmtNode,
-    BinaryAssignmentStmtNode,
+    AugmentedAssignmentStmtNode,
     ExprStmtNode,
     IfStmtNode,
     ElseifStmtNode,
@@ -54,11 +54,10 @@ from veclang.parser.vl_ast_io import pretty_print_ast
 DEBUG: bool = False
 
 PARSER_SPEC_STR = """
-start : program
-
 comment : COMMENT
 type : TYPE
 
+start : program
 program : stmts
 
 stmts : stmt
@@ -66,11 +65,13 @@ stmts : stmt
 
 block : LEFT_CURLY_BRACKET stmts RIGHT_CURLY_BRACKET
 
-stmt : function_declaration_stmt
-     | variable_declaration_stmt
-     | constant_declaration_stmt
+decl : function_decl
+     | variable_decl
+     | constant_decl
+
+stmt : decl
      | assignment_stmt
-     | binary_assignment_operation_stmt
+     | augmented_assignment_stmt
      | expr_stmt
      | if_stmt
      | elif_stmt
@@ -80,7 +81,7 @@ stmt : function_declaration_stmt
      | break_stmt
      | continue_stmt
      | return_stmt
-     | COMMENT
+     | comment
 
 
 attribute_tags : attribute_tags attribute_tag
@@ -93,19 +94,19 @@ attribute_tag : LEFT_ANGLE_BRACKET identifier COLON attribute_tag_values RIGHT_A
 attribute_tag_values : attribute_tag_values COMMA simple_literal
                      | simple_literal
 
-function_declaration_parameter : identifier COLON type
-function_declaration_parameters : function_declaration_parameter
-                                | function_declaration_parameters COMMA function_declaration_parameter
-                                |
+function_decl_parameter : identifier COLON type
+function_decl_parameters : function_decl_parameter
+                         | function_decl_parameters COMMA function_decl_parameter
+                         |
 
-function_declaration_stmt : attribute_tags FN identifier LEFT_PARENTHESIS function_declaration_parameters RIGHT_PARENTHESIS RIGHT_ARROW type block
+function_decl : attribute_tags FN identifier LEFT_PARENTHESIS function_decl_parameters RIGHT_PARENTHESIS RIGHT_ARROW type block
 
 
-variable_declaration_stmt : LET identifier COLON type ASSIGNMENT expr SEMICOLON
-constant_declaration_stmt : CONST identifier COLON type ASSIGNMENT expr SEMICOLON
+variable_decl : LET identifier COLON type ASSIGNMENT expr SEMICOLON
+constant_decl : CONST identifier COLON type ASSIGNMENT expr SEMICOLON
 
 assignment_stmt : identifier ASSIGNMENT expr SEMICOLON
-binary_assignment_operation_stmt : identifier binary_assignment_operator expr SEMICOLON
+augmented_assignment_stmt : identifier augmented_assignment_operator expr SEMICOLON
 
 expr_stmt : expr SEMICOLON
 
@@ -124,11 +125,11 @@ continue_stmt : CONTINUE SEMICOLON
 return_stmt : RETURN expr SEMICOLON
 
 
-binary_assignment_operator : PLUS_ASSIGNMENT
-                           | MINUS_ASSIGNMENT
-                           | TIMES_ASSIGNMENT
-                           | DIVIDE_ASSIGNMENT
-                           | MODULUS_ASSIGNMENT
+augmented_assignment_operator : PLUS_ASSIGNMENT
+                              | MINUS_ASSIGNMENT
+                              | TIMES_ASSIGNMENT
+                              | DIVIDE_ASSIGNMENT
+                              | MODULUS_ASSIGNMENT
 
 comparison_operator : EQUAL_TO
                     | NOT_EQUAL_TO
@@ -235,6 +236,7 @@ primary_expr : atomic_expr
              | parenthesised_expr
 
 expr : disjunction_prec_expr
+
 """
 
 
@@ -298,41 +300,39 @@ def p_attribute_tag_values(p):
         p[0] = AttributeTagValuesNode(None, p[1], get_ast_pos_info(p))
 
 
-def p_function_declaration_parameter(p):
-    p[0] = FunctionDeclarationParameterNode(p[1], p[3], get_ast_pos_info(p))
+def p_function_decl_parameter(p):
+    p[0] = FunctionDeclParameterNode(p[1], p[3], get_ast_pos_info(p))
 
 
-def p_function_declaration_parameters(p):
+def p_function_decl_parameters(p):
     if len(p) == 4:
         # Multi-element: a, b...
-        p[0] = FunctionDeclarationParametersNode(p[1], p[3], get_ast_pos_info(p))
+        p[0] = FunctionDeclParametersNode(p[1], p[3], get_ast_pos_info(p))
     elif len(p) == 2:
         # One element: a
-        p[0] = FunctionDeclarationParametersNode(None, p[1], get_ast_pos_info(p))
+        p[0] = FunctionDeclParametersNode(None, p[1], get_ast_pos_info(p))
     else:
-        p[0] = FunctionDeclarationParametersNode(None, None, get_ast_pos_info(p))
+        p[0] = FunctionDeclParametersNode(None, None, get_ast_pos_info(p))
 
 
-def p_function_declaration_stmt(p):
-    p[0] = FunctionDeclarationStmtNode(
-        p[1], p[3], p[5], p[8], p[9], get_ast_pos_info(p)
-    )
+def p_function_decl(p):
+    p[0] = FunctionDeclNode(p[1], p[3], p[5], p[8], p[9], get_ast_pos_info(p))
 
 
-def p_variable_declaration_stmt(p):
-    p[0] = VariableDeclarationStmtNode(p[2], p[4], p[6], get_ast_pos_info(p))
+def p_variable_decl(p):
+    p[0] = VariableDeclNode(p[2], p[4], p[6], get_ast_pos_info(p))
 
 
-def p_constant_declaration_stmt(p):
-    p[0] = ConstantDeclarationStmtNode(p[2], p[4], p[6], get_ast_pos_info(p))
+def p_constant_decl(p):
+    p[0] = ConstantDeclNode(p[2], p[4], p[6], get_ast_pos_info(p))
 
 
 def p_assignment_stmt(p):
     p[0] = AssignmentStmtNode(p[1], p[3], get_ast_pos_info(p))
 
 
-def p_binary_assignment_operation_stmt(p):
-    operator: BinaryAssignmentOperatorType
+def p_augmented_assignment_stmt(p):
+    operator: AugmentedAssignmentOperatorType
     if p[2] == "+=":
         operator = "PLUS_ASSIGNMENT"
     elif p[2] == "-":
@@ -345,7 +345,7 @@ def p_binary_assignment_operation_stmt(p):
         operator = "MODULUS_ASSIGNMENT"
     else:
         raise ValueError(f"Unknown operator type '{p[2]}'")
-    p[0] = BinaryAssignmentStmtNode(p[1], operator, p[3], get_ast_pos_info(p))
+    p[0] = AugmentedAssignmentStmtNode(p[1], operator, p[3], get_ast_pos_info(p))
 
 
 def p_expr_stmt(p):
@@ -630,16 +630,17 @@ PARSER_FUNCTION_SPEC = {
     "stmts": p_stmts,
     "block": p_block,
     "stmt": p_passthrough,
+    "decl": p_passthrough,
     "attribute_tags": p_attribute_tags,
     "attribute_tag": p_attribute_tag,
     "attribute_tag_values": p_attribute_tag_values,
-    "function_declaration_parameter": p_function_declaration_parameter,
-    "function_declaration_parameters": p_function_declaration_parameters,
-    "function_declaration_stmt": p_function_declaration_stmt,
-    "variable_declaration_stmt": p_variable_declaration_stmt,
-    "constant_declaration_stmt": p_constant_declaration_stmt,
+    "function_decl_parameter": p_function_decl_parameter,
+    "function_decl_parameters": p_function_decl_parameters,
+    "function_decl": p_function_decl,
+    "variable_decl": p_variable_decl,
+    "constant_decl": p_constant_decl,
     "assignment_stmt": p_assignment_stmt,
-    "binary_assignment_operation_stmt": p_binary_assignment_operation_stmt,
+    "augmented_assignment_stmt": p_augmented_assignment_stmt,
     "expr_stmt": p_expr_stmt,
     "if_stmt": p_if_stmt,
     "elif_stmt": p_elif_stmt,
@@ -651,7 +652,7 @@ PARSER_FUNCTION_SPEC = {
     "continue_stmt": p_continue_stmt,
     "return_stmt": p_return_stmt,
     "comparison_operator": p_passthrough,
-    "binary_assignment_operator": p_passthrough,
+    "augmented_assignment_operator": p_passthrough,
     "disjunction_prec_expr": p_disjunction_prec_expr,
     "conjunction_prec_expr": p_conjunction_prec_expr,
     "inversion_prec_expr": p_inversion_prec_expr,
@@ -706,6 +707,7 @@ def parse(input_str: str) -> ProgramNode:
 
 
 if __name__ == "__main__":
+
     def t(input_str: str):
         result = parser.parse(input_str)
         print(pretty_print_ast(result))

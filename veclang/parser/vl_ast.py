@@ -4,7 +4,7 @@ import abc
 import typing
 
 # Definitions for operators
-BinaryAssignmentOperatorType = typing.Literal[
+AugmentedAssignmentOperatorType = typing.Literal[
     "PLUS_ASSIGNMENT",
     "MINUS_ASSIGNMENT",
     "TIMES_ASSIGNMENT",
@@ -105,11 +105,15 @@ class ASTNode(abc.ABC):
 
 
 class ExprNode(ASTNode, abc.ABC):
-    """An AST node for an expr"""
+    """An AST node for an expression"""
 
 
 class StmtNode(ASTNode, abc.ABC):
-    """An AST node for a stmt"""
+    """An AST node for a statement"""
+
+
+class DeclNode(StmtNode, abc.ABC):
+    """An AST node for a declaration"""
 
 
 class ProgramNode(ASTNode):
@@ -127,19 +131,19 @@ class ProgramNode(ASTNode):
     def get_node_type_str() -> str:
         return "ProgramNode"
 
-    @classmethod
-    def _from_dict(
-        cls, input_dict: dict, ast_position_info: ASTPositionInfo
-    ) -> "ASTNode":
-        return cls(
-            StmtsNode.from_dict(input_dict["stmts"]) if input_dict["stmts"] else None,
-            ast_position_info,
-        )
-
     def _to_dict(self) -> dict:
         return {
             "stmts": self.stmts.to_dict() if self.stmts else [],
         }
+
+    @classmethod
+    def _from_dict(
+        cls, input_dict: dict, ast_position_info: ASTPositionInfo
+    ) -> "ProgramNode":
+        return cls(
+            StmtsNode.from_dict(input_dict["stmts"]) if input_dict["stmts"] else None,
+            ast_position_info,
+        )
 
 
 class StmtsNode(ASTNode):
@@ -168,7 +172,7 @@ class StmtsNode(ASTNode):
     @classmethod
     def _from_dict(
         cls, input_dict: dict, ast_position_info: ASTPositionInfo
-    ) -> "ASTNode":
+    ) -> "StmtsNode":
         node = cls(None, None, ast_position_info)
         node.stmts = [stmt_from_dict(stmt) for stmt in input_dict["stmts"]]
         return node
@@ -194,7 +198,7 @@ class IdentifierNode(ASTNode):
     @classmethod
     def _from_dict(
         cls, input_dict: dict, ast_position_info: ASTPositionInfo
-    ) -> "ASTNode":
+    ) -> "IdentifierNode":
         return cls(input_dict["name"], ast_position_info)
 
 
@@ -206,7 +210,7 @@ class TypeNode(IdentifierNode):
         return "TypeNode"
 
 
-class FunctionDeclarationParameterNode(ASTNode):
+class FunctionDeclParameterNode(ASTNode):
     """An AST node for a single function parameter when used in declarations"""
 
     def __init__(
@@ -221,7 +225,7 @@ class FunctionDeclarationParameterNode(ASTNode):
 
     @staticmethod
     def get_node_type_str() -> str:
-        return "FunctionDeclarationParameterNode"
+        return "FunctionDeclParameterNode"
 
     def _to_dict(self) -> dict:
         return {"name": self.name.to_dict(), "type": self.type.to_dict()}
@@ -229,7 +233,7 @@ class FunctionDeclarationParameterNode(ASTNode):
     @classmethod
     def _from_dict(
         cls, input_dict: dict, ast_position_info: ASTPositionInfo
-    ) -> "ASTNode":
+    ) -> "FunctionDeclParameterNode":
         return cls(
             IdentifierNode.from_dict(input_dict["name"]),
             TypeNode.from_dict(input_dict["type"]),
@@ -237,13 +241,13 @@ class FunctionDeclarationParameterNode(ASTNode):
         )
 
 
-class FunctionDeclarationParametersNode(ASTNode):
+class FunctionDeclParametersNode(ASTNode):
     """An AST node for function arguments when used in declarations"""
 
     def __init__(
         self,
-        parameters: typing.Optional["FunctionDeclarationParametersNode"],
-        parameter: typing.Optional[FunctionDeclarationParameterNode],
+        parameters: typing.Optional["FunctionDeclParametersNode"],
+        parameter: typing.Optional[FunctionDeclParameterNode],
         ast_position_info: ASTPositionInfo,
     ) -> None:
         super().__init__(ast_position_info)
@@ -255,7 +259,7 @@ class FunctionDeclarationParametersNode(ASTNode):
 
     @staticmethod
     def get_node_type_str() -> str:
-        return "FunctionDeclarationParametersNode"
+        return "FunctionDeclParametersNode"
 
     def _to_dict(self) -> dict:
         return {
@@ -269,7 +273,7 @@ class FunctionDeclarationParametersNode(ASTNode):
     @classmethod
     def _from_dict(
         cls, input_dict: dict, ast_position_info: ASTPositionInfo
-    ) -> "ASTNode":
+    ) -> "FunctionDeclParametersNode":
         node = cls(None, None, ast_position_info)
         node.stmts = [stmt_from_dict(stmt) for stmt in input_dict["parameters"]]
         return node
@@ -307,7 +311,7 @@ class RangeLiteralExprNode(ExprNode):
     @classmethod
     def _from_dict(
         cls, input_dict: dict, ast_position_info: ASTPositionInfo
-    ) -> "ASTNode":
+    ) -> "RangeLiteralExprNode":
         return cls(
             expr_from_dict(input_dict["start"]),
             expr_from_dict(input_dict["end"]),
@@ -343,7 +347,7 @@ class ArrayLiteralElementsNode(ASTNode):
     @classmethod
     def _from_dict(
         cls, input_dict: dict, ast_position_info: ASTPositionInfo
-    ) -> "ASTNode":
+    ) -> "ArrayLiteralElementsNode":
         node = cls(None, None, ast_position_info)
         node.stmts = [expr_from_dict(expr) for expr in input_dict["exprs"]]
         return node
@@ -369,7 +373,7 @@ class ArrayLiteralExprNode(ExprNode):
     @classmethod
     def _from_dict(
         cls, input_dict: dict, ast_position_info: ASTPositionInfo
-    ) -> "ASTNode":
+    ) -> "ArrayLiteralExprNode":
         return cls(
             ArrayLiteralElementsNode.from_dict(input_dict["elements"]),
             ast_position_info,
@@ -395,7 +399,7 @@ class MemberAccessExprNode(ExprNode):
     @classmethod
     def _from_dict(
         cls, input_dict: dict, ast_position_info: ASTPositionInfo
-    ) -> "ASTNode":
+    ) -> "MemberAccessExprNode":
         return cls(
             expr_from_dict(input_dict["target"]),
             IdentifierNode.from_dict(input_dict["name"]),
@@ -430,7 +434,7 @@ class IndexElementsNode(ASTNode):
     @classmethod
     def _from_dict(
         cls, input_dict: dict, ast_position_info: ASTPositionInfo
-    ) -> "ASTNode":
+    ) -> "IndexElementsNode":
         node = cls(None, None, ast_position_info)
         node.stmts = [expr_from_dict(expr) for expr in input_dict["exprs"]]
         return node
@@ -458,7 +462,7 @@ class IndexExprNode(ExprNode):
     @classmethod
     def _from_dict(
         cls, input_dict: dict, ast_position_info: ASTPositionInfo
-    ) -> "ASTNode":
+    ) -> "IndexExprNode":
         return cls(
             expr_from_dict(input_dict["target"]),
             IndexElementsNode.from_dict(input_dict["indices"]),
@@ -496,7 +500,7 @@ class FunctionCallArgumentsNode(ASTNode):
     @classmethod
     def _from_dict(
         cls, input_dict: dict, ast_position_info: ASTPositionInfo
-    ) -> "ASTNode":
+    ) -> "FunctionCallArgumentsNode":
         node = cls(None, None, ast_position_info)
         node.stmts = [expr_from_dict(expr) for expr in input_dict["arguments"]]
         return node
@@ -525,7 +529,7 @@ class FunctionCallExprNode(ExprNode):
     @classmethod
     def _from_dict(
         cls, input_dict: dict, ast_position_info: ASTPositionInfo
-    ) -> "ASTNode":
+    ) -> "FunctionCallExprNode":
         return cls(
             IdentifierNode.from_dict(input_dict["callee"]),
             FunctionCallArgumentsNode.from_dict(input_dict["arguments"]),
@@ -562,7 +566,7 @@ class BinaryOperationExprNode(ExprNode):
     @classmethod
     def _from_dict(
         cls, input_dict: dict, ast_position_info: ASTPositionInfo
-    ) -> "ASTNode":
+    ) -> "BinaryOperationExprNode":
         return cls(
             expr_from_dict(input_dict["left"]),
             expr_from_dict(input_dict["right"]),
@@ -594,7 +598,7 @@ class UnaryOperatorExprNode(ExprNode):
     @classmethod
     def _from_dict(
         cls, input_dict: dict, ast_position_info: ASTPositionInfo
-    ) -> "ASTNode":
+    ) -> "UnaryOperatorExprNode":
         return cls(
             expr_from_dict(input_dict["operand"]),
             input_dict["operator"],
@@ -666,19 +670,32 @@ class ConstantExprNode(ExprNode):
     @classmethod
     def _from_dict(
         cls, input_dict: dict, ast_position_info: ASTPositionInfo
-    ) -> "ASTNode":
+    ) -> "ConstantExprNode":
         return cls(
             ConstantValue.from_dict(input_dict["value"]),
             ast_position_info,
         )
 
 
-class CommentNode(ConstantExprNode):
+class CommentNode(StmtNode):
     """An AST node for a comment"""
+
+    def __init__(self, value: str, ast_position_info: ASTPositionInfo) -> None:
+        super().__init__(ast_position_info)
+        self.value = value
 
     @staticmethod
     def get_node_type_str() -> str:
         return "CommentNode"
+
+    def _to_dict(self) -> dict:
+        return {"value": self.value}
+
+    @classmethod
+    def _from_dict(
+        cls, input_dict: dict, ast_position_info: ASTPositionInfo
+    ) -> "CommentNode":
+        return cls(input_dict["value"], ast_position_info)
 
 
 # Stmts
@@ -710,7 +727,7 @@ class AttributeTagValuesNode(ASTNode):
     @classmethod
     def _from_dict(
         cls, input_dict: dict, ast_position_info: ASTPositionInfo
-    ) -> "ASTNode":
+    ) -> "AttributeTagValuesNode":
         node = cls(None, None, ast_position_info)
         node.stmts = [expr_from_dict(expr) for expr in input_dict["values"]]
         return node
@@ -738,7 +755,7 @@ class AttributeTagNode(ASTNode):
     @classmethod
     def _from_dict(
         cls, input_dict: dict, ast_position_info: ASTPositionInfo
-    ) -> "ASTNode":
+    ) -> "AttributeTagNode":
         node = cls(input_dict["key"], None, ast_position_info)
         node.values = [expr_from_dict(expr) for expr in input_dict["values"]]
         return node
@@ -761,7 +778,7 @@ class AttributeTagsNode(ASTNode):
 
     @staticmethod
     def get_node_type_str() -> str:
-        return "AttributeTags"
+        return "AttributeTagsNode"
 
     def _to_dict(self) -> dict:
         return {"tags": ([tag.to_dict() for tag in self.tags] if self.tags else [])}
@@ -769,20 +786,20 @@ class AttributeTagsNode(ASTNode):
     @classmethod
     def _from_dict(
         cls, input_dict: dict, ast_position_info: ASTPositionInfo
-    ) -> "ASTNode":
+    ) -> "AttributeTagsNode":
         node = cls(None, None, ast_position_info)
         node.stmts = [AttributeTagNode.from_dict(tag) for tag in input_dict["tags"]]
         return node
 
 
-class FunctionDeclarationStmtNode(StmtNode):
+class FunctionDeclNode(StmtNode):
     """An AST node for a function declaration"""
 
     def __init__(
         self,
         attribute_tags: AttributeTagsNode,
         identifier: IdentifierNode,
-        parameters: FunctionDeclarationParametersNode,
+        parameters: FunctionDeclParametersNode,
         return_type: TypeNode,
         stmts: StmtsNode,
         ast_position_info: ASTPositionInfo,
@@ -796,7 +813,7 @@ class FunctionDeclarationStmtNode(StmtNode):
 
     @staticmethod
     def get_node_type_str() -> str:
-        return "FunctionDeclarationStmtNode"
+        return "FunctionDeclNode"
 
     def _to_dict(self) -> dict:
         return {
@@ -810,18 +827,18 @@ class FunctionDeclarationStmtNode(StmtNode):
     @classmethod
     def _from_dict(
         cls, input_dict: dict, ast_position_info: ASTPositionInfo
-    ) -> "ASTNode":
+    ) -> "FunctionDeclNode":
         return cls(
             AttributeTagsNode.from_dict(input_dict["attribute_tags"]),
             IdentifierNode.from_dict(input_dict["identifier"]),
-            FunctionDeclarationParametersNode.from_dict(input_dict["parameters"]),
+            FunctionDeclParametersNode.from_dict(input_dict["parameters"]),
             TypeNode.from_dict(input_dict["return_type"]),
             StmtsNode.from_dict(input_dict["stmts"]),
             ast_position_info,
         )
 
 
-class DataDeclarationStmtNode(StmtNode, abc.ABC):
+class DataDeclNode(StmtNode, abc.ABC):
     """An AST node for variable / constant declaration"""
 
     def __init__(
@@ -846,7 +863,7 @@ class DataDeclarationStmtNode(StmtNode, abc.ABC):
     @classmethod
     def _from_dict(
         cls, input_dict: dict, ast_position_info: ASTPositionInfo
-    ) -> "ASTNode":
+    ) -> "DataDeclNode":
         return cls(
             IdentifierNode.from_dict(input_dict["target"]),
             TypeNode.from_dict(input_dict["_type"]),
@@ -855,18 +872,18 @@ class DataDeclarationStmtNode(StmtNode, abc.ABC):
         )
 
 
-class VariableDeclarationStmtNode(DataDeclarationStmtNode):
+class VariableDeclNode(DataDeclNode):
 
     @staticmethod
     def get_node_type_str() -> str:
-        return "VariableDeclarationStmt"
+        return "VariableDeclNode"
 
 
-class ConstantDeclarationStmtNode(DataDeclarationStmtNode):
+class ConstantDeclNode(DataDeclNode):
 
     @staticmethod
     def get_node_type_str() -> str:
-        return "ConstantDeclarationStmt"
+        return "ConstantDeclNode"
 
 
 class AssignmentStmtNode(StmtNode):
@@ -895,7 +912,7 @@ class AssignmentStmtNode(StmtNode):
     @classmethod
     def _from_dict(
         cls, input_dict: dict, ast_position_info: ASTPositionInfo
-    ) -> "ASTNode":
+    ) -> "AssignmentStmtNode":
         return cls(
             expr_from_dict(input_dict["target"]),
             expr_from_dict(input_dict["value"]),
@@ -903,13 +920,13 @@ class AssignmentStmtNode(StmtNode):
         )
 
 
-class BinaryAssignmentStmtNode(StmtNode):
-    """An AST node for binary assignment"""
+class AugmentedAssignmentStmtNode(StmtNode):
+    """An AST node for augmented assignment"""
 
     def __init__(
         self,
         target: ExprNode,
-        operator: BinaryAssignmentOperatorType,
+        operator: AugmentedAssignmentOperatorType,
         value: ExprNode,
         ast_position_info: ASTPositionInfo,
     ) -> None:
@@ -920,7 +937,7 @@ class BinaryAssignmentStmtNode(StmtNode):
 
     @staticmethod
     def get_node_type_str() -> str:
-        return "BinaryAssignmentStmtNode"
+        return "AugmentedAssignmentStmtNode"
 
     def _to_dict(self) -> dict:
         return {
@@ -932,7 +949,7 @@ class BinaryAssignmentStmtNode(StmtNode):
     @classmethod
     def _from_dict(
         cls, input_dict: dict, ast_position_info: ASTPositionInfo
-    ) -> "ASTNode":
+    ) -> "AugmentedAssignmentStmtNode":
         return cls(
             expr_from_dict(input_dict["target"]),
             input_dict["operator"],
@@ -958,7 +975,7 @@ class ExprStmtNode(StmtNode):
     @classmethod
     def _from_dict(
         cls, input_dict: dict, ast_position_info: ASTPositionInfo
-    ) -> "ASTNode":
+    ) -> "ExprStmtNode":
         return cls(
             expr_from_dict(input_dict["expr"]),
             ast_position_info,
@@ -988,7 +1005,7 @@ class IfStmtNode(StmtNode):
     @classmethod
     def _from_dict(
         cls, input_dict: dict, ast_position_info: ASTPositionInfo
-    ) -> "ASTNode":
+    ) -> "IfStmtNode":
         return cls(
             expr_from_dict(input_dict["condition"]),
             StmtsNode.from_dict(input_dict["stmts"]),
@@ -1021,7 +1038,7 @@ class ElseStmtNode(StmtNode):
     @classmethod
     def _from_dict(
         cls, input_dict: dict, ast_position_info: ASTPositionInfo
-    ) -> "ASTNode":
+    ) -> "ElseStmtNode":
         return cls(
             StmtsNode.from_dict(input_dict["stmts"]),
             ast_position_info,
@@ -1057,7 +1074,7 @@ class ForInitialisationStmtNode(StmtNode):
     @classmethod
     def _from_dict(
         cls, input_dict: dict, ast_position_info: ASTPositionInfo
-    ) -> "ASTNode":
+    ) -> "ForInitialisationStmtNode":
         return cls(
             IdentifierNode.from_dict(input_dict["target"]),
             TypeNode.from_dict(input_dict["init_type"]),
@@ -1089,7 +1106,7 @@ class ForStmtNode(StmtNode):
     @classmethod
     def _from_dict(
         cls, input_dict: dict, ast_position_info: ASTPositionInfo
-    ) -> "ASTNode":
+    ) -> "ForStmtNode":
         return cls(
             ForInitialisationStmtNode.from_dict(input_dict["init_stmt"]),
             StmtsNode.from_dict(input_dict["stmts"]),
@@ -1120,7 +1137,7 @@ class WhileStmtNode(StmtNode):
     @classmethod
     def _from_dict(
         cls, input_dict: dict, ast_position_info: ASTPositionInfo
-    ) -> "ASTNode":
+    ) -> "WhileStmtNode":
         return cls(
             expr_from_dict(input_dict["condition"]),
             StmtsNode.from_dict(input_dict["stmts"]),
@@ -1145,7 +1162,7 @@ class ReturnStmtNode(StmtNode):
     @classmethod
     def _from_dict(
         cls, input_dict: dict, ast_position_info: ASTPositionInfo
-    ) -> "ASTNode":
+    ) -> "ReturnStmtNode":
         return cls(
             expr_from_dict(input_dict["value"]),
             ast_position_info,
@@ -1160,7 +1177,7 @@ class StatelessStmtNode(StmtNode, abc.ABC):
     @classmethod
     def _from_dict(
         cls, input_dict: dict, ast_position_info: ASTPositionInfo
-    ) -> "ASTNode":
+    ) -> "StatelessStmtNode":
         return cls(ast_position_info)
 
 
@@ -1186,5 +1203,5 @@ def expr_from_dict(input_dict: dict) -> ExprNode:
 
 
 def stmt_from_dict(input_dict: dict) -> StmtNode:
-    if input_dict["node_type"] == "FunctionDeclarationStmtNode":
-        return FunctionDeclarationStmtNode.from_dict(input_dict)
+    if input_dict["node_type"] == "FunctionDeclStmtNode":
+        return FunctionDeclNode.from_dict(input_dict)

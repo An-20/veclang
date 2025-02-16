@@ -7,7 +7,7 @@ import math
 
 
 from veclang.parser.vl_ast import (
-    BinaryAssignmentOperatorType,
+    AugmentedAssignmentOperatorType,
     BinaryOperatorType,
     UnaryOperatorType,
     ASTPositionInfo,
@@ -18,8 +18,8 @@ from veclang.parser.vl_ast import (
     StmtsNode,
     IdentifierNode,
     TypeNode,
-    FunctionDeclarationParameterNode,
-    FunctionDeclarationParametersNode,
+    FunctionDeclParameterNode,
+    FunctionDeclParametersNode,
     RangeLiteralExprNode,
     ArrayLiteralElementsNode,
     ArrayLiteralExprNode,
@@ -36,12 +36,12 @@ from veclang.parser.vl_ast import (
     AttributeTagValuesNode,
     AttributeTagNode,
     AttributeTagsNode,
-    FunctionDeclarationStmtNode,
-    DataDeclarationStmtNode,
-    VariableDeclarationStmtNode,
-    ConstantDeclarationStmtNode,
+    FunctionDeclNode,
+    DataDeclNode,
+    VariableDeclNode,
+    ConstantDeclNode,
     AssignmentStmtNode,
-    BinaryAssignmentStmtNode,
+    AugmentedAssignmentStmtNode,
     ExprStmtNode,
     IfStmtNode,
     ElseifStmtNode,
@@ -375,7 +375,7 @@ class InterpreterState(typing.TypedDict):
     global_consts: dict[str, VlTypeABC]
     local_consts: dict[str, VlTypeABC]
 
-    fns: list[FunctionDeclarationStmtNode]
+    fns: list[FunctionDeclNode]
 
     in_function: bool
     function_ret_val: VlTypeABC | None
@@ -417,9 +417,7 @@ def resolve_var(identifier_name: str, state: InterpreterState) -> VlTypeABC:
         raise ValueError(f"Identifier {identifier_name} could not be resolved")
 
 
-def resolve_fn(
-    identifier_name: str, state: InterpreterState
-) -> FunctionDeclarationStmtNode:
+def resolve_fn(identifier_name: str, state: InterpreterState) -> FunctionDeclNode:
     for declaration in state["fns"]:
         if declaration.identifier.name == identifier_name:
             return declaration
@@ -475,10 +473,10 @@ def eval_vl(node: ASTNode, state: InterpreterState) -> VlTypeABC | None:
     elif isinstance(node, TypeNode):
         return
 
-    elif isinstance(node, FunctionDeclarationParameterNode):
+    elif isinstance(node, FunctionDeclParameterNode):
         return
 
-    elif isinstance(node, FunctionDeclarationParametersNode):
+    elif isinstance(node, FunctionDeclParametersNode):
         return
 
     elif isinstance(node, RangeLiteralExprNode):
@@ -556,7 +554,7 @@ def eval_vl(node: ASTNode, state: InterpreterState) -> VlTypeABC | None:
         for parameter, argument in zip(
             fn.parameters.parameters, node.arguments.arguments
         ):
-            parameter: FunctionDeclarationParameterNode
+            parameter: FunctionDeclParameterNode
 
             argument_val = eval_vl(argument, state)
             expected_type = parameter.type.name
@@ -653,13 +651,13 @@ def eval_vl(node: ASTNode, state: InterpreterState) -> VlTypeABC | None:
     ):
         return
 
-    elif isinstance(node, FunctionDeclarationStmtNode):
+    elif isinstance(node, FunctionDeclNode):
         if state["in_function"]:
             raise ValueError("Cannot declare function inside function")
         state["fns"].append(node)
         return
 
-    elif isinstance(node, VariableDeclarationStmtNode):
+    elif isinstance(node, VariableDeclNode):
         expr = eval_vl(node.value, state)
         expr_t = expr.get_type_name()
         expected_t = node._type.name
@@ -675,7 +673,7 @@ def eval_vl(node: ASTNode, state: InterpreterState) -> VlTypeABC | None:
         else:
             state["global_vars"][node.target.name] = expr
 
-    elif isinstance(node, ConstantDeclarationStmtNode):
+    elif isinstance(node, ConstantDeclNode):
         expr = eval_vl(node.value, state)
         expr_t = expr.get_type_name()
         expected_t = node._type.name
@@ -730,7 +728,7 @@ def eval_vl(node: ASTNode, state: InterpreterState) -> VlTypeABC | None:
 
         return
 
-    elif isinstance(node, BinaryAssignmentStmtNode):
+    elif isinstance(node, AugmentedAssignmentStmtNode):
         raise ValueError("Not yet implemented")
 
     elif isinstance(node, ExprStmtNode):

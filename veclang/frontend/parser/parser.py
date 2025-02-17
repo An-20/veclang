@@ -52,7 +52,7 @@ from veclang.frontend.parser.vl_ast import (
     BreakStmtNode,
     ContinueStmtNode,
 )
-from veclang.frontend.parser.vl_ast_io import pretty_print_ast
+from veclang.frontend.parser.vl_ast_io import format_ast
 
 
 DEBUG: bool = False
@@ -714,7 +714,7 @@ if __name__ == "__main__":
 
     def t(input_str: str):
         result = parser.parse(input_str)
-        print(pretty_print_ast(result))
+        print(format_ast(result))
 
     t(
         """

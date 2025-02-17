@@ -794,7 +794,7 @@ class AttributeTagsNode(ASTNode):
         return node
 
 
-class FunctionDeclNode(StmtNode):
+class FunctionDeclNode(DeclNode):
     """An AST node for a function declaration"""
 
     def __init__(
@@ -840,7 +840,7 @@ class FunctionDeclNode(StmtNode):
         )
 
 
-class DataDeclNode(StmtNode, abc.ABC):
+class DataDeclNode(DeclNode, abc.ABC):
     """An AST node for variable / constant declaration"""
 
     def __init__(

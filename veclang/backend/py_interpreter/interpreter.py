@@ -56,7 +56,7 @@ from veclang.frontend.parser.vl_ast import (
 )
 
 from veclang.frontend.parser.parser import parse
-from veclang.frontend.parser.vl_ast_io import pretty_print_ast
+
 
 import abc
 

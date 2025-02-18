@@ -320,6 +320,7 @@ class DataDeclNode(DeclNode, abc.ABC):
         ast_node: vl_ast.DataDeclNode
         self.constant = isinstance(ast_node, vl_ast.ConstantDeclNode)
         self.target = ast_node.target.name
+        # noinspection PyProtectedMember
         self._type = lower_vl_type(ast_node._type.name)
         self.value = lower_expr(ast_node.value)
 

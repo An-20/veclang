@@ -44,6 +44,8 @@ UnaryOperatorType = typing.Literal[
     "BOOLEAN_NOT", "BITWISE_NOT", "UNARY_PLUS", "UNARY_MINUS"
 ]
 
+VlOperator = AugmentedAssignmentOperatorType | BinaryOperatorType | UnaryOperatorType
+
 
 class ASTPositionInfo(typing.NamedTuple):
     """Position info of an AST node"""

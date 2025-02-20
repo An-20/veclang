@@ -39,6 +39,8 @@ from veclang.frontend.parser.vl_ast import (
     FunctionDeclNode,
     VariableDeclNode,
     ConstantDeclNode,
+    UsingDeclIdentifiersNode,
+    UsingDeclNode,
     AssignmentStmtNode,
     AugmentedAssignmentStmtNode,
     ExprStmtNode,
@@ -108,6 +110,13 @@ function_decl : attribute_tags FN identifier LEFT_PARENTHESIS function_decl_para
 
 variable_decl : LET identifier COLON type ASSIGNMENT expr SEMICOLON
 constant_decl : CONST identifier COLON type ASSIGNMENT expr SEMICOLON
+
+
+using_decl_identifiers : using_decl_identifiers COMMA identifier
+                       | identifier
+using_decl : USING using_decl_identifiers SEMICOLON
+           | USING identifier SCOPE_RESOLUTION identifier SEMICOLON
+           | USING identifier SCOPE_RESOLUTION LEFT_PARENTHESIS using_decl_identifiers RIGHT_PARENTHESIS SEMICOLON
 
 assignment_stmt : identifier ASSIGNMENT expr SEMICOLON
 augmented_assignment_stmt : identifier augmented_assignment_operator expr SEMICOLON
@@ -328,6 +337,27 @@ def p_variable_decl(p):
 
 def p_constant_decl(p):
     p[0] = ConstantDeclNode(p[2], p[4], p[6], get_ast_pos_info(p))
+
+
+def p_using_decl_identifiers(p):
+    if len(p) == 4:
+        # Multi-element: a, b...
+        p[0] = UsingDeclIdentifiersNode(p[1], p[3], get_ast_pos_info(p))
+    else:
+        # One element: a
+        p[0] = UsingDeclIdentifiersNode(None, p[1], get_ast_pos_info(p))
+
+
+def p_using_decl(p):
+    if len(p) == 4:
+        # using a;
+        p[0] = UsingDeclNode(p[2], None, None, get_ast_pos_info(p))
+    elif len(p) == 6:
+        # using a::b;
+        p[0] = UsingDeclNode(None, (p[2], p[4]), None, get_ast_pos_info(p))
+    else:
+        # using a::{b, c};
+        p[0] = UsingDeclNode(None, None, (p[2], p[5]), get_ast_pos_info(p))
 
 
 def p_assignment_stmt(p):

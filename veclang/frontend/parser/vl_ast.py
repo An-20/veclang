@@ -766,7 +766,7 @@ class FunctionDeclParameterNode(ASTNode):
 
 
 class FunctionDeclParametersNode(ASTNode):
-    """An AST node for function arguments when used in declarations"""
+    """An AST node for function parameters when used in declarations"""
 
     def __init__(
         self,
@@ -799,7 +799,9 @@ class FunctionDeclParametersNode(ASTNode):
         cls, input_dict: dict, ast_position_info: ASTPositionInfo
     ) -> "FunctionDeclParametersNode":
         node = cls(None, None, ast_position_info)
-        node.stmts = [stmt_from_dict(stmt) for stmt in input_dict["parameters"]]
+        node.parameters = [
+            FunctionDeclParameterNode.from_dict(x) for x in input_dict["parameters"]
+        ]
         return node
 
 
@@ -895,6 +897,134 @@ class ConstantDeclNode(DataDeclNode):
     @staticmethod
     def get_node_type_str() -> str:
         return "ConstantDeclNode"
+
+
+class UsingDeclIdentifiersNode(ASTNode):
+    """An AST node for using declaration list of identifiers"""
+
+    def __init__(
+        self,
+        identifiers: typing.Optional["UsingDeclIdentifiersNode"],
+        identifier: typing.Optional[IdentifierNode],
+        ast_position_info: ASTPositionInfo,
+    ) -> None:
+        super().__init__(ast_position_info)
+        self.identifiers = []
+        if identifiers:
+            self.identifiers.extend(identifiers.identifiers)
+        if identifier:
+            self.identifiers.append(identifier)
+
+    @staticmethod
+    def get_node_type_str() -> str:
+        return "UsingDeclIdentifiersNode"
+
+    def _to_dict(self) -> dict:
+        return {
+            "identifiers": (
+                [identifier.to_dict() for identifier in self.identifiers]
+                if self.identifiers
+                else []
+            )
+        }
+
+    @classmethod
+    def _from_dict(
+        cls, input_dict: dict, ast_position_info: ASTPositionInfo
+    ) -> "UsingDeclIdentifiersNode":
+        node = cls(None, None, ast_position_info)
+        node.identifiers = [
+            IdentifierNode.from_dict(x) for x in input_dict["identifiers"]
+        ]
+        return node
+
+
+class UsingDeclNode(ASTNode):
+    """An AST node for using declaration"""
+
+    def __init__(
+        self,
+        namespace_identifiers: typing.Optional[UsingDeclIdentifiersNode],
+        namespace_and_identifier: typing.Optional[
+            tuple[IdentifierNode, IdentifierNode]
+        ],
+        namespace_and_identifiers: typing.Optional[
+            tuple[IdentifierNode, UsingDeclIdentifiersNode]
+        ],
+        ast_position_info: ASTPositionInfo,
+    ) -> None:
+        super().__init__(ast_position_info)
+        self.namespace_identifiers = namespace_identifiers
+        self.namespace_and_identifier = namespace_and_identifier
+        self.namespace_and_identifiers = namespace_and_identifiers
+        passed = 0
+        passed += 1 if namespace_identifiers else 0
+        passed += 1 if namespace_and_identifier else 0
+        passed += 1 if namespace_and_identifiers else 0
+        if passed > 1:
+            raise ValueError(
+                "Expected only one non-None argument for initializing UsingDeclNode"
+            )
+
+    @staticmethod
+    def get_node_type_str() -> str:
+        return "UsingDeclNode"
+
+    def _to_dict(self) -> dict:
+        return {
+            "namespace_identifiers": (
+                self.namespace_identifiers.to_dict()
+                if self.namespace_identifiers
+                else None
+            ),
+            "namespace_and_identifier": (
+                [
+                    self.namespace_and_identifier[0].to_dict(),
+                    self.namespace_and_identifier[1].to_dict(),
+                ]
+                if self.namespace_and_identifier
+                else None
+            ),
+            "namespace_and_identifiers": (
+                [
+                    self.namespace_and_identifiers[0].to_dict(),
+                    self.namespace_and_identifiers[1].to_dict(),
+                ]
+                if self.namespace_and_identifiers
+                else None
+            ),
+        }
+
+    @classmethod
+    def _from_dict(
+        cls, input_dict: dict, ast_position_info: ASTPositionInfo
+    ) -> "UsingDeclNode":
+        node = cls(None, None, None, ast_position_info)
+        passed = 0
+        if input_dict["namespace_identifiers"]:
+            node.namespace_identifiers = UsingDeclIdentifiersNode.from_dict(
+                input_dict["namespace_identifiers"]
+            )
+            passed += 1
+        if input_dict["namespace_and_identifier"]:
+            node.namespace_and_identifier = (
+                IdentifierNode.from_dict(input_dict["namespace_and_identifier"][0]),
+                IdentifierNode.from_dict(input_dict["namespace_and_identifier"][1]),
+            )
+            passed += 1
+        if input_dict["namespace_and_identifiers"]:
+            node.namespace_and_identifier = (
+                IdentifierNode.from_dict(input_dict["namespace_and_identifiers"][0]),
+                UsingDeclIdentifiersNode.from_dict(
+                    input_dict["namespace_and_identifiers"][1]
+                ),
+            )
+            passed += 1
+        if passed != 1:
+            raise ValueError(
+                "Expected exactly one non-None argument for initializing UsingDeclNode from dict"
+            )
+        return node
 
 
 class AssignmentStmtNode(StmtNode):

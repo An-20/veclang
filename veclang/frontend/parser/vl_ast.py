@@ -214,75 +214,6 @@ class TypeNode(IdentifierNode):
         return "TypeNode"
 
 
-class FunctionDeclParameterNode(ASTNode):
-    """An AST node for a single function parameter when used in declarations"""
-
-    def __init__(
-        self,
-        name: IdentifierNode,
-        _type: TypeNode,
-        ast_position_info: ASTPositionInfo,
-    ) -> None:
-        super().__init__(ast_position_info)
-        self.name = name
-        self.type = _type
-
-    @staticmethod
-    def get_node_type_str() -> str:
-        return "FunctionDeclParameterNode"
-
-    def _to_dict(self) -> dict:
-        return {"name": self.name.to_dict(), "type": self.type.to_dict()}
-
-    @classmethod
-    def _from_dict(
-        cls, input_dict: dict, ast_position_info: ASTPositionInfo
-    ) -> "FunctionDeclParameterNode":
-        return cls(
-            IdentifierNode.from_dict(input_dict["name"]),
-            TypeNode.from_dict(input_dict["type"]),
-            ast_position_info,
-        )
-
-
-class FunctionDeclParametersNode(ASTNode):
-    """An AST node for function arguments when used in declarations"""
-
-    def __init__(
-        self,
-        parameters: typing.Optional["FunctionDeclParametersNode"],
-        parameter: typing.Optional[FunctionDeclParameterNode],
-        ast_position_info: ASTPositionInfo,
-    ) -> None:
-        super().__init__(ast_position_info)
-        self.parameters = []
-        if parameters:
-            self.parameters.extend(parameters.parameters)
-        if parameter:
-            self.parameters.append(parameter)
-
-    @staticmethod
-    def get_node_type_str() -> str:
-        return "FunctionDeclParametersNode"
-
-    def _to_dict(self) -> dict:
-        return {
-            "parameters": (
-                [parameter.to_dict() for parameter in self.parameters]
-                if self.parameters
-                else []
-            )
-        }
-
-    @classmethod
-    def _from_dict(
-        cls, input_dict: dict, ast_position_info: ASTPositionInfo
-    ) -> "FunctionDeclParametersNode":
-        node = cls(None, None, ast_position_info)
-        node.stmts = [stmt_from_dict(stmt) for stmt in input_dict["parameters"]]
-        return node
-
-
 # Exprs
 # ----------------------------------------
 
@@ -793,6 +724,82 @@ class AttributeTagsNode(ASTNode):
     ) -> "AttributeTagsNode":
         node = cls(None, None, ast_position_info)
         node.stmts = [AttributeTagNode.from_dict(tag) for tag in input_dict["tags"]]
+        return node
+
+
+class FunctionDeclParameterNode(ASTNode):
+    """An AST node for a single function parameter when used in declarations"""
+
+    def __init__(
+        self,
+        attribute_tags: AttributeTagsNode,
+        name: IdentifierNode,
+        _type: TypeNode,
+        ast_position_info: ASTPositionInfo,
+    ) -> None:
+        super().__init__(ast_position_info)
+        self.attribute_tags = attribute_tags
+        self.name = name
+        self.type = _type
+
+    @staticmethod
+    def get_node_type_str() -> str:
+        return "FunctionDeclParameterNode"
+
+    def _to_dict(self) -> dict:
+        return {
+            "attribute_tags": self.attribute_tags.to_dict(),
+            "name": self.name.to_dict(),
+            "type": self.type.to_dict(),
+        }
+
+    @classmethod
+    def _from_dict(
+        cls, input_dict: dict, ast_position_info: ASTPositionInfo
+    ) -> "FunctionDeclParameterNode":
+        return cls(
+            AttributeTagsNode.from_dict(input_dict["attribute_tags"]),
+            IdentifierNode.from_dict(input_dict["name"]),
+            TypeNode.from_dict(input_dict["type"]),
+            ast_position_info,
+        )
+
+
+class FunctionDeclParametersNode(ASTNode):
+    """An AST node for function arguments when used in declarations"""
+
+    def __init__(
+        self,
+        parameters: typing.Optional["FunctionDeclParametersNode"],
+        parameter: typing.Optional[FunctionDeclParameterNode],
+        ast_position_info: ASTPositionInfo,
+    ) -> None:
+        super().__init__(ast_position_info)
+        self.parameters = []
+        if parameters:
+            self.parameters.extend(parameters.parameters)
+        if parameter:
+            self.parameters.append(parameter)
+
+    @staticmethod
+    def get_node_type_str() -> str:
+        return "FunctionDeclParametersNode"
+
+    def _to_dict(self) -> dict:
+        return {
+            "parameters": (
+                [parameter.to_dict() for parameter in self.parameters]
+                if self.parameters
+                else []
+            )
+        }
+
+    @classmethod
+    def _from_dict(
+        cls, input_dict: dict, ast_position_info: ASTPositionInfo
+    ) -> "FunctionDeclParametersNode":
+        node = cls(None, None, ast_position_info)
+        node.stmts = [stmt_from_dict(stmt) for stmt in input_dict["parameters"]]
         return node
 
 

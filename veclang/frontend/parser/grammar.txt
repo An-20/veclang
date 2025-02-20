@@ -46,10 +46,11 @@ RIGHT_CURLY_BRACKET: "\}"
 
 DOT: "\."
 COMMA: "\,"
+SCOPE_RESOLUTION: "\:\:"
 COLON: "\:"
 SEMICOLON: ";"
 
-IMPORT: "import"
+USING: "using"
 LET: "let"
 CONST: "const"
 IN: "in"
@@ -65,7 +66,7 @@ CONTINUE: "continue"
 RETURN: "return"
 ignore: "	 "
 
-IDENTIFIER: "\b(?!import\b|let\b|const\b|fn\b|if\b|elif\b|else\b|for\b|while\b|break\b|continue\b|return\b|i\b|true\b|false\b|null\b|int\b|uint\b|long\b|ulong\b|real\b|complex\b|vec2\b|vec3\b|vec4\b|mat2\b|mat3\b|mat4\b)[a-zA-Z_][a-zA-Z_0-9]*"
+IDENTIFIER: "\b(?!using\b|let\b|const\b|fn\b|if\b|elif\b|else\b|for\b|while\b|break\b|continue\b|return\b|i\b|true\b|false\b|null\b|int\b|uint\b|long\b|ulong\b|real\b|complex\b|vec2\b|vec3\b|vec4\b|mat2\b|mat3\b|mat4\b)[a-zA-Z_][a-zA-Z_0-9]*"
 COMMENT: "(\/\*(.|\s)*?\*\/|\/\/.*)"
 
 
@@ -109,7 +110,7 @@ attribute_tag : LEFT_ANGLE_BRACKET identifier COLON attribute_tag_values RIGHT_A
 attribute_tag_values : attribute_tag_values COMMA simple_literal
                      | simple_literal
 
-function_decl_parameter : identifier COLON type
+function_decl_parameter : attribute_tags identifier COLON type
 function_decl_parameters : function_decl_parameter
                          | function_decl_parameters COMMA function_decl_parameter
                          |
@@ -119,6 +120,13 @@ function_decl : attribute_tags FN identifier LEFT_PARENTHESIS function_decl_para
 
 variable_decl : LET identifier COLON type ASSIGNMENT expr SEMICOLON
 constant_decl : CONST identifier COLON type ASSIGNMENT expr SEMICOLON
+
+
+using_decl_identifiers : using_decl_identifiers COMMA identifier
+                       | identifier
+using_decl : USING using_decl_identifiers SEMICOLON
+           | USING identifier SCOPE_RESOLUTION identifier SEMICOLON
+           | USING identifier SCOPE_RESOLUTION LEFT_PARENTHESIS using_decl_identifiers RIGHT_PARENTHESIS SEMICOLON
 
 assignment_stmt : identifier ASSIGNMENT expr SEMICOLON
 augmented_assignment_stmt : identifier augmented_assignment_operator expr SEMICOLON

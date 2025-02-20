@@ -53,10 +53,11 @@ RIGHT_CURLY_BRACKET: "\\}"
 
 DOT: "\\."
 COMMA: "\\,"
+SCOPE_RESOLUTION: "\:\:"
 COLON: "\\:"
 SEMICOLON: ";"
 
-IMPORT: "import"
+USING: "using"
 LET: "let"
 CONST: "const"
 IN: "in"
@@ -74,7 +75,7 @@ RETURN: "return"
 LEXER_TOKEN_SPEC_STR += '\nignore: "\t "\n'
 
 RESERVED_KEYWORDS = [
-    "import",
+    "using",
     "let",
     "const",
     "in",
@@ -210,7 +211,7 @@ if __name__ == "__main__":
     lexer.line_no = 0
     lexer_tokens = []
     # Give the lexer some input
-    lexer.input("0.7 + 32i -0x2113afe1")
+    lexer.input("0.7 + 32i -0x2113afe1 a::b")
 
     # Tokenize
     while True:

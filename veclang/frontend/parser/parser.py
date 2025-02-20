@@ -98,7 +98,7 @@ attribute_tag : LEFT_ANGLE_BRACKET identifier COLON attribute_tag_values RIGHT_A
 attribute_tag_values : attribute_tag_values COMMA simple_literal
                      | simple_literal
 
-function_decl_parameter : identifier COLON type
+function_decl_parameter : attribute_tags identifier COLON type
 function_decl_parameters : function_decl_parameter
                          | function_decl_parameters COMMA function_decl_parameter
                          |
@@ -240,7 +240,6 @@ primary_expr : atomic_expr
              | parenthesised_expr
 
 expr : disjunction_prec_expr
-
 """
 
 
@@ -305,7 +304,7 @@ def p_attribute_tag_values(p):
 
 
 def p_function_decl_parameter(p):
-    p[0] = FunctionDeclParameterNode(p[1], p[3], get_ast_pos_info(p))
+    p[0] = FunctionDeclParameterNode(p[1], p[2], p[4], get_ast_pos_info(p))
 
 
 def p_function_decl_parameters(p):

@@ -12,20 +12,10 @@ from veclang.frontend.parser.parser import (
     ASTPositionInfo,
 )
 
+from veclang.midend.vl_types import VlTypeABC, VlInt, VlReal
 
-VlType = typing.Literal[
-    "int",
-    "bool",
-    "real",
-    "complex",
-    "vec2",
-    "vec3",
-    "vec4",
-    "mat2",
-    "mat3",
-    "mat4",
-]
-VlTypes = [
+VlType = typing.Type[VlTypeABC]
+VlTypeStrs = [
     "int",
     "bool",
     "real",
@@ -40,10 +30,9 @@ VlTypes = [
 
 
 def lower_vl_type(vl_type: str) -> VlType:
-    if vl_type not in VlTypes:
+    if vl_type not in VlTypeStrs:
         raise ValueError(f"Unknown type '{vl_type}'")
-    vl_type: VlType
-    return vl_type
+    return {"int": VlInt, "real": VlReal}[vl_type]
 
 
 def lower_stmts(stmts: vl_ast.StmtsNode) -> list["StmtNode"]:

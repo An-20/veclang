@@ -3,72 +3,49 @@
 import typing
 import warnings
 
-import veclang.frontend.vl_ast as ast
+import veclang.frontend.parser.vl_ast as ast
 
-from veclang.linter.util_types import (
-    TypeProfile,
-    IdentifiedTypeProfile,
+import veclang.midend.vl_hir as hir
+
+from veclang.midend.linter.util_types import (
+    IdentifiedTypeProfiles,
     FunctionTypesProfile,
-    IdentifierTypesContext,
-    FunctionTypesContext,
+    FunctionTypeContext,
+    LinterItem,
     LinterItems,
-    LinterWeakWarning,
-    LinterError,
-    PositionInfo,
+    ASTPositionInfo,
 )
 
-from veclang.linter.util_operations import (
-    g_TYPE,
-    g_OPERATOR,
+from veclang.midend.linter.util_operations import (
+    VlType,
     AllAllowedOperations,
 )
 
-from veclang.linter.util_case import (
+from veclang.midend.linter.util_case import (
     check_snake_case,
     check_constant_case,
 )
 
-from veclang.linter.util_imports import (
+from veclang.midend.linter.util_imports import (
     get_available_namespaces,
     get_available_functions,
 )
 
 
 def profile_function_types(
-    ast_node: ast.FunctionDeclarationStmtNode,
+    ast_node: hir.FunctionDeclNode,
 ) -> FunctionTypesProfile:
     """Profiles the types used for a function"""
-    return_type = TypeProfile(ast_node.return_type.name, "VARIABLE")
-    input_types = []
-    for parameter in ast_node.parameters.parameters:
-        input_types.append(
-            IdentifiedTypeProfile(parameter.name, parameter.type.type_name, "VARIABLE")
-        )
-    return FunctionTypesProfile(return_type, input_types)
-
-
-def declaration_arguments_list_node_to_identified_type_profiles(
-    node: ast.FunctionDeclarationParametersNode,
-) -> typing.List[IdentifiedTypeProfile]:
-    input_types = []
-    for x in node.parameters:
-        input_types.append(
-            IdentifiedTypeProfile(x.name, x.type.type_name, x.type.qualifier)
-        )
-    return input_types
-
-
-def convert_pos_info(ast_position_info: ast.ASTPositionInfo) -> PositionInfo:
-    return PositionInfo(
-        ast_position_info.line_number, ast_position_info.line_character_number
-    )
+    return_type = ast_node.return_type.get_name()
+    parameter_types = {x.name: x._type for x in ast_node.parameters}
+    return FunctionTypesProfile(parameter_types, return_type)
 
 
 def format_operator(
     operator: typing.Union[
+        ast.AugmentedAssignmentOperatorType,
         ast.BinaryOperatorType,
         ast.UnaryOperatorType,
-        ast.BinaryAssignmentOperatorType,
     ]
 ) -> str:
     return {
@@ -77,12 +54,6 @@ def format_operator(
         "TIMES_ASSIGNMENT": "*=",
         "DIVIDE_ASSIGNMENT": "/=",
         "MODULUS_ASSIGNMENT": "%=",
-        "EQUAL_TO": "==",
-        "NOT_EQUAL_TO": "!=",
-        "LESS_THAN": "<",
-        "LESS_THAN_OR_EQUAL": "<=",
-        "GREATER_THAN": ">",
-        "GREATER_THAN_OR_EQUAL": ">=",
         "PLUS": "+",
         "MINUS": "-",
         "TIMES": "*",
@@ -90,36 +61,42 @@ def format_operator(
         "MODULUS": "%",
         "INTEGER_DIVIDE": "//",
         "EXPONENTIATION": "^",
-        "BOOLEAN_AND": "AND",
-        "BOOLEAN_OR": "OR",
+        "BOOLEAN_AND": "&&",
+        "BOOLEAN_OR": "||",
         "BITWISE_AND": "&",
         "BITWISE_OR": "|",
         "BITWISE_XOR": "^",
         "BITWISE_LEFT_SHIFT": "<<",
         "BITWISE_RIGHT_SHIFT": ">>",
-        "BOOLEAN_NOT": "NOT",
+        "EQUAL_TO": "==",
+        "NOT_EQUAL_TO": "!=",
+        "LESS_THAN": "<",
+        "LESS_THAN_OR_EQUAL": "<=",
+        "GREATER_THAN": ">",
+        "GREATER_THAN_OR_EQUAL": ">=",
+        "BOOLEAN_NOT": "!",
         "BITWISE_NOT": "~",
         "UNARY_PLUS": "+",
         "UNARY_MINUS": "-",
     }[type(operator)]
 
 
-class LinterContext(typing.TypedDict):
-    identifiers: IdentifierTypesContext
-    functions: FunctionTypesContext
+class Linter:
 
-    available_namespaces: typing.List[str]
-    namespace_available_functions: FunctionTypesContext
+    def __init__(self):
+        self.global_vars: IdentifiedTypeProfiles = {}
+        self.global_consts: IdentifiedTypeProfiles = {}
+        self.functions: dict[str, FunctionTypesProfile] = {}
 
-    identifier_ref_count: typing.Dict[str, int]
-    function_ref_count: typing.Dict[str, int]
-    stack_trace: typing.List
+        self.global_var_ref_count: typing.Dict[str, int] = {}
+        self.global_const_ref_count: typing.Dict[str, int] = {}
+        self.function_ref_count: typing.Dict[str, int] = {}
+        self.stack_trace: typing.List = []
 
-    # Other utility values
-    current_function_name: str
-    current_function_return_type_name: str
-
-    current_loop_depth: int
+        # Other utility values
+        self.ctx_function_name: str = ""
+        self.ctx_function_return_type: str = ""
+        self.ctx_loop_depth: int = 0
 
 
 def lint_expression(

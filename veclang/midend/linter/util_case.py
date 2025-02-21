@@ -33,10 +33,7 @@ def check_variable_name_descriptiveness(input_str: str) -> bool:
     not 'descriptive enough'.#
 
     Generally, single letter variable names are flagged other than
-    if they are in {a, b, c, i, j, x, y, z}.
-
-    Two-letter variable names are flagged if they do not contain
-    a number.
+    if they are in {a, b, c, i, j, w, x, y, z}.
 
     All other variable names are allowed.
 
@@ -44,7 +41,5 @@ def check_variable_name_descriptiveness(input_str: str) -> bool:
     :return: Returns a bool of if the string is descriptive
     """
     if len(input_str) == 1 and input_str not in "abcdijwxyz":
-        return False
-    if len(input_str) == 2 and not any([x in input_str for x in "1234567890"]):
         return False
     return True

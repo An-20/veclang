@@ -1,48 +1,35 @@
 """Utility types"""
 
 import typing
+import dataclasses
+
+from veclang.frontend.parser.vl_ast import ASTPositionInfo
+
+from veclang.midend.vl_types import VlType
 
 
-class PositionInfo(typing.NamedTuple):
-    """Position info of an AST node"""
-
-    line_number: typing.Optional[int]
-    line_character_number: typing.Optional[int]
+IdentifiedTypeProfiles = dict[str, VlType]
 
 
-class TypeProfile(typing.NamedTuple):
-    """A type profile"""
-
-    type_name: str
-    type_qualifier: str
-
-
-class IdentifiedTypeProfile(typing.NamedTuple):
-    """A type profile attached to an identifier"""
-
-    identifier: str
-    type_name: str
-    type_qualifier: str
+@dataclasses.dataclass
+class FunctionTypesProfile:
+    parameter_types: IdentifiedTypeProfiles
+    return_type: VlType
 
 
-class FunctionTypesProfile(typing.NamedTuple):
-    """A function profile"""
-
-    return_type: TypeProfile
-    input_types: typing.List[IdentifiedTypeProfile]
-
-
-IdentifierTypesContext = typing.Dict[str, TypeProfile]
-FunctionTypesContext = typing.Dict[str, FunctionTypesProfile]
+@dataclasses.dataclass
+class FunctionTypeContext:
+    variable_types: IdentifiedTypeProfiles
+    constant_types: IdentifiedTypeProfiles
 
 
-LinterWeakWarningCodeLiteral = typing.Literal["X000", "X001", "X002"]
-
-LinterStrongWarningCodeLiteral = typing.Literal[
-    "W000", "W010", "W011", "W012", "W020", "W021"
-]
-
-LinterErrorCodeLiteral = typing.Literal[
+LinterCodeLiteral = typing.Literal[
+    "W000",
+    "W010",
+    "W011",
+    "W012",
+    "W020",
+    "W021",
     "E000",
     "E001",
     "E002",
@@ -88,6 +75,7 @@ LinterErrorCodeLiteral = typing.Literal[
 
 class LinterItemDict(typing.TypedDict):
     """A linter item as a dictionary"""
+
     line_no: int
     char_no: int
     code: str
@@ -97,24 +85,25 @@ class LinterItemDict(typing.TypedDict):
 
 class LinterItem:
     """
-    A generic linter weak item
+    A generic linter item
     """
 
     def __init__(
         self,
-        position_info: PositionInfo,
-        code: LinterWeakWarningCodeLiteral,
+        position_info: ASTPositionInfo,
+        code: LinterCodeLiteral,
         stack_trace: str,
         message: str,
     ) -> None:
         self.line_no: int = position_info.line_number
         self.char_no: int = position_info.line_character_number
-        self.code: LinterWeakWarningCodeLiteral = code
+        self.code: LinterCodeLiteral = code
         self.stack_trace: str = stack_trace
         self.message: str = message
 
     def __str__(self) -> str:
-        return f"Linter weak warning on line {self.line_no}, char {self.char_no} ({self.code}): '{self.message}'"
+        item_type = "warning" if self.code[0] == "W" else "error"
+        return f"Linter {item_type} on line {self.line_no}, char {self.char_no} ({self.code}): '{self.message}'"
 
     def __repr__(self):
         return str(self)

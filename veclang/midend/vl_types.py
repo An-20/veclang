@@ -1,6 +1,33 @@
 import abc
+import typing
 
 from veclang.frontend.parser.vl_ast import VlOperator
+
+
+VlTypeStr = typing.Literal[
+    "int",
+    "bool",
+    "real",
+    "complex",
+    "vec2",
+    "vec3",
+    "vec4",
+    "mat2",
+    "mat3",
+    "mat4",
+]
+VlTypeStrs = [
+    "int",
+    "bool",
+    "real",
+    "complex",
+    "vec2",
+    "vec3",
+    "vec4",
+    "mat2",
+    "mat3",
+    "mat4",
+]
 
 
 class Method:
@@ -19,7 +46,7 @@ class VlTypeABC(abc.ABC):
 
     @staticmethod
     @abc.abstractmethod
-    def get_name():
+    def get_name() -> VlTypeStr:
         pass
 
     @staticmethod
@@ -41,7 +68,7 @@ class VlTypeABC(abc.ABC):
 class VlInt(VlTypeABC):
 
     @staticmethod
-    def get_name():
+    def get_name() -> VlTypeStr:
         return "int"
 
     @staticmethod
@@ -60,7 +87,7 @@ class VlInt(VlTypeABC):
 class VlReal(VlTypeABC):
 
     @staticmethod
-    def get_name():
+    def get_name() -> VlTypeStr:
         return "real"
 
     @staticmethod
@@ -74,3 +101,6 @@ class VlReal(VlTypeABC):
     @staticmethod
     def get_methods() -> list[Method]:
         pass
+
+
+VlType = typing.Type[VlTypeABC]

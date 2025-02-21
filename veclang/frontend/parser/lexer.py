@@ -114,7 +114,7 @@ LEXER_TOKEN_SPEC_STR += f'IDENTIFIER: "{IDENTIFIER_REGEX}"\n'
 # noinspection PyPep8Naming
 # noinspection PySingleQuotedDocstring
 def t_REAL_LITERAL(t):
-    r"((0|[1-9]\d*)(\.\d+)([eE][+\-]?\d+)?)|([+-]?(0|[1-9]\d*)(\.\d+)?[eE][+\-]?\d+)"
+    r"((0|[1-9]\d*)(\.\d+)([eE][+\-]?\d+)?)|((0|[1-9]\d*)(\.\d+)?[eE][+\-]?\d+)"
     t.value = ConstantValue(float(str(t.value)), "real")
     return t
 

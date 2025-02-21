@@ -325,6 +325,30 @@ class DataDeclNode(DeclNode, abc.ABC):
         self.value = lower_expr(ast_node.value)
 
 
+class UsingDeclNode(DeclNode, abc.ABC):
+    """A HIR node for an using declaration"""
+
+    def __init__(self, ast_node: vl_ast.ASTNode) -> None:
+        super().__init__(ast_node, "UsingDeclNode", vl_ast.UsingDeclNode)
+        ast_node: vl_ast.UsingDeclNode
+        self.namespace_identifiers: list[str] | None = None
+        self.scoped_identifiers: list[str] | None = None
+        if ast_node.namespace_identifiers:
+            self.namespace_identifiers = [
+                x.name for x in ast_node.namespace_identifiers.identifiers
+            ]
+        if ast_node.namespace_and_identifiers:
+            namespace = ast_node.namespace_and_identifiers[0].name
+            self.scoped_identifiers = [
+                (namespace, x.name)
+                for x in ast_node.namespace_and_identifiers[1].identifiers
+            ]
+        if ast_node.namespace_identifiers and ast_node.namespace_and_identifiers:
+            raise ValueError(
+                "Expected exactly one non-None argument for initializing UsingDeclNode from AST UsingDeclNode"
+            )
+
+
 class AssignmentStmtNode(StmtNode):
     """A HIR node for assignment"""
 

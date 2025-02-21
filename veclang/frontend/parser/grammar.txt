@@ -212,6 +212,7 @@ int_literal : INT_LITERAL
 bool_literal : BOOL_LITERAL
 real_literal : REAL_LITERAL
 str_literal : STR_LITERAL
+null_literal : NULL_LITERAL
 
 num_literal : int_literal
             | real_literal
@@ -219,6 +220,7 @@ num_literal : int_literal
 simple_literal : num_literal
                | bool_literal
                | str_literal
+               | null_literal
 
 imaginary_literal : num_literal IMAGINARY_UNIT
 

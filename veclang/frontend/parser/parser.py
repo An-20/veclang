@@ -74,6 +74,7 @@ block : LEFT_CURLY_BRACKET stmts RIGHT_CURLY_BRACKET
 decl : function_decl
      | variable_decl
      | constant_decl
+     | using_decl
 
 stmt : decl
      | assignment_stmt
@@ -202,6 +203,7 @@ int_literal : INT_LITERAL
 bool_literal : BOOL_LITERAL
 real_literal : REAL_LITERAL
 str_literal : STR_LITERAL
+null_literal : NULL_LITERAL
 
 num_literal : int_literal
             | real_literal
@@ -209,6 +211,7 @@ num_literal : int_literal
 simple_literal : num_literal
                | bool_literal
                | str_literal
+               | null_literal
 
 imaginary_literal : num_literal IMAGINARY_UNIT
 
@@ -351,13 +354,17 @@ def p_using_decl_identifiers(p):
 def p_using_decl(p):
     if len(p) == 4:
         # using a;
-        p[0] = UsingDeclNode(p[2], None, None, get_ast_pos_info(p))
+        p[0] = UsingDeclNode(p[2], None, get_ast_pos_info(p))
     elif len(p) == 6:
         # using a::b;
-        p[0] = UsingDeclNode(None, (p[2], p[4]), None, get_ast_pos_info(p))
+        p[0] = UsingDeclNode(
+            None,
+            (p[2], UsingDeclIdentifiersNode(None, p[4], get_ast_pos_info(p))),
+            get_ast_pos_info(p),
+        )
     else:
         # using a::{b, c};
-        p[0] = UsingDeclNode(None, None, (p[2], p[5]), get_ast_pos_info(p))
+        p[0] = UsingDeclNode(None, (p[2], p[5]), get_ast_pos_info(p))
 
 
 def p_assignment_stmt(p):
@@ -576,6 +583,10 @@ def p_str_literal(p):
     p[0] = ConstantExprNode(p[1], get_ast_pos_info(p))
 
 
+def p_null_literal(p):
+    p[0] = ConstantExprNode(p[1], get_ast_pos_info(p))
+
+
 def p_imaginary_literal(p):
     value = ConstantValue(complex(0, p[1].value.value), "complex")
     p[0] = ConstantExprNode(value, get_ast_pos_info(p))
@@ -672,6 +683,8 @@ PARSER_FUNCTION_SPEC = {
     "function_decl": p_function_decl,
     "variable_decl": p_variable_decl,
     "constant_decl": p_constant_decl,
+    "using_decl_identifiers": p_using_decl_identifiers,
+    "using_decl": p_using_decl,
     "assignment_stmt": p_assignment_stmt,
     "augmented_assignment_stmt": p_augmented_assignment_stmt,
     "expr_stmt": p_expr_stmt,
@@ -703,6 +716,7 @@ PARSER_FUNCTION_SPEC = {
     "bool_literal": p_bool_literal,
     "real_literal": p_real_literal,
     "str_literal": p_str_literal,
+    "null_literal": p_null_literal,
     "simple_literal": p_passthrough,
     "imaginary_literal": p_imaginary_literal,
     "range_literal": p_range_literal,
@@ -747,7 +761,10 @@ if __name__ == "__main__":
 
     t(
         """
-    fn main() -> int {
+    fn main(
+        <key: "value">
+        asdas: mat4
+    ) -> int {
         return 0;
     }
     """

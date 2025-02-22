@@ -37,7 +37,7 @@ def profile_function_types(
 ) -> FunctionTypesProfile:
     """Profiles the types used for a function"""
     return_type = ast_node.return_type.get_name()
-    parameter_types = {x.name: x._type for x in ast_node.parameters}
+    parameter_types = {x.name: x.vl_type for x in ast_node.parameters}
     return FunctionTypesProfile(parameter_types, return_type)
 
 

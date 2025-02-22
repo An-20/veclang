@@ -1,7 +1,7 @@
 import abc
 import typing
 
-from veclang.frontend.parser.vl_ast import VlOperator
+from veclang.frontend.parser.vl_ast import VlOperatorType
 
 
 VlTypeStr = typing.Literal[
@@ -36,9 +36,16 @@ class Method:
         pass
 
 
-class Operation:
+class Operation(abc.ABC):
+    """boip"""
 
-    def __init__(self):
+    @abc.abstractmethod
+    def emit_bytecode(self):
+        pass
+
+
+class UnaryOperation:
+    def __init__(self) -> None:
         pass
 
 
@@ -48,6 +55,15 @@ class VlTypeABC(abc.ABC):
     @abc.abstractmethod
     def get_name() -> VlTypeStr:
         pass
+
+    @staticmethod
+    @abc.abstractmethod
+    def is_val() -> bool:
+        pass
+
+    @classmethod
+    def is_obj(cls) -> bool:
+        return not cls.is_val()
 
     @staticmethod
     @abc.abstractmethod
@@ -72,6 +88,10 @@ class VlInt(VlTypeABC):
         return "int"
 
     @staticmethod
+    def is_val() -> bool:
+        return True
+
+    @staticmethod
     def get_size() -> int:
         return 4
 
@@ -89,6 +109,10 @@ class VlReal(VlTypeABC):
     @staticmethod
     def get_name() -> VlTypeStr:
         return "real"
+
+    @staticmethod
+    def is_val() -> bool:
+        return True
 
     @staticmethod
     def get_size() -> int:

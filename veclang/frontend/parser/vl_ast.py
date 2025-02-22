@@ -44,7 +44,9 @@ UnaryOperatorType = typing.Literal[
     "BOOLEAN_NOT", "BITWISE_NOT", "UNARY_PLUS", "UNARY_MINUS"
 ]
 
-VlOperator = AugmentedAssignmentOperatorType | BinaryOperatorType | UnaryOperatorType
+VlOperatorType = (
+    AugmentedAssignmentOperatorType | BinaryOperatorType | UnaryOperatorType
+)
 
 
 class ASTPositionInfo(typing.NamedTuple):
@@ -734,13 +736,13 @@ class FunctionDeclParameterNode(ASTNode):
         self,
         attribute_tags: AttributeTagsNode,
         name: IdentifierNode,
-        _type: TypeNode,
+        vl_type: TypeNode,
         ast_position_info: ASTPositionInfo,
     ) -> None:
         super().__init__(ast_position_info)
         self.attribute_tags = attribute_tags
         self.name = name
-        self.type = _type
+        self.type = vl_type
 
     @staticmethod
     def get_node_type_str() -> str:
@@ -857,19 +859,19 @@ class DataDeclNode(DeclNode, abc.ABC):
     def __init__(
         self,
         target: IdentifierNode,
-        _type: TypeNode,
+        vl_type: TypeNode,
         value: ExprNode,
         ast_position_info: ASTPositionInfo,
     ) -> None:
         super().__init__(ast_position_info)
         self.target = target
-        self._type = _type
+        self._type = vl_type
         self.value = value
 
     def _to_dict(self) -> dict:
         return {
             "target": self.target.to_dict(),
-            "_type": self._type.to_dict(),
+            "vl_type": self._type.to_dict(),
             "value": self.value.to_dict(),
         }
 
@@ -879,7 +881,7 @@ class DataDeclNode(DeclNode, abc.ABC):
     ) -> "DataDeclNode":
         return cls(
             IdentifierNode.from_dict(input_dict["target"]),
-            TypeNode.from_dict(input_dict["_type"]),
+            TypeNode.from_dict(input_dict["vl_type"]),
             expr_from_dict(input_dict["value"]),
             ast_position_info,
         )

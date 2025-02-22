@@ -13,35 +13,28 @@ def format_ast(ast_node: ASTNode, depth: int = 0) -> str:
         and y not in {"_abc_impl"}
         and not callable(ast_node.__getattribute__(y))
     ]:
-        if isinstance(ast_node.__getattribute__(x), ASTNode):
-            output_str += "\n" + "  " * (depth + 1) + x + ": "
-            output_str += "\n" + format_ast(ast_node.__getattribute__(x), depth + 2)
+        attr_value = ast_node.__getattribute__(x)
+        if isinstance(attr_value, ASTNode):
+            output_str += f"\n{'  ' * (depth + 1)}{x}: "
+            output_str += f"\n{format_ast(attr_value, depth + 2)}"
 
-        elif isinstance(ast_node.__getattribute__(x), list):
-            if not ast_node.__getattribute__(x):
-                output_str += "\n" + "  " * (depth + 1) + "<empty list>"
+        elif isinstance(attr_value, list):
+            if not attr_value:
+                output_str += f"\n{'  ' * (depth + 1)}{x}: <empty list>"
             else:
-                output_str += "\n" + "  " * (depth + 1) + x + ":"
-                for z in ast_node.__getattribute__(x):
-                    output_str += "\n" + format_ast(z, depth + 2)
+                output_str += f"\n{'  ' * (depth + 1)}{x}:"
+                for z in attr_value:
+                    output_str += f"\n{format_ast(z, depth + 2)}"
                     if depth < 3:
                         output_str += "\n"
 
-        elif isinstance(ast_node.__getattribute__(x), (str, ConstantValue)):
+        elif isinstance(attr_value, (str, ConstantValue)):
             # ConstantValues are handled by calling the __str__ method
-            output_str += (
-                "\n"
-                + "  " * (depth + 1)
-                + x
-                + ': "'
-                + str(ast_node.__getattribute__(x))
-                + '"'
-            )
+            output_str += "\n" + "  " * (depth + 1) + x + ': "' + str(attr_value) + '"'
 
         else:
-            output_str += (
-                "\n" + "  " * (depth + 1) + x + ": " + str(ast_node.__getattribute__(x))
-            )
+            output_str += f"\n{'  ' * (depth + 1)}{x}: {str(attr_value)}"
+
     return output_str
 
 

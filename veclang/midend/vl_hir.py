@@ -251,6 +251,14 @@ class ConstantExprNode(ExprNode):
         ast_node: vl_ast.ConstantExprNode
         self.value: vl_ast.ConstantValue = ast_node.value
 
+    def to_bytes(self) -> bytes:
+        if isinstance(self.value, (int, bool)):
+            # TODO: implement full 32 / 64 support
+            as_bytes = self.value.to_bytes()
+            if len(as_bytes) <= 2:
+                return as_bytes.rjust(2)
+            return as_bytes.rjust(4)
+
 
 # Stmts
 # ----------------------------------------
@@ -295,8 +303,7 @@ class DataDeclNode(DeclNode, abc.ABC):
         ast_node: vl_ast.DataDeclNode
         self.constant = isinstance(ast_node, vl_ast.ConstantDeclNode)
         self.target = ast_node.target.name
-        # noinspection PyProtectedMember
-        self._type = lower_vl_type(ast_node._type.name)
+        self.vl_type = lower_vl_type(ast_node._type.name)
         self.value = lower_expr(ast_node.value)
 
 

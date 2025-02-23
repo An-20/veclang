@@ -5,7 +5,7 @@ import dataclasses
 
 from veclang.frontend.parser.vl_ast import ASTPositionInfo
 
-from veclang.midend.vl_types import VlType
+from veclang.midend.hir.vl_types import VlType
 
 
 IdentifiedTypeProfiles = dict[str, VlType]

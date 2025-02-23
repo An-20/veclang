@@ -1,7 +1,7 @@
 from veclang.frontend.parser.parser import parse
 from veclang.frontend.parser.vl_ast_io import print_ast, format_ast
-from veclang.midend.vl_hir import ProgramNode
-from veclang.midend.vl_hlr_io import print_hir, format_hir
+from veclang.midend.hir.vl_hir import ProgramNode
+from veclang.midend.hir.vl_hlr_io import print_hir, format_hir
 
 
 parsed = parse(
@@ -20,7 +20,7 @@ fn mandlebrot(
     const THRESHOLD: real = 100;
     let c: complex = x / res_x + (y / res_y) * 1i;
     let z: complex = 0;
-    for (_: int in (0:ITERATIONS)) {
+    for (_: int in 0:ITERATIONS) {
         if (z.re * z.re + z.im * z.im > THRESHOLD) {
             return [0, 0, 0];
         }

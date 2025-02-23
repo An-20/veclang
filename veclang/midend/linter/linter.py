@@ -5,19 +5,15 @@ import warnings
 
 import veclang.frontend.parser.vl_ast as ast
 
-import veclang.midend.vl_hir as hir
+import veclang.midend.hir.vl_hir as hir
 
 from veclang.midend.linter.util_types import (
     IdentifiedTypeProfiles,
     FunctionTypesProfile,
-    FunctionTypeContext,
-    LinterItem,
     LinterItems,
-    ASTPositionInfo,
 )
 
 from veclang.midend.linter.util_operations import (
-    VlType,
     AllAllowedOperations,
 )
 

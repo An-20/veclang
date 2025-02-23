@@ -2,11 +2,9 @@ import dataclasses
 
 from veclang.backend.bc_compiler.instruction import OpcodeHRMap
 
-from veclang.midend.vl_hir import (
+from veclang.midend.hir.vl_hir import (
     ExprNode,
     StmtNode,
-    DeclNode,
-    ProgramNode,
     IdentifierExprNode,
     ArrayLiteralExprNode,
     MemberAccessExprNode,
@@ -15,23 +13,11 @@ from veclang.midend.vl_hir import (
     BinaryOperationExprNode,
     UnaryOperatorExprNode,
     ConstantExprNode,
-    AttributeTagsNode,
     FunctionDeclNode,
-    DataDeclNode,
-    UsingDeclNode,
-    AssignmentStmtNode,
-    AugmentedAssignmentStmtNode,
-    ExprStmtNode,
-    SelectionStackStmt,
-    RangedForStmtNode,
-    WhileStmtNode,
-    ReturnStmtNode,
-    BreakStmtNode,
-    ContinueStmtNode,
 )
-from veclang.midend.vl_types import VlType, VlInt, VlReal
+from veclang.midend.hir.vl_types import VlType, VlInt, VlReal
 
-from veclang.backend.bc_compiler.emitter_util import int_to_1_byte, int_to_2_bytes
+from veclang.backend.bc_compiler.emitter_util import int_to_2_bytes
 
 
 @dataclasses.dataclass

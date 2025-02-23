@@ -1,7 +1,7 @@
 """Input/output functions for a HIR tree"""
 
 from veclang.frontend.parser.vl_ast import ConstantValue
-from veclang.midend.vl_hir import HIRNode
+from veclang.midend.hir.vl_hir import HIRNode
 
 
 def format_hir(ast_node: HIRNode, depth: int = 0) -> str:

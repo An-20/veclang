@@ -215,8 +215,8 @@ simple_literal : num_literal
 
 imaginary_literal : num_literal IMAGINARY_UNIT
 
-range_literal : LEFT_PARENTHESIS expr COLON expr RIGHT_PARENTHESIS
-              | LEFT_PARENTHESIS expr COLON expr COLON expr RIGHT_PARENTHESIS
+range_literal : expr COLON expr
+              | expr COLON expr COLON expr
 
 array_literal_elements : expr
                        | array_literal_elements COMMA expr
@@ -227,7 +227,6 @@ identifier : IDENTIFIER
 
 atomic_expr : simple_literal
             | imaginary_literal
-            | range_literal
             | array_literal
             | identifier
 
@@ -593,13 +592,13 @@ def p_imaginary_literal(p):
 
 
 def p_range_literal(p):
-    if len(p) == 6:
+    if len(p) == 4:
         # start : end (assume step = 1)
         step_expr_node = ConstantExprNode(ConstantValue(1, "int"), get_ast_pos_info(p))
-        p[0] = RangeLiteralExprNode(p[2], p[4], step_expr_node, get_ast_pos_info(p))
+        p[0] = RangeLiteralExprNode(p[1], p[3], step_expr_node, get_ast_pos_info(p))
     else:
         # start : end : step
-        p[0] = RangeLiteralExprNode(p[2], p[4], p[6], get_ast_pos_info(p))
+        p[0] = RangeLiteralExprNode(p[1], p[3], p[5], get_ast_pos_info(p))
 
 
 def p_array_literal_elements(p):

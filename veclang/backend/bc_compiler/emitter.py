@@ -133,19 +133,21 @@ class BytecodeEmitter:
     def emit_function_decl_node(self, node: FunctionDeclNode) -> None:
         fn_identifier = node.identifier
         fn_instruction_offset = len(self.instructions)
-        self.ctx_stack_frame_locals = {}
+        self.ctx_stack_frame_local_variables = {}
         self.ctx_stack_frame_locals_offset = 0
 
         # pop arguments off the intermediate value stack and onto the call stack
         for parameter in node.parameters:
-            self.ctx_stack_frame_locals[parameter.name] = (
+            self.ctx_stack_frame_local_variables[parameter.name] = (
                 self.ctx_stack_frame_locals_offset
             )
             self.ctx_stack_frame_locals_offset += parameter.vl_type.get_size()
             if parameter.vl_type in [VlInt, VlReal]:
                 self.add_instruction(
                     "OP_SET_LOCAL_VAL",
-                    self.ctx_stack_frame_locals[parameter.name].to_bytes().rjust(2),
+                    self.ctx_stack_frame_local_variables[parameter.name]
+                    .to_bytes()
+                    .rjust(2),
                 )
 
         # emit each statement

@@ -4,11 +4,7 @@
 #include <fstream>
 #include <iostream>
 
-
-struct Chunk {
-    std::vector<uint32_t> instructions;
-    std::vector<double> constants;
-};
+#include "chunk.h"
 
 
 Chunk deserialize_chunk(const std::vector<uint8_t>& data) {

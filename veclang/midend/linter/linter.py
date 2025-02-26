@@ -10,12 +10,10 @@ import veclang.midend.hir.vl_hir as hir
 from veclang.midend.linter.util_types import (
     IdentifiedTypeProfiles,
     FunctionTypesProfile,
-    LinterItems,
+    LinterItem,
+    LinterCodeLiteral,
 )
-
-from veclang.midend.linter.util_operations import (
-    AllAllowedOperations,
-)
+import veclang.midend.hir.vl_types as vl_types
 
 from veclang.midend.linter.util_case import (
     check_snake_case,
@@ -37,13 +35,7 @@ def profile_function_types(
     return FunctionTypesProfile(parameter_types, return_type)
 
 
-def format_operator(
-    operator: typing.Union[
-        ast.AugmentedAssignmentOperatorType,
-        ast.BinaryOperatorType,
-        ast.UnaryOperatorType,
-    ]
-) -> str:
+def format_operator(operator: ast.VlOperatorType) -> str:
     return {
         "PLUS_ASSIGNMENT": "+=",
         "MINUS_ASSIGNMENT": "-=",
@@ -94,6 +86,35 @@ class Linter:
         self.ctx_function_return_type: str = ""
         self.ctx_loop_depth: int = 0
 
+        self.ctx_last_position_info: ast.ASTPositionInfo = ast.ASTPositionInfo(0, 0)
+
+        self.items: list[LinterItem] = []
+
+    def emit_item(self, code: LinterCodeLiteral, message: str) -> None:
+        self.items.append(
+            LinterItem(
+                self.ctx_last_position_info, code, ":".join(self.stack_trace), message
+            )
+        )
+
+    def node(self, node: hir.HIRNode):
+        self.ctx_last_position_info = node.position_info
+
+    def lint_expr(self, node: hir.ExprNode) -> vl_types.VlType | None:
+        self.node(node)
+        if isinstance(node, hir.ConstantExprNode):
+            if type(node.value.value) in {int, float, bool, None}:
+                if isinstance(node.value.value, bool):
+                    return vl_types.VlBool
+                elif isinstance(node.value.value, int):
+                    return vl_types.VlInt
+                elif isinstance(node.value.value, float):
+                    return vl_types.VlReal
+                elif node.value.value is None:
+                    return vl_types.VlNone
+            self.emit_item("E400", f"Unknown constant type '{type(node.value.value)}'")
+            return None
+
 
 def lint_expression(
     node: ast.ExprNode,
@@ -101,58 +122,7 @@ def lint_expression(
     flags: typing.Dict[str, bool],
 ) -> typing.Tuple[LinterItems, LinterContext, g_TYPE]:
     """Gets type of expression when evaluated"""
-    # noinspection PyTypeChecker
-    operator_conversions: typing.Dict[ast.ASTNode, g_OPERATOR] = {
-        ast.AssignmentStmtNode: "assignment",
-        ast.AdditionBinaryOperatorNode: "binary_plus",
-        ast.SubtractionBinaryOperatorNode: "binary_minus",
-        ast.MultiplicationBinaryOperatorNode: "binary_multiply",
-        ast.DivisionBinaryOperatorNode: "binary_divide",
-        ast.IntegerDivisionBinaryOperatorNode: "binary_integer_divide",
-        ast.ModulusBinaryOperatorNode: "binary_modulus",
-        ast.ExponentiationBinaryOperatorNode: "binary_exponentiation",
-        ast.InplaceAdditionBinaryOperatorNode: "binary_inplace_plus",
-        ast.InplaceSubtractionBinaryOperatorNode: "binary_inplace_minus",
-        ast.InplaceMultiplicationBinaryOperatorNode: "binary_inplace_multiply",
-        ast.InplaceDivisionBinaryOperatorNode: "binary_inplace_divide",
-        ast.EqualToComparativeOperatorNode: "comparative_equality",
-        ast.NotEqualToComparativeOperatorNode: "comparative_inequality",
-        ast.LessThanComparativeOperatorNode: "comparative_less_than",
-        ast.LessThanOrEqualToComparativeOperatorNode: "comparative_less_than_or_equal",
-        ast.GreaterThanComparativeOperatorNode: "comparative_greater_than",
-        ast.GreaterThanOrEqualToComparativeOperatorNode: "comparative_greater_than_or_equal",
-        ast.AndBooleanOperatorNode: "boolean_and",
-        ast.OrBooleanOperatorNode: "boolean_or",
-        ast.NegatorUnaryOperatorNode: "unary_not",
-    }
-
-    # noinspection PyTypeChecker
-    constant_type_conversions: typing.Dict[ast.ASTNode, g_TYPE] = {
-        ast.ConstantExpressionFloatNode: "float",
-        ast.ConstantExpressionIntegerNode: "integer",
-        ast.ConstantExpressionBooleanNode: "boolean",
-        ast.ConstantExpressionStringNode: "string",
-    }
-
-    if isinstance(node, ast.ConstantExpressionNode):
-        if type(node) in constant_type_conversions:
-            # noinspection PyTypeChecker
-            return ([], linter_context, constant_type_conversions[type(node)])
-        else:
-            return (
-                [
-                    LinterError(
-                        convert_pos_info(node.position_info),
-                        "E400",
-                        "<program>",
-                        f"E400: Unknown AST node type {type(node)}",
-                    )
-                ],
-                linter_context,
-                "NO_EVAL",
-            )
-
-    elif isinstance(
+    if isinstance(
         node,
         (
             ast.BinaryOperationExpressionNode,

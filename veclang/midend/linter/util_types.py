@@ -5,8 +5,6 @@ import dataclasses
 
 from veclang.frontend.parser.vl_ast import ASTPositionInfo
 
-from veclang.midend.hir.vl_types import VlType
-
 
 IdentifiedTypeProfiles = dict[str, VlType]
 
@@ -117,6 +115,3 @@ class LinterItem:
             "stack_trace": self.stack_trace,
             "message": self.message,
         }
-
-
-LinterItems = typing.List[LinterItem]

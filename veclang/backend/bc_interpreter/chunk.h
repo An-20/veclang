@@ -1,5 +1,5 @@
-#include <cstdint>
 #include <vector>
+#include <cstdint>
 
 
 enum Opcode : uint8_t {
@@ -94,3 +94,6 @@ struct Chunk {
     std::vector<uint32_t> instructions;
     std::vector<double> constants;
 };
+
+
+Chunk deserialize_chunk(const std::vector<uint8_t>& data);

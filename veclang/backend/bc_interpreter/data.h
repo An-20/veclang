@@ -34,6 +34,7 @@ union VlValue {
     float f;
     bool b;
 };
+
 VlValue add(const VlValue& a, const VlValue& b) {
     VlValue result;
     result.f = a.f + b.f;

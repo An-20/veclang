@@ -474,6 +474,40 @@ class FunctionCallExprNode(ExprNode):
         )
 
 
+class CastExprNode(ExprNode):
+    """An AST node for a cast call"""
+
+    def __init__(
+        self,
+        cast_type: TypeNode,
+        argument: ExprNode,
+        ast_position_info: ASTPositionInfo,
+    ) -> None:
+        super().__init__(ast_position_info)
+        self.cast_type = cast_type
+        self.argument = argument
+
+    @staticmethod
+    def get_node_type_str() -> str:
+        return "CastExprNode"
+
+    def _to_dict(self) -> dict:
+        return {
+            "cast_type": self.cast_type.to_dict(),
+            "argument": self.argument.to_dict(),
+        }
+
+    @classmethod
+    def _from_dict(
+        cls, input_dict: dict, ast_position_info: ASTPositionInfo
+    ) -> "CastExprNode":
+        return cls(
+            TypeNode.from_dict(input_dict["cast_type"]),
+            expr_from_dict(input_dict["argument"]),
+            ast_position_info,
+        )
+
+
 class BinaryOperationExprNode(ExprNode):
     """An AST node for a binary operation"""
 

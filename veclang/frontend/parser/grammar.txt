@@ -254,10 +254,13 @@ index_expr : primary_expr LEFT_SQUARE_BRACKET index_elements RIGHT_SQUARE_BRACKE
 
 parenthesised_expr : LEFT_PARENTHESIS expr RIGHT_PARENTHESIS
 
+cast_expr : type LEFT_PARENTHESIS expr RIGHT_PARENTHESIS
+
 primary_expr : atomic_expr
              | member_access_expr
              | function_call_expr
              | index_expr
+             | cast_expr
              | parenthesised_expr
 
 expr : disjunction_prec_expr

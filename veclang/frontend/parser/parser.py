@@ -29,6 +29,7 @@ from veclang.frontend.parser.vl_ast import (
     IndexExprNode,
     FunctionCallArgumentsNode,
     FunctionCallExprNode,
+    CastExprNode,
     BinaryOperationExprNode,
     UnaryOperatorExprNode,
     ConstantValue,
@@ -244,10 +245,13 @@ index_expr : primary_expr LEFT_SQUARE_BRACKET index_elements RIGHT_SQUARE_BRACKE
 
 parenthesised_expr : LEFT_PARENTHESIS expr RIGHT_PARENTHESIS
 
+cast_expr : type LEFT_PARENTHESIS expr RIGHT_PARENTHESIS
+
 primary_expr : atomic_expr
              | member_access_expr
              | function_call_expr
              | index_expr
+             | cast_expr
              | parenthesised_expr
 
 expr : disjunction_prec_expr
@@ -654,6 +658,10 @@ def p_index_expr(p):
     p[0] = IndexExprNode(p[1], p[3], get_ast_pos_info(p))
 
 
+def p_cast_expr(p):
+    p[0] = CastExprNode(p[0], p[2], get_ast_pos_info(p))
+
+
 def p_parenthesised_expr(p):
     p[0] = p[2]
 
@@ -728,6 +736,7 @@ PARSER_FUNCTION_SPEC = {
     "member_access_expr": p_member_access_expr,
     "index_elements": p_index_elements,
     "index_expr": p_index_expr,
+    "cast_expr": p_cast_expr,
     "parenthesised_expr": p_parenthesised_expr,
     "primary_expr": p_passthrough,
     "expr": p_passthrough,
@@ -764,7 +773,7 @@ if __name__ == "__main__":
         <key: "value">
         asdas: mat4
     ) -> int {
-        return 0;
+        return real(0);
     }
     """
     )

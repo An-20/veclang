@@ -1,4 +1,4 @@
-enum VlOpcode : byte {
+enum VlOpcode : uint8 {
     OP_CONSTANT_VAL_DIRECT=0x00,
     OP_CONSTANT_OBJ_DIRECT=0x01,
     OP_CONSTANT_VAL_TABLE=0x02,
@@ -100,14 +100,14 @@ enum VlType : byte {
 
 
 struct VlHeaderFlags {
-
+    repl: bool;
 }
 
 
 table VlHeader {
     magic: string;  // "VECL"
     version: uint32;
-    flags: VlProgramHeaderFlags;
+    flags: VlHeaderFlags;
 }
 
 table VlFunction {
@@ -121,8 +121,9 @@ table VlFunction {
 
 table VlProgram {
     header: VlHeader;
-    constants: Constants;
-
+    constants: [byte];
+    functions: [VlFunction];
+    instructions: [byte];
 }
 
 

@@ -17,7 +17,10 @@ from veclang.midend.hir.vl_hir import (
 )
 from veclang.midend.hir.vl_types import VlType, VlInt, VlReal
 
-from veclang.backend.bc_compiler.emitter_util import int_to_2_bytes
+from veclang.backend.bc_compiler.emitter_util import (
+    int_to_2_bytes,
+    constant_value_to_bytes,
+)
 
 
 @dataclasses.dataclass
@@ -127,8 +130,12 @@ class BytecodeEmitter:
         if len(as_bytes) <= 2:
             # direct loading
             self.add_instruction("OP_CONSTANT_VAL_DIRECT", as_bytes)
-
-        # TODO: implement
+        else:
+            # add to constant table
+            constant_offset = self.add_constant(as_bytes)
+            self.add_instruction(
+                "OP_CONSTANT_VAL_TABLE", int_to_2_bytes(constant_offset)
+            )
 
     def emit_function_decl_node(self, node: FunctionDeclNode) -> None:
         fn_identifier = node.identifier

@@ -49,16 +49,39 @@ class VlOperation(abc.ABC):
         op_type: VlOperatorType,
         operand_types: list[VlTypeStr],
         opcode_hr: str,
-    ):
+        result_type: VlTypeStr,
+        fast_jmp_opcode_hr: str | None = None,
+    ) -> None:
         self.op_arity: VlOperatorArity = op_arity
         self.op_type: VlOperatorType = op_type
         self.operand_types: list[VlTypeStr] = operand_types
         self.opcode_hr: str = opcode_hr
+        self.result_type: str = result_type
+        self.fast_jmp_opcode_hr: str | None = fast_jmp_opcode_hr
 
 
 class VlConstOperation(VlOperation):
 
-    @abc.abstractmethod
+    def __init__(
+        self,
+        op_arity: VlOperatorArity,
+        op_type: VlOperatorType,
+        operand_types: list[VlTypeStr],
+        opcode_hr: str,
+        result_type: VlTypeStr,
+        eval_fn: typing.Callable,
+        fast_jmp_opcode_hr: str | None = None,
+    ) -> None:
+        super().__init__(
+            op_arity,
+            op_type,
+            operand_types,
+            opcode_hr,
+            result_type,
+            fast_jmp_opcode_hr,
+        )
+        self.eval_fn: typing.Callable = eval_fn
+
     def evaluate(self, *args):
         if self.op_arity == "UNARY" and len(args) != 0:
             raise ValueError("Unary operation must take exactly 1 operand.")
@@ -66,8 +89,15 @@ class VlConstOperation(VlOperation):
             raise ValueError("Binary operation must take exactly 2 operands.")
         elif self.op_arity == "TERNARY" and len(args) != 2:
             raise ValueError("Ternary operation must take exactly 3 operands.")
-        else:
+        elif self.op_arity not in ["UNARY", "BINARY", "TERNARY"]:
             raise ValueError(f"Unknown operation arity: '{self.op_type}'.")
+        return self.eval_fn(args)
+
+
+class VlCast:
+
+    def __init__(self, to_type: VlTypeStr) -> None:
+        self.to_type: VlTypeStr = to_type
 
 
 class VlTypeABC(abc.ABC):
@@ -103,6 +133,11 @@ class VlTypeABC(abc.ABC):
     @staticmethod
     @abc.abstractmethod
     def get_methods() -> list[VlMethod]:
+        pass
+
+    @staticmethod
+    @abc.abstractmethod
+    def get_casts() -> list[VlCast]:
         pass
 
 

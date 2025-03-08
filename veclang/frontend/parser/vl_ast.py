@@ -23,7 +23,6 @@ BinaryOperatorType = typing.Literal[
     "TIMES",
     "DIVIDE",
     "MODULUS",
-    "INTEGER_DIVIDE",
     "EXPONENTIATION",
     "BOOLEAN_AND",
     "BOOLEAN_OR",
@@ -34,10 +33,10 @@ BinaryOperatorType = typing.Literal[
     "BITWISE_RIGHT_SHIFT",
     "EQUAL_TO",
     "NOT_EQUAL_TO",
-    "LESS_THAN",
-    "LESS_THAN_OR_EQUAL",
     "GREATER_THAN",
     "GREATER_THAN_OR_EQUAL",
+    "LESS_THAN",
+    "LESS_THAN_OR_EQUAL",
 ]
 
 UnaryOperatorType = typing.Literal[

@@ -7,6 +7,7 @@ from veclang.frontend.parser.vl_ast import VlOperatorType
 VlOperatorArity = typing.Literal["UNARY", "BINARY", "TERNARY"]
 
 VlTypeStr = typing.Literal[
+    "null",
     "int",
     "bool",
     "real",
@@ -19,6 +20,7 @@ VlTypeStr = typing.Literal[
     "mat4",
 ]
 VlTypeStrs = [
+    "null",
     "int",
     "bool",
     "real",
@@ -42,11 +44,13 @@ class VlMethod:
         arg_types: list[VlTypeStr],
         return_type: VlTypeStr,
         id_code: int,
+        help_str: str,
     ) -> None:
         self.name: str = name
         self.arg_types: list[VlTypeStr] = arg_types
         self.return_type: VlTypeStr = return_type
         self.id_code: int = id_code
+        self.help_str: str = help_str
 
 
 class VlOperation(abc.ABC):
@@ -60,6 +64,7 @@ class VlOperation(abc.ABC):
         opcode_hr: str,
         result_type: VlTypeStr,
         fast_jmp_opcode_hr: str | None = None,
+        extra_opcode_val: int | None = None,
     ) -> None:
         self.op_arity: VlOperatorArity = op_arity
         self.op_type: VlOperatorType = op_type
@@ -67,6 +72,7 @@ class VlOperation(abc.ABC):
         self.opcode_hr: str = opcode_hr
         self.result_type: str = result_type
         self.fast_jmp_opcode_hr: str | None = fast_jmp_opcode_hr
+        self.extra_opcode_val: int | None = extra_opcode_val
 
 
 class VlConstOperation(VlOperation):

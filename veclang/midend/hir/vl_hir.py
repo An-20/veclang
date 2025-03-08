@@ -12,7 +12,7 @@ from veclang.frontend.parser.parser import (
     ASTPositionInfo,
 )
 
-from veclang.midend.hir.vl_types import VlType, VlTypeStrs, VlInt, VlReal
+from veclang.midend.vl_core import VlType, VlTypeStrs, VlInt, VlReal
 
 
 def lower_vl_type(vl_type: str) -> VlType:

@@ -55,7 +55,6 @@ from veclang.frontend.parser.vl_ast import (
     BreakStmtNode,
     ContinueStmtNode,
 )
-from veclang.frontend.parser.vl_ast_io import format_ast
 
 
 DEBUG: bool = False
@@ -535,8 +534,6 @@ def p_multiplication_prec_expr(p):
             operator = "TIMES"
         elif p[2] == "/":
             operator = "DIVIDE"
-        elif p[2] == "//":
-            operator = "INTEGER_DIVIDE"
         elif p[2] == "%":
             operator = "MODULUS"
         else:

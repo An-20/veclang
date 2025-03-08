@@ -9,6 +9,32 @@ from veclang.midend.vl_core.vl_type import (
 )
 
 
+class VlNull(VlTypeABC):
+
+    def __init__(self, underlying: None) -> None:
+        if underlying is not None:
+            raise ValueError(
+                f"Underlying value of VlNull must be a Python None, not '{type(underlying)}'"
+            )
+        self.underlying: None = None
+
+    @staticmethod
+    def get_info() -> tuple[VlTypeStr, VlTypeType, tuple[int, int]]:
+        return "null", "VAL", (0, 0)
+
+    @staticmethod
+    def get_operations() -> list[VlOperation]:
+        return []
+
+    @staticmethod
+    def get_methods() -> list[VlMethod]:
+        pass
+
+    @staticmethod
+    def get_casts() -> list[VlCast]:
+        pass
+
+
 class VlInt(VlTypeABC):
 
     def __init__(self, underlying: int) -> None:

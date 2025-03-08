@@ -4,8 +4,6 @@ MINUS: "-"
 TIMES: "\*"
 DIVIDE: "/"
 MODULUS: "%"
-
-INTEGER_DIVIDE: "//"
 EXPONENTIATION: "\*\*"
 
 PLUS_ASSIGNMENT: "\+="
@@ -195,7 +193,6 @@ addition_prec_expr : addition_prec_expr PLUS multiplication_prec_expr
 
 multiplication_prec_expr : multiplication_prec_expr TIMES unary_prec_expr
                          | multiplication_prec_expr DIVIDE unary_prec_expr
-                         | multiplication_prec_expr INTEGER_DIVIDE unary_prec_expr
                          | multiplication_prec_expr MODULUS unary_prec_expr
                          | unary_prec_expr
 

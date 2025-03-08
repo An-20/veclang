@@ -11,15 +11,13 @@ MINUS: "-"
 TIMES: "\\*"
 DIVIDE: "/"
 MODULUS: "%"
+EXPONENTIATION: "\\*\\*"
 
 PLUS_ASSIGNMENT: "\\+="
 MINUS_ASSIGNMENT: "-="
 TIMES_ASSIGNMENT: "\\*="
 DIVIDE_ASSIGNMENT: "/="
 MODULUS_ASSIGNMENT: "%="
-
-INTEGER_DIVIDE: "//"
-EXPONENTIATION: "\\*\\*"
 
 TYPE: "(int|uint|long|ulong|real|complex|vec2|vec3|vec4|mat2|mat3|mat4)"
 IMAGINARY_UNIT: "i"
@@ -53,7 +51,7 @@ RIGHT_CURLY_BRACKET: "\\}"
 
 DOT: "\\."
 COMMA: "\\,"
-SCOPE_RESOLUTION: "\:\:"
+SCOPE_RESOLUTION: "\\:\\:"
 COLON: "\\:"
 SEMICOLON: ";"
 

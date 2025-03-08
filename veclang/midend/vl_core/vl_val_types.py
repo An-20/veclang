@@ -1,4 +1,4 @@
-from veclang.midend.hir.vl_types.vl_type import (
+from veclang.midend.vl_core.vl_type import (
     VlTypeABC,
     VlTypeStr,
     VlTypeType,

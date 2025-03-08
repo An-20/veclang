@@ -36,8 +36,17 @@ VlTypeType = typing.Literal["VAL", "OBJ"]
 
 class VlMethod:
 
-    def __init__(self):
-        pass
+    def __init__(
+        self,
+        name: str,
+        arg_types: list[VlTypeStr],
+        return_type: VlTypeStr,
+        id_code: int,
+    ) -> None:
+        self.name: str = name
+        self.arg_types: list[VlTypeStr] = arg_types
+        self.return_type: VlTypeStr = return_type
+        self.id_code: int = id_code
 
 
 class VlOperation(abc.ABC):

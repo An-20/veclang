@@ -186,7 +186,6 @@ addition_prec_expr : addition_prec_expr PLUS multiplication_prec_expr
 
 multiplication_prec_expr : multiplication_prec_expr TIMES unary_prec_expr
                          | multiplication_prec_expr DIVIDE unary_prec_expr
-                         | multiplication_prec_expr INTEGER_DIVIDE unary_prec_expr
                          | multiplication_prec_expr MODULUS unary_prec_expr
                          | unary_prec_expr
 
@@ -759,21 +758,3 @@ def parse(input_str: str) -> ProgramNode:
     """Parse a string and return an AST"""
     result = parser.parse(input_str)
     return result
-
-
-if __name__ == "__main__":
-
-    def t(input_str: str):
-        result = parser.parse(input_str)
-        print(format_ast(result))
-
-    t(
-        """
-    fn main(
-        <key: "value">
-        asdas: mat4
-    ) -> int {
-        return real(0);
-    }
-    """
-    )

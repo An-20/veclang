@@ -67,6 +67,9 @@ OpcodeMap: dict[int, Instruction] = {
     0x15: Instruction(0x15, "OP_SET_LOCAL_OBJ", 2),
     0x16: Instruction(0x16, "OP_GET_GLOBAL_OBJ", 2),
     0x17: Instruction(0x17, "OP_SET_GLOBAL_OBJ", 2),
+    0x20: Instruction(0x20, "OP_JMP_IF_TRUE", 0),
+    0x21: Instruction(0x21, "OP_JMP_IF_FALSE", 0),
+    0x22: Instruction(0x22, "OP_JMP", 0),
     # ========================================
     # 0x80 - 0xDF - OPERATIONS
     # ========================================
@@ -90,12 +93,6 @@ OpcodeMap: dict[int, Instruction] = {
     0x90: Instruction(0x90, "OP_INT_NOT", 0),
     0x91: Instruction(0x91, "OP_INT_LEFT_SHIFT", 0),
     0x92: Instruction(0x92, "OP_INT_RIGHT_SHIFT", 0),
-    0x93: Instruction(0x93, "OP_INT_JMP_IF_EQUAL", 1),
-    0x94: Instruction(0x94, "OP_INT_JMP_IF_NOT_EQUAL", 1),
-    0x95: Instruction(0x95, "OP_INT_JMP_IF_GREATER", 1),
-    0x96: Instruction(0x96, "OP_INT_JMP_IF_GREATER_OR_EQUAL", 1),
-    0x97: Instruction(0x97, "OP_INT_JMP_IF_LESS", 1),
-    0x98: Instruction(0x98, "OP_INT_JMP_IF_LESS_OR_EQUAL", 1),
     0x9C: Instruction(0x9C, "OP_BOOLEAN_AND", 0),
     0x9D: Instruction(0x9D, "OP_BOOLEAN_OR", 0),
     0x9E: Instruction(0x9E, "OP_BOOLEAN_NOT", 0),
@@ -122,12 +119,6 @@ OpcodeMap: dict[int, Instruction] = {
     0xB5: Instruction(0xB5, "OP_COMPLEX_DIV", 0),
     0xB6: Instruction(0xB6, "OP_COMPLEX_EXP", 0),
     0xB7: Instruction(0xB7, "OP_COMPLEX_NEG", 0),
-    0xBA: Instruction(0xBA, "OP_REAL_JMP_IF_EQUAL", 0),
-    0xBB: Instruction(0xBB, "OP_REAL_JMP_IF_NOT_EQUAL", 0),
-    0xBC: Instruction(0xBC, "OP_REAL_JMP_IF_GREATER", 1),
-    0xBD: Instruction(0xBD, "OP_REAL_JMP_IF_GREATER_OR_EQUAL", 1),
-    0xBE: Instruction(0xBE, "OP_REAL_JMP_IF_LESS", 1),
-    0xBF: Instruction(0xBF, "OP_REAL_JMP_IF_LESS_OR_EQUAL", 1),
     # 0xC0 - 0xCF - VECTOR AND MATRIX OPERATIONS
     0xC0: MatVecInstruction(0xC0, "OP_VECTOR_ADD", 1),
     0xC1: MatVecInstruction(0xC1, "OP_VECTOR_SUB", 1),

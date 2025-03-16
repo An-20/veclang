@@ -63,7 +63,6 @@ class VlOperation(abc.ABC):
         operand_types: list[VlTypeStr],
         opcode_hr: str,
         result_type: VlTypeStr,
-        fast_jmp_opcode_hr: str | None = None,
         extra_opcode_val: int | None = None,
     ) -> None:
         self.op_arity: VlOperatorArity = op_arity
@@ -71,7 +70,6 @@ class VlOperation(abc.ABC):
         self.operand_types: list[VlTypeStr] = operand_types
         self.opcode_hr: str = opcode_hr
         self.result_type: str = result_type
-        self.fast_jmp_opcode_hr: str | None = fast_jmp_opcode_hr
         self.extra_opcode_val: int | None = extra_opcode_val
 
 
@@ -85,7 +83,6 @@ class VlConstOperation(VlOperation):
         opcode_hr: str,
         result_type: VlTypeStr,
         eval_fn: typing.Callable,
-        fast_jmp_opcode_hr: str | None = None,
     ) -> None:
         super().__init__(
             op_arity,
@@ -93,7 +90,6 @@ class VlConstOperation(VlOperation):
             operand_types,
             opcode_hr,
             result_type,
-            fast_jmp_opcode_hr,
         )
         self.eval_fn: typing.Callable = eval_fn
 

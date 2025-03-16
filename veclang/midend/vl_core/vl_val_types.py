@@ -58,7 +58,6 @@ class VlInt(VlTypeABC):
                 "OP_INT_EQUAL",
                 "bool",
                 lambda x, y: x == y,
-                fast_jmp_opcode_hr="OP_INT_JMP_IF_EQUAL",
             ),
             VlConstOperation(
                 "BINARY",
@@ -67,7 +66,6 @@ class VlInt(VlTypeABC):
                 "OP_INT_NOT_EQUAL",
                 "bool",
                 lambda x, y: x != y,
-                fast_jmp_opcode_hr="OP_INT_JMP_IF_NOT_EQUAL",
             ),
             VlConstOperation(
                 "BINARY",
@@ -76,7 +74,6 @@ class VlInt(VlTypeABC):
                 "OP_INT_GREATER",
                 "bool",
                 lambda x, y: x > y,
-                fast_jmp_opcode_hr="OP_INT_JMP_IF_GREATER",
             ),
             VlConstOperation(
                 "BINARY",
@@ -85,7 +82,6 @@ class VlInt(VlTypeABC):
                 "OP_INT_GREATER_OR_EQUAL",
                 "bool",
                 lambda x, y: x >= y,
-                fast_jmp_opcode_hr="OP_INT_JMP_IF_GREATER_OR_EQUAL",
             ),
             VlConstOperation(
                 "BINARY",
@@ -94,7 +90,6 @@ class VlInt(VlTypeABC):
                 "OP_INT_LESS",
                 "bool",
                 lambda x, y: x < y,
-                fast_jmp_opcode_hr="OP_INT_JMP_IF_LESS",
             ),
             VlConstOperation(
                 "BINARY",
@@ -103,7 +98,6 @@ class VlInt(VlTypeABC):
                 "OP_INT_LESS_OR_EQUAL",
                 "bool",
                 lambda x, y: x <= y,
-                fast_jmp_opcode_hr="OP_INT_JMP_IF_LESS_OR_EQUAL",
             ),
             VlConstOperation(
                 "BINARY", "PLUS", ["int"], "OP_INT_ADD", "int", lambda x, y: x + y
@@ -238,7 +232,6 @@ class VlBool(VlTypeABC):
                 "OP_INT_EQUAL",
                 "bool",
                 lambda x, y: x == y,
-                fast_jmp_opcode_hr="OP_INT_JMP_IF_EQUAL",
             ),
             VlConstOperation(
                 "BINARY",
@@ -247,7 +240,6 @@ class VlBool(VlTypeABC):
                 "OP_INT_NOT_EQUAL",
                 "bool",
                 lambda x, y: x != y,
-                fast_jmp_opcode_hr="OP_INT_JMP_IF_NOT_EQUAL",
             ),
             VlConstOperation(
                 "BINARY",
@@ -302,7 +294,6 @@ class VlReal(VlTypeABC):
                 "OP_REAL_EQUAL",
                 "bool",
                 lambda x, y: x == y,
-                fast_jmp_opcode_hr="OP_REAL_JMP_IF_EQUAL",
             ),
             VlConstOperation(
                 "BINARY",
@@ -311,7 +302,6 @@ class VlReal(VlTypeABC):
                 "OP_REAL_NOT_EQUAL",
                 "bool",
                 lambda x, y: x != y,
-                fast_jmp_opcode_hr="OP_REAL_JMP_IF_NOT_EQUAL",
             ),
             VlConstOperation(
                 "BINARY",
@@ -320,7 +310,6 @@ class VlReal(VlTypeABC):
                 "OP_REAL_GREATER",
                 "bool",
                 lambda x, y: x > y,
-                fast_jmp_opcode_hr="OP_REAL_JMP_IF_GREATER",
             ),
             VlConstOperation(
                 "BINARY",
@@ -329,7 +318,6 @@ class VlReal(VlTypeABC):
                 "OP_REAL_GREATER_OR_EQUAL",
                 "bool",
                 lambda x, y: x >= y,
-                fast_jmp_opcode_hr="OP_REAL_JMP_IF_GREATER_OR_EQUAL",
             ),
             VlConstOperation(
                 "BINARY",
@@ -338,7 +326,6 @@ class VlReal(VlTypeABC):
                 "OP_REAL_LESS",
                 "bool",
                 lambda x, y: x < y,
-                fast_jmp_opcode_hr="OP_REAL_JMP_IF_LESS",
             ),
             VlConstOperation(
                 "BINARY",
@@ -347,7 +334,6 @@ class VlReal(VlTypeABC):
                 "OP_REAL_LESS_OR_EQUAL",
                 "bool",
                 lambda x, y: x <= y,
-                fast_jmp_opcode_hr="OP_REAL_JMP_IF_LESS_OR_EQUAL",
             ),
             VlConstOperation(
                 "BINARY", "PLUS", ["real"], "OP_REAL_ADD", "real", lambda x, y: x + y

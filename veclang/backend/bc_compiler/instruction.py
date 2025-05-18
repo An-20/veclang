@@ -29,7 +29,7 @@ class Instruction:
                 raise ValueError(
                     f"Instruction '{self.opcode_hr}' takes 1 2-byte operand."
                 )
-            return bytes([self.opcode] + list(operands[0]))
+            return bytes([self.opcode] + [0] + list(operands[0]))
         elif self.num_operands == 2:
             if not isinstance(operands[0], bytes) or len(operands[0]) != 1:
                 raise ValueError(
@@ -59,6 +59,7 @@ OpcodeMap: dict[int, Instruction] = {
     0x02: Instruction(0x02, "OP_CONSTANT_VAL_TABLE", 1),
     0x03: Instruction(0x03, "OP_CONSTANT_OBJ_TABLE", 2),
     0x04: Instruction(0x04, "OP_POP", 0),
+    0x0F: Instruction(0x0F, "OP_CALL", 1),
     0x10: Instruction(0x10, "OP_GET_LOCAL_VAL", 1),
     0x11: Instruction(0x11, "OP_SET_LOCAL_VAL", 1),
     0x12: Instruction(0x12, "OP_GET_GLOBAL_VAL", 1),

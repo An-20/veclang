@@ -12,11 +12,12 @@ def int_to_1_byte(x: int) -> bytes:
 def int_to_2_bytes(x: int) -> bytes:
     if x not in range(65536):
         raise ValueError("Int must be in range(65536)")
-    return x.to_bytes()
+    return x.to_bytes().rjust(2, bytes(1))
 
 
 def constant_value_to_bytes(x: ConstantValue) -> bytes:
     # TODO: fix for 32 / 64 bit
+    x = x.value
     if isinstance(x, int):
         if 0 <= x <= 65535:
             return x.to_bytes()

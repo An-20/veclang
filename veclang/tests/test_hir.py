@@ -1,6 +1,6 @@
 from veclang.frontend.parser.parser import parse
 from veclang.frontend.parser.vl_ast_io import print_ast, format_ast
-from veclang.midend.hir.vl_hir import ProgramNode
+from veclang.midend.hir import lower
 from veclang.midend.hir.vl_hlr_io import print_hir, format_hir
 
 
@@ -31,7 +31,7 @@ fn mandlebrot(
 """
 )
 print_ast(parsed)
-hir = ProgramNode(parsed)
+hir = lower(parsed)
 print_hir(hir)
 
 print(len(format_ast(parsed)), len(format_hir(hir)))

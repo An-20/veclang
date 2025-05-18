@@ -198,13 +198,13 @@ class IdentifierNode(ASTNode):
         return "IdentifierNode"
 
     def _to_dict(self) -> dict:
-        return {"name": self.name}
+        return {"identifier": self.name}
 
     @classmethod
     def _from_dict(
         cls, input_dict: dict, ast_position_info: ASTPositionInfo
     ) -> "IdentifierNode":
-        return cls(input_dict["name"], ast_position_info)
+        return cls(input_dict["identifier"], ast_position_info)
 
 
 class TypeNode(IdentifierNode):
@@ -330,7 +330,7 @@ class MemberAccessExprNode(ExprNode):
         return "MemberAccessExpr"
 
     def _to_dict(self) -> dict:
-        return {"target": self.target.to_dict(), "name": self.name.to_dict()}
+        return {"target": self.target.to_dict(), "identifier": self.name.to_dict()}
 
     @classmethod
     def _from_dict(
@@ -338,7 +338,7 @@ class MemberAccessExprNode(ExprNode):
     ) -> "MemberAccessExprNode":
         return cls(
             expr_from_dict(input_dict["target"]),
-            IdentifierNode.from_dict(input_dict["name"]),
+            IdentifierNode.from_dict(input_dict["identifier"]),
             ast_position_info,
         )
 
@@ -784,7 +784,7 @@ class FunctionDeclParameterNode(ASTNode):
     def _to_dict(self) -> dict:
         return {
             "attribute_tags": self.attribute_tags.to_dict(),
-            "name": self.name.to_dict(),
+            "identifier": self.name.to_dict(),
             "type": self.type.to_dict(),
         }
 
@@ -794,7 +794,7 @@ class FunctionDeclParameterNode(ASTNode):
     ) -> "FunctionDeclParameterNode":
         return cls(
             AttributeTagsNode.from_dict(input_dict["attribute_tags"]),
-            IdentifierNode.from_dict(input_dict["name"]),
+            IdentifierNode.from_dict(input_dict["identifier"]),
             TypeNode.from_dict(input_dict["type"]),
             ast_position_info,
         )

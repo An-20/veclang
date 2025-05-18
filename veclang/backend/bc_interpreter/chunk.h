@@ -1,8 +1,8 @@
 #include <vector>
 #include <cstdint>
 
-
-enum Opcode : uint8_t {
+enum Opcode : uint8_t
+{
     OP_CONSTANT_VAL_DIRECT = 0x00,
     OP_CONSTANT_OBJ_DIRECT = 0x01,
     OP_CONSTANT_VAL_TABLE = 0x02,
@@ -89,11 +89,10 @@ enum Opcode : uint8_t {
     OP_MATRIX_INV = 0xCF
 };
 
-
-struct Chunk {
+struct Chunk
+{
     std::vector<uint32_t> instructions;
     std::vector<double> constants;
 };
 
-
-Chunk deserialize_chunk(const std::vector<uint8_t>& data);
+Chunk deserialize_chunk(const std::vector<uint8_t> &data);

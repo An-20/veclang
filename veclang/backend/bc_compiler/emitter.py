@@ -3,8 +3,11 @@ import dataclasses
 from veclang.backend.bc_compiler.instruction import OpcodeHRMap
 
 from veclang.midend.hir.vl_hir import (
+    HIRNode,
     ExprNode,
     StmtNode,
+    DeclNode,
+    ProgramNode,
     IdentifierExprNode,
     ArrayLiteralExprNode,
     MemberAccessExprNode,
@@ -14,8 +17,19 @@ from veclang.midend.hir.vl_hir import (
     UnaryOperatorExprNode,
     ConstantExprNode,
     FunctionDeclNode,
+    DataDeclNode,
+    UsingDeclNode,
+    AssignmentStmtNode,
+    AugmentedAssignmentStmtNode,
+    ExprStmtNode,
+    SelectionStackStmt,
+    RangedForStmtNode,
+    WhileStmtNode,
+    ReturnStmtNode,
+    BreakStmtNode,
+    ContinueStmtNode,
 )
-from veclang.midend.hir.vl_types import VlType, VlInt, VlReal
+from veclang.midend.vl_core import VlType, VlNull, VlInt, VlReal, VlBool
 
 from veclang.backend.bc_compiler.emitter_util import (
     int_to_2_bytes,
@@ -50,6 +64,11 @@ class BytecodeEmitter:
         self.ctx_stack_frame_local_constants: dict[str, ConstantExprNode] = {}
         self.ctx_stack_frame_locals_offset = 0
 
+    def emit(self, hir_node: ProgramNode) -> list[bytes]:
+        for stmt in hir_node.stmts:
+            self.emit_stmt(stmt)
+        return self.instructions
+
     def add_constant(self, constant_as_bytes: bytes) -> int:
         """
         If a constant is not already in the constant table, adds a constant to the constant table, returning the offset.
@@ -68,7 +87,11 @@ class BytecodeEmitter:
         self.instructions.append(OpcodeHRMap[opcode_hr].pack(operands))
 
     def emit_stmt(self, node: StmtNode) -> None:
-        pass
+        if isinstance(node, DeclNode):
+            pass
+        elif isinstance(node, ExprStmtNode):
+            if isinstance(node.expr, FunctionCallExprNode):
+                self.emit_expr(node.expr)
 
     def emit_expr(self, node: ExprNode) -> None:
         if isinstance(node, IdentifierExprNode):
@@ -80,16 +103,18 @@ class BytecodeEmitter:
         elif isinstance(node, IndexExprNode):
             pass
         elif isinstance(node, FunctionCallExprNode):
-            pass
+            self.emit_function_call_expr(node)
         elif isinstance(node, BinaryOperationExprNode):
-            pass
+            self.emit_binary_operator_expr(node)
         elif isinstance(node, UnaryOperatorExprNode):
-            pass
+            self.emit_unary_operator_expr(node)
         elif isinstance(node, ConstantExprNode):
-            pass
+            self.emit_constant_expr(node)
+        else:
+            raise ValueError
 
     def emit_identifier_expr(self, node: IdentifierExprNode) -> None:
-        identifier = node.name
+        identifier = node.identifier
         # check global constants
         if identifier in self.global_constants:
             self.emit_constant_expr(self.global_constants[identifier])
@@ -125,17 +150,31 @@ class BytecodeEmitter:
             return
         raise ValueError(f"Unknown identifier '{identifier}'")
 
+    def emit_function_call_expr(self, node: FunctionCallExprNode) -> None:
+        # arguments are pushed onto the stack in reverse order
+        for argument in reversed(node.arguments):
+            self.emit_expr(argument)
+        self.add_instruction("OP_CALL", int_to_2_bytes(0))
+
+    def emit_unary_operator_expr(self, node: UnaryOperatorExprNode) -> None:
+        pass
+
+    def emit_binary_operator_expr(self, node: BinaryOperationExprNode) -> None:
+        # post-order traversal
+        self.emit_expr(node.right)
+        self.emit_expr(node.left)
+        self.add_instruction(node.operation.opcode_hr)
+
     def emit_constant_expr(self, node: ConstantExprNode) -> None:
-        as_bytes = node.to_bytes()
-        if len(as_bytes) <= 2:
+        as_bytes = constant_value_to_bytes(node.value)
+        if isinstance(node.value.value, (bool, int)) and len(as_bytes) <= 2:
             # direct loading
-            self.add_instruction("OP_CONSTANT_VAL_DIRECT", as_bytes)
-        else:
-            # add to constant table
-            constant_offset = self.add_constant(as_bytes)
-            self.add_instruction(
-                "OP_CONSTANT_VAL_TABLE", int_to_2_bytes(constant_offset)
-            )
+            self.add_instruction("OP_CONSTANT_VAL_DIRECT", as_bytes.rjust(2, bytes(1)))
+            return
+
+        # add to constant table
+        constant_offset = self.add_constant(as_bytes)
+        self.add_instruction("OP_CONSTANT_VAL_TABLE", int_to_2_bytes(constant_offset))
 
     def emit_function_decl_node(self, node: FunctionDeclNode) -> None:
         fn_identifier = node.identifier
@@ -145,14 +184,14 @@ class BytecodeEmitter:
 
         # pop arguments off the intermediate value stack and onto the call stack
         for parameter in node.parameters:
-            self.ctx_stack_frame_local_variables[parameter.name] = (
+            self.ctx_stack_frame_local_variables[parameter.identifier] = (
                 self.ctx_stack_frame_locals_offset
             )
-            self.ctx_stack_frame_locals_offset += parameter.vl_type.get_size()
+            self.ctx_stack_frame_locals_offset += parameter.vl_type.get_info()[2]
             if parameter.vl_type in [VlInt, VlReal]:
                 self.add_instruction(
                     "OP_SET_LOCAL_VAL",
-                    self.ctx_stack_frame_local_variables[parameter.name]
+                    self.ctx_stack_frame_local_variables[parameter.identifier]
                     .to_bytes()
                     .rjust(2),
                 )

@@ -4,6 +4,9 @@ enum VlOpcode : uint8 {
     OP_CONSTANT_VAL_TABLE=0x02,
     OP_CONSTANT_OBJ_TABLE=0x03,
     OP_POP=0x04,
+
+    OP_CALL=0x0F,
+
     OP_GET_LOCAL_VAL=0x10,
     OP_SET_LOCAL_VAL=0x11,
     OP_GET_GLOBAL_VAL=0x12,

@@ -22,7 +22,7 @@ met:
 * Redistributions in binary form must reproduce the above copyright notice,
   this list of conditions and the following disclaimer in the documentation
   and/or other materials provided with the distribution.
-* Neither the name of David Beazley or Dabeaz LLC may be used to
+* Neither the identifier of David Beazley or Dabeaz LLC may be used to
   endorse or promote products derived from this software without
   specific prior written permission.
 
@@ -89,7 +89,7 @@ yacc_debug = False
 # Debugging mode.  If set, yacc generates a
 # a 'parser.out' file in the current directory
 
-debug_file = "parser.out"  # Default name of the debugging file
+debug_file = "parser.out"  # Default identifier of the debugging file
 error_count = 3  # Number of symbols that must be shifted to leave recovery mode
 result_limit = 40  # Size limit of results when running in debug mode.
 
@@ -401,7 +401,7 @@ class LRParserEngine:
 
                     # Get production function
                     sym = YaccSymbol()
-                    sym.type = pname  # Production name
+                    sym.type = pname  # Production identifier
                     sym.value = None
 
                     if debug:
@@ -661,7 +661,7 @@ _is_identifier = re.compile(r"^[a-zA-Z0-9_-]+$")
 #
 # Here are the basic attributes defined on all productions
 #
-#       name     - Name of the production.  For example 'expr'
+#       identifier     - Name of the production.  For example 'expr'
 #       prod     - A list of symbols on the right side ['expr','PLUS','term']
 #       precedence_level     - Production precedence level
 #       number   - Production number.
@@ -685,7 +685,7 @@ class Production:
         expr : expr PLUS term
 
     Here are the basic attributes defined on all productions
-        name     - Name of the production.  For example 'expr'
+        identifier     - Name of the production.  For example 'expr'
         prod     - A list of symbols on the right side ['expr','PLUS','term']
         precedence_level     - Production precedence level
         number   - Production number.
@@ -767,7 +767,7 @@ class Production:
 
     def bind(self, function_spec):
         """
-        Bind the production function name to a callable
+        Bind the production function identifier to a callable
         """
         if self.func:
             self.callable = function_spec[self.func]
@@ -782,7 +782,7 @@ class LRItem:
 
     In the above, the "." represents the current location of the parse.  Here
     basic attributes:
-          name       - Name of the production.  For example 'expr'
+          identifier       - Name of the production.  For example 'expr'
           prod       - A list of symbols on the right side ['expr','.', 'PLUS','term']
           number     - Production number.
           lr_next      Next LR item. Example, if we are ' expr -> expr . PLUS term'
@@ -917,7 +917,7 @@ class Grammar(object):
     # computes its precedence level.
     #
     # The production rule is supplied as a list of symbols.   For example,
-    # a rule such as 'expr : expr PLUS term' has a production name of 'expr' and
+    # a rule such as 'expr : expr PLUS term' has a production identifier of 'expr' and
     # symbols ['expr','PLUS','term'].
     #
     # Precedence is determined by the precedence of the right-most non-terminal
@@ -930,16 +930,18 @@ class Grammar(object):
     def add_production(self, prod_name, syms, func=None, file="", line=0):
         if prod_name in self.terminals:
             raise GrammarError(
-                "%s:%d: Illegal rule name %r. Already defined as a token"
+                "%s:%d: Illegal rule identifier %r. Already defined as a token"
                 % (file, line, prod_name)
             )
         if prod_name == "error":
             raise GrammarError(
-                "%s:%d: Illegal rule name %r. error is a reserved word"
+                "%s:%d: Illegal rule identifier %r. error is a reserved word"
                 % (file, line, prod_name)
             )
         if not _is_identifier.match(prod_name):
-            raise GrammarError("%s:%d: Illegal rule name %r" % (file, line, prod_name))
+            raise GrammarError(
+                "%s:%d: Illegal rule identifier %r" % (file, line, prod_name)
+            )
 
         # Look for literal tokens
         for n, s in enumerate(syms):
@@ -959,7 +961,8 @@ class Grammar(object):
                     pass
             if not _is_identifier.match(s) and s != "%precedence_level":
                 raise GrammarError(
-                    "%s:%d: Illegal name %r in rule %r" % (file, line, s, prod_name)
+                    "%s:%d: Illegal identifier %r in rule %r"
+                    % (file, line, s, prod_name)
                 )
 
         # Determine the precedence level
@@ -1186,7 +1189,7 @@ class Grammar(object):
     # unused_precedence()
     #
     # Returns a list of tuples (term,precedence) corresponding to precedence
-    # rules that were never used by the grammar.  term is the name of the terminal
+    # rules that were never used by the grammar.  term is the identifier of the terminal
     # on which precedence was applied and precedence is a string such as 'left' or
     # 'right' corresponding to the type of precedence.
     # -----------------------------------------------------------------------------
@@ -1727,7 +1730,7 @@ class LRTable:
                 if p.name != N:
                     continue
 
-                # Okay, we have a name match.  We now follow the production all the way
+                # Okay, we have a identifier match.  We now follow the production all the way
                 # through the state machine until we get the . on the right hand side
 
                 lr_index = p.lr_index
@@ -2256,7 +2259,7 @@ class ParserReflect:
         """Validate the tokens"""
         # Validate the tokens.
         if "error" in self.tokens:
-            self.log.error("Illegal token name 'error'. Is a reserved word")
+            self.log.error("Illegal token identifier 'error'. Is a reserved word")
             self.error = True
             return
 

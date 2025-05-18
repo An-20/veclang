@@ -1,5 +1,6 @@
 import abc
 import typing
+import dataclasses
 
 from veclang.frontend.parser.vl_ast import VlOperatorType
 
@@ -61,16 +62,16 @@ class VlOperation(abc.ABC):
         op_arity: VlOperatorArity,
         op_type: VlOperatorType,
         operand_types: list[VlTypeStr],
-        opcode_hr: str,
         result_type: VlTypeStr,
-        extra_opcode_val: int | None = None,
+        opcode_hr: str,
+        extra_opcode_hr: str | None = None,
     ) -> None:
         self.op_arity: VlOperatorArity = op_arity
         self.op_type: VlOperatorType = op_type
         self.operand_types: list[VlTypeStr] = operand_types
         self.opcode_hr: str = opcode_hr
         self.result_type: str = result_type
-        self.extra_opcode_val: int | None = extra_opcode_val
+        self.extra_opcode_hr: str | None = extra_opcode_hr
 
 
 class VlConstOperation(VlOperation):
@@ -80,16 +81,13 @@ class VlConstOperation(VlOperation):
         op_arity: VlOperatorArity,
         op_type: VlOperatorType,
         operand_types: list[VlTypeStr],
-        opcode_hr: str,
         result_type: VlTypeStr,
         eval_fn: typing.Callable,
+        opcode_hr: str,
+        extra_opcode_hr: str | None = None,
     ) -> None:
         super().__init__(
-            op_arity,
-            op_type,
-            operand_types,
-            opcode_hr,
-            result_type,
+            op_arity, op_type, operand_types, result_type, opcode_hr, extra_opcode_hr
         )
         self.eval_fn: typing.Callable = eval_fn
 
@@ -107,8 +105,9 @@ class VlConstOperation(VlOperation):
 
 class VlCast:
 
-    def __init__(self, to_type: VlTypeStr) -> None:
+    def __init__(self, to_type: VlTypeStr, method_name: str) -> None:
         self.to_type: VlTypeStr = to_type
+        self.method_name: str = method_name
 
 
 class VlTypeABC(abc.ABC):
@@ -118,12 +117,16 @@ class VlTypeABC(abc.ABC):
     def get_info() -> tuple[VlTypeStr, VlTypeType, tuple[int, int]]:
         """
         Gets basic information about the type, including:
-        - its name
+        - its identifier
         - its type ("VAL" or "OBJ")
         - its size in bytes in 32-bit and 64-bit modes
         :return: tuple[type_name, type_type, tuple[32bit_bytes, 64bit_byte]]
         """
         pass
+
+    @classmethod
+    def to_vl_type_str(cls) -> VlTypeStr:
+        return cls.get_info()[0]
 
     @classmethod
     def is_val(cls) -> bool:
@@ -153,3 +156,33 @@ class VlTypeABC(abc.ABC):
 
 
 VlType = typing.Type[VlTypeABC]
+
+
+@dataclasses.dataclass
+class VlFunctionParameterTypeProfile:
+    identifier: str
+    vl_type: VlType
+
+
+@dataclasses.dataclass
+class VlFunctionTypeProfile:
+    identifier: str
+    parameters: list[VlFunctionParameterTypeProfile]
+    return_type: VlType
+
+
+class VlBuiltinFunction:
+
+    def __init__(
+        self,
+        name: str,
+        arg_types: list[VlTypeStr],
+        return_type: VlTypeStr,
+        id_code: int,
+        help_str: str,
+    ) -> None:
+        self.name: str = name
+        self.arg_types: list[VlTypeStr] = arg_types
+        self.return_type: VlTypeStr = return_type
+        self.id_code: int = id_code
+        self.help_str: str = help_str

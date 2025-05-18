@@ -22,7 +22,7 @@ met:
 * Redistributions in binary form must reproduce the above copyright notice,
   this list of conditions and the following disclaimer in the documentation
   and/or other materials provided with the distribution.
-* Neither the name of David Beazley or Dabeaz LLC may be used to
+* Neither the identifier of David Beazley or Dabeaz LLC may be used to
   endorse or promote products derived from this software without
   specific prior written permission.
 
@@ -429,9 +429,9 @@ def _form_master_re(re_list, re_flags, token_spec, function_spec, token_names):
 
 def __state_token(s, names):
     """
-    Given a declaration name s of the form "t_" and a dictionary whose keys are
+    Given a declaration identifier s of the form "t_" and a dictionary whose keys are
     state names, this function returns a tuple (states, token_name) where states
-    is a tuple of state names and token_name is the name of the token.  For example,
+    is a tuple of state names and token_name is the identifier of the token.  For example,
     calling this with s = "t_foo_bar_SPAM" might return (('foo','bar'),'SPAM')
     """
     parts = s.split("_")
@@ -498,7 +498,7 @@ class LexerReflect:
         terminals = {}
         for n in self.tokens:
             if not _is_identifier.match(n):
-                self.log.error(f"Bad token name {n!r}")
+                self.log.error(f"Bad token identifier {n!r}")
                 self.error = True
             if n in terminals:
                 self.log.warning(f"Token {n!r} multiply defined")

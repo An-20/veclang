@@ -27,9 +27,9 @@ def check_snake_case(input_str: str) -> bool:
 
 def check_variable_name_descriptiveness(input_str: str) -> bool:
     """
-    Checks if a string is a descriptive variable name
+    Checks if a string is a descriptive variable identifier
 
-    This follows some rules to determine if a variable name is
+    This follows some rules to determine if a variable identifier is
     not 'descriptive enough'.#
 
     Generally, single letter variable names are flagged other than

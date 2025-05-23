@@ -44,13 +44,13 @@ class VlMethod:
         name: str,
         arg_types: list[VlTypeStr],
         return_type: VlTypeStr,
-        id_code: int,
+        fn_id: int,
         help_str: str,
     ) -> None:
         self.name: str = name
         self.arg_types: list[VlTypeStr] = arg_types
         self.return_type: VlTypeStr = return_type
-        self.id_code: int = id_code
+        self.fn_id: int = fn_id
         self.help_str: str = help_str
 
 
@@ -105,9 +105,9 @@ class VlConstOperation(VlOperation):
 
 class VlCast:
 
-    def __init__(self, to_type: VlTypeStr, method_name: str) -> None:
+    def __init__(self, to_type: VlTypeStr, fn_id: int) -> None:
         self.to_type: VlTypeStr = to_type
-        self.method_name: str = method_name
+        self.fn_id: int = fn_id
 
 
 class VlTypeABC(abc.ABC):
@@ -151,6 +151,15 @@ class VlTypeABC(abc.ABC):
 
     @staticmethod
     @abc.abstractmethod
+    def get_properties() -> list[VlMethod]:
+        """
+        A property is just syntactic sugar for calling a method on a piece of data where:
+        - The only argument passed to the method is the piece of data itself
+        """
+        pass
+
+    @staticmethod
+    @abc.abstractmethod
     def get_casts() -> list[VlCast]:
         pass
 
@@ -167,22 +176,6 @@ class VlFunctionParameterTypeProfile:
 @dataclasses.dataclass
 class VlFunctionTypeProfile:
     identifier: str
+    fn_id: int
     parameters: list[VlFunctionParameterTypeProfile]
     return_type: VlType
-
-
-class VlBuiltinFunction:
-
-    def __init__(
-        self,
-        name: str,
-        arg_types: list[VlTypeStr],
-        return_type: VlTypeStr,
-        id_code: int,
-        help_str: str,
-    ) -> None:
-        self.name: str = name
-        self.arg_types: list[VlTypeStr] = arg_types
-        self.return_type: VlTypeStr = return_type
-        self.id_code: int = id_code
-        self.help_str: str = help_str

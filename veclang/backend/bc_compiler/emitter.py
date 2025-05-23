@@ -9,9 +9,6 @@ from veclang.midend.hir.vl_hir import (
     DeclNode,
     ProgramNode,
     IdentifierExprNode,
-    ArrayLiteralExprNode,
-    MemberAccessExprNode,
-    IndexExprNode,
     FunctionCallExprNode,
     BinaryOperationExprNode,
     UnaryOperatorExprNode,
@@ -96,12 +93,6 @@ class BytecodeEmitter:
     def emit_expr(self, node: ExprNode) -> None:
         if isinstance(node, IdentifierExprNode):
             self.emit_identifier_expr(node)
-        elif isinstance(node, ArrayLiteralExprNode):
-            pass
-        elif isinstance(node, MemberAccessExprNode):
-            pass
-        elif isinstance(node, IndexExprNode):
-            pass
         elif isinstance(node, FunctionCallExprNode):
             self.emit_function_call_expr(node)
         elif isinstance(node, BinaryOperationExprNode):

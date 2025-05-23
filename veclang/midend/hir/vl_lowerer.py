@@ -19,9 +19,6 @@ from veclang.midend.hir.vl_hir import (
     DeclNode,
     ProgramNode,
     IdentifierExprNode,
-    ArrayLiteralExprNode,
-    MemberAccessExprNode,
-    IndexExprNode,
     FunctionCallExprNode,
     BinaryOperationExprNode,
     UnaryOperatorExprNode,
@@ -43,6 +40,7 @@ from veclang.midend.hir.vl_hir import (
 from veclang.midend.vl_core import (
     VlType,
     VlTypeABC,
+    VlTypeStr,
     VlTypeStrs,
     VlFunctionTypeProfile,
     VlFunctionParameterTypeProfile,
@@ -59,24 +57,22 @@ from veclang.midend.vl_core import (
     VlVec4,
 )
 
+from veclang.midend.hir.vl_lowerer_utils import ScopeTracker
+
 
 class Lowerer:
 
     def __init__(self):
-        self.global_variables: dict[str, VlType] = {}
-        self.global_constants: dict[str, VlTypeABC] = {}
+        self.imported_constants: list[tuple[str, str]] = []
+        self.imported_functions: list[tuple[str, str]] = []
         self.functions: dict[str, VlFunctionTypeProfile] = {
             "print": VlFunctionTypeProfile(
-                "print", [VlFunctionParameterTypeProfile("arg", VlInt)], VlNull
+                "print", 0x0000, [VlFunctionParameterTypeProfile("arg", VlInt)], VlNull
             )
         }
 
-        self.imported_constants: list[tuple[str, str]] = []
-        self.imported_functions: list[tuple[str, str]] = []
-
         self.ctx_function_name: str | None = None
-        self.ctx_function_local_variables: dict[str, VlType] = {}
-        self.ctx_function_local_constants: dict[str, VlTypeABC] = {}
+        self.ctx_scopes: ScopeTracker = ScopeTracker()
 
     def lower(self, ast_node: vl_ast.ProgramNode) -> ProgramNode:
         return ProgramNode(self.lower_stmts(ast_node.stmts), ast_node.position_info)
@@ -100,39 +96,61 @@ class Lowerer:
 
     def lower_identifier_expr(self, expr: vl_ast.IdentifierNode) -> IdentifierExprNode:
         # Not to be called when the identifier identifies a function
-        vl_type: VlType
         identifier = expr.name
-        if identifier in self.global_constants:
-            vl_type = type(self.global_constants[identifier])
-            return IdentifierExprNode(identifier, True, vl_type, expr.position_info)
+        vl_type_or_val, is_variable = self.ctx_scopes.resolve(identifier)
+        vl_type = vl_type_or_val if is_variable else vl_type_or_val.__class__
+        # TODO: FIXME FOR CONSTEXPR
+        return IdentifierExprNode(identifier, False, vl_type, expr.position_info)
 
-        elif identifier in self.global_variables:
-            vl_type = self.global_variables[identifier]
-            return IdentifierExprNode(identifier, False, vl_type, expr.position_info)
-
-        elif identifier in self.ctx_function_local_constants:
-            vl_type = type(self.ctx_function_local_constants[identifier])
-            return IdentifierExprNode(identifier, True, vl_type, expr.position_info)
-
-        elif identifier in self.global_variables:
-            vl_type = self.global_variables[identifier]
-            return IdentifierExprNode(identifier, False, vl_type, expr.position_info)
-
-        else:
-            raise ValueError(f"Unknown identifier '{expr.name}")
-            # TODO: FIXME
+    @classmethod
+    def try_widen_cast_expr(
+        cls, expr: ExprNode, desired_type: VlTypeStr
+    ) -> ExprNode | None:
+        """Attempts a widening cast to cast expr into desired_type"""
+        for cast in expr.vl_type.get_casts():
+            if cast.to_type == desired_type:
+                return FunctionCallExprNode(
+                    cast.fn_id,
+                    [expr],
+                    False,
+                    cls.lower_vl_type(cast.to_type),
+                    expr.ast_position_info,
+                )
+        return None
 
     def lower_array_literal_expr(
         self, expr: vl_ast.ArrayLiteralExprNode
-    ) -> ArrayLiteralExprNode:
-        # TODO: FIXME FOR DIFFERENT LENGTHS
+    ) -> FunctionCallExprNode:
+        # TODO: Support matrices
         if len(expr.elements.exprs) in [2, 3, 4]:
             vl_type_str = f"vec{len(expr.elements.exprs)}"
         else:
-            raise ValueError(f"Unsupported array literal with length {len(expr)}")
+            raise ValueError(
+                f"Unsupported array literal with length {len(expr.elements.exprs)}"
+            )
 
-        return ArrayLiteralExprNode(
-            [self.lower_expr(x) for x in expr.elements.exprs],
+        is_constant_value = True
+        elements = [self.lower_expr(x) for x in expr.elements.exprs]
+        casted_elements = []
+        for element in elements:
+            if element.vl_type.to_vl_type_str() == "real":
+                is_constant_value = is_constant_value and element.constexpr
+                casted_elements.append(element)
+                continue
+            is_constant_value = False
+            casted_element = self.try_widen_cast_expr(element, "real")
+            if casted_element is None:
+                # TODO: FIX error msg
+                raise ValueError("Could not cast array literal element to real")
+            casted_elements.append(casted_element)
+
+        # TODO: Emitting a constant to add to constant table instead of calling the function
+        constructor_fn_id = {"vec2": 0x1300, "vec3": 0x1301, "vec4": 0x1302}[
+            vl_type_str
+        ]
+        return FunctionCallExprNode(
+            constructor_fn_id,
+            casted_elements,
             False,
             self.lower_vl_type(vl_type_str),
             expr.position_info,
@@ -140,10 +158,27 @@ class Lowerer:
 
     def lower_member_access_expr(
         self, expr: vl_ast.MemberAccessExprNode
-    ) -> MemberAccessExprNode:
-        pass
+    ) -> FunctionCallExprNode:
+        target = self.lower_expr(expr.target)
+        identifier = expr.name.name
+        # TODO: FIXME FOR METHODS
+        for method in target.vl_type.get_properties():
+            if identifier != method.name:
+                continue
+            return FunctionCallExprNode(
+                method.fn_id,
+                [target],
+                False,
+                self.lower_vl_type(method.return_type),
+                expr.position_info,
+            )
+        else:
+            raise ValueError(
+                f"Member access on resolved type '{target.vl_type.to_vl_type_str()}' which does not have identifier '{identifier}'"
+            )
 
-    def lower_index_expr(self, expr: vl_ast.IndexExprNode) -> IndexExprNode:
+    def lower_index_expr(self, expr: vl_ast.IndexExprNode) -> FunctionCallExprNode:
+        """Call the underlying index fn"""
         pass
 
     def lower_function_call_expr(
@@ -164,7 +199,7 @@ class Lowerer:
 
         function_profile = self.functions[expr.callee.name]
         return FunctionCallExprNode(
-            expr.callee.name,
+            function_profile.fn_id,
             arguments,
             False,
             function_profile.return_type,
@@ -178,7 +213,7 @@ class Lowerer:
         right = self.lower_expr(expr.right)
         operator = expr.operator
 
-        # TODO: FIXME for type casting, etc.
+        # First, resolve operation simply
         operation = [
             x
             for x in left.vl_type.get_operations()
@@ -186,23 +221,51 @@ class Lowerer:
             and x.op_type == operator
             and x.operand_types == [right.vl_type.to_vl_type_str()]
         ]
-        if not operation:
-            raise ValueError(
-                f"Unsupported operation '{operator}' between '{left.vl_type.to_vl_type_str()}' and '{right.vl_type.to_vl_type_str()}'"
-            )
-        elif len(operation) > 1:
+        if len(operation) > 1:
             raise ValueError("Internal error: multiple operations found")
-        operation = operation[0]
+        if operation:
+            operation = operation[0]
+            return BinaryOperationExprNode(
+                left,
+                right,
+                expr.operator,
+                operation,
+                False,
+                self.lower_vl_type(operation.result_type),
+                expr.position_info,
+            )
 
-        return BinaryOperationExprNode(
-            left,
-            right,
-            expr.operator,
-            operation,
-            False,
-            self.lower_vl_type(operation.result_type),
-            expr.position_info,
-        )
+        # Next, try coercing right
+        for operation in left.vl_type.get_operations():
+            if operation.op_arity != "BINARY" or operation.op_type != operator:
+                continue
+            right_widened = self.try_widen_cast_expr(right, operation.operand_types[0])
+            if right_widened:
+                return BinaryOperationExprNode(
+                    left,
+                    right_widened,
+                    expr.operator,
+                    operation,
+                    False,
+                    self.lower_vl_type(operation.result_type),
+                    expr.position_info,
+                )
+
+        # Next, try coercing left
+        for operation in right.vl_type.get_operations():
+            if operation.op_arity != "BINARY" or operation.op_type != operator:
+                continue
+            left_widened = self.try_widen_cast_expr(left, operation.operand_types[0])
+            if left_widened:
+                return BinaryOperationExprNode(
+                    left_widened,
+                    right,
+                    expr.operator,
+                    operation,
+                    False,
+                    self.lower_vl_type(operation.result_type),
+                    expr.position_info,
+                )
 
     def lower_unary_operation_expr(
         self, expr: vl_ast.UnaryOperatorExprNode
@@ -234,8 +297,19 @@ class Lowerer:
         )
 
     def lower_constant_expr(self, expr: vl_ast.ConstantExprNode) -> ConstantExprNode:
+        if isinstance(expr.value.value, int):
+            value = VlInt(expr.value.value)
+        elif isinstance(expr.value.value, bool):
+            value = VlBool(expr.value.value)
+        elif isinstance(expr.value.value, float):
+            value = VlReal(expr.value.value)
+        elif isinstance(expr.value.value, complex):
+            value = VlComplex(expr.value.value)
+        else:
+            raise ValueError("TODO")
+
         return ConstantExprNode(
-            expr.value,
+            value,
             True,
             self.lower_vl_type(expr.value.type),
             expr.position_info,
@@ -266,7 +340,16 @@ class Lowerer:
             for x in decl.parameters.parameters
         ]
         return_type = self.lower_vl_type(decl.return_type.name)
+
+        # TODO: Check for duplicate parameter identifiers
+        self.ctx_scopes.scope_in(decl.identifier.name, decl.position_info)
+        for parameter in decl.parameters.parameters:
+            self.ctx_scopes.init_variable(
+                parameter.name.name, self.lower_vl_type(parameter.type.name)
+            )
         stmts = self.lower_stmts(decl.stmts)
+        self.ctx_scopes.scope_out()
+
         return FunctionDeclNode(
             attribute_tags_dict,
             identifier,
@@ -279,11 +362,21 @@ class Lowerer:
     def lower_data_decl(
         self, decl: vl_ast.ConstantDeclNode | vl_ast.VariableDeclNode
     ) -> DataDeclNode:
+        value_lowered = self.lower_expr(decl.value)
+        if isinstance(decl, vl_ast.VariableDeclNode):
+            self.ctx_scopes.init_variable(
+                decl.target.name, self.lower_vl_type(decl._type.name)
+            )
+        else:
+            # check that we are assigning a ConstantValue
+            if not isinstance(value_lowered, ConstantExprNode):
+                raise ValueError
+            self.ctx_scopes.init_constant(decl.target.name, value_lowered.value)
         return DataDeclNode(
             isinstance(decl, vl_ast.ConstantDeclNode),
             decl.target.name,
             self.lower_vl_type(decl._type.name),
-            self.lower_expr(decl.value),
+            value_lowered,
             decl.position_info,
         )
 
@@ -307,9 +400,27 @@ class Lowerer:
             raise ValueError(
                 "TODO: Expected exactly one non-None argument for initializing UsingDeclNode from AST UsingDeclNode"
             )
+
+        # TODO: ADD TO SCOPE
+
         return UsingDeclNode(
             namespace_identifiers, scoped_identifiers, decl.position_info
         )
+
+    def lower_assignment_stmt(self, stmt: vl_ast.AssignmentStmtNode) -> StmtNode:
+        target = self.lower_expr(stmt.target)
+        # TODO: add special handling for indexing and member access
+        if not isinstance(target, IdentifierExprNode):
+            raise ValueError("TODO")
+
+        value = self.lower_expr(stmt.value)
+        vl_type_or_val, is_variable = self.ctx_scopes.resolve(target.identifier)
+        vl_type = vl_type_or_val if is_variable else vl_type_or_val.__class__
+        if not is_variable:
+            raise ValueError("Cant assign to a constant!")
+        if not value.vl_type == vl_type.to_vl_type_str():
+            raise ValueError("value.vl_type == vl_type.to_vl_type_str()")
+        return AssignmentStmtNode(target.identifier, value, stmt.position_info)
 
     def lower_selection_stack_stmt(
         self, stmts: list[vl_ast.StmtNode]
@@ -342,8 +453,34 @@ class Lowerer:
             )
             for x in conditioned
         ]
+        # else stmt must have stmts
         else_stmts = self.lower_stmts(stmts[-1].stmts) if has_else else None
         return SelectionStackStmt(blocks, else_stmts, stmts[0].position_info)
+
+    def lower_ranged_for_stmt(self, stmt: vl_ast.ForStmtNode) -> RangedForStmtNode:
+        identifier = stmt.init_stmt.target.name
+        vl_type_str = stmt.init_stmt.init_type.name
+        range_node = stmt.init_stmt.value
+        if not isinstance(range_node, vl_ast.RangeLiteralExprNode):
+            raise ValueError("TODO")
+        if vl_type_str != "int":
+            raise ValueError("TODO")
+
+        # lower stmts with updated loop context
+        self.ctx_scopes.scope_in("for_loop", stmt.position_info)
+        self.ctx_scopes.init_variable(identifier, self.lower_vl_type(vl_type_str))
+        stmts = self.lower_stmts(stmt.stmts)
+        self.ctx_scopes.scope_out()
+
+        return RangedForStmtNode(
+            identifier,
+            self.lower_vl_type(stmt.init_stmt.init_type.name),
+            self.lower_expr(range_node.start),
+            self.lower_expr(range_node.end),
+            self.lower_expr(range_node.step),
+            stmts,
+            stmt.position_info,
+        )
 
     def lower_expr_stmt(self, stmt: vl_ast.ExprStmtNode) -> ExprStmtNode:
         return ExprStmtNode(self.lower_expr(stmt.expr), stmt.position_info)
@@ -377,25 +514,31 @@ class Lowerer:
             elif isinstance(stmt, vl_ast.AssignmentStmtNode):
                 # TODO: FIXME
                 pass
+
             elif isinstance(stmt, vl_ast.AugmentedAssignmentStmtNode):
                 # TODO: FIXME
                 pass
 
             elif isinstance(stmt, vl_ast.ForStmtNode):
-                # TODO: FIXME
-                pass
+                out_stmts.append(self.lower_ranged_for_stmt(stmt))
+
             elif isinstance(stmt, vl_ast.WhileStmtNode):
                 # TODO: FIXME
                 pass
+
             elif isinstance(stmt, vl_ast.BreakStmtNode):
-                # TODO: FIXME
-                pass
+                # TODO: check if in loop first
+                out_stmts.append(BreakStmtNode(stmt.position_info))
+
             elif isinstance(stmt, vl_ast.ContinueStmtNode):
-                # TODO: FIXME
-                pass
+                # TODO: check if in loop first
+                out_stmts.append(ContinueStmtNode(stmt.position_info))
+
             elif isinstance(stmt, vl_ast.ReturnStmtNode):
-                # TODO: FIXME
-                pass
+                # TODO: check if in fn first, and check ret type
+                out_stmts.append(
+                    ReturnStmtNode(self.lower_expr(stmt.value), stmt.position_info)
+                )
 
             elif isinstance(stmt, vl_ast.ExprStmtNode):
                 out_stmts.append(self.lower_expr_stmt(stmt))
@@ -407,7 +550,7 @@ class Lowerer:
 
         # if there are still selection statements left over
         if selection_stmts:
-            out_stmts.append(SelectionStackStmt(selection_stmts))
+            out_stmts.append(self.lower_selection_stack_stmt(selection_stmts))
         return out_stmts
 
     def lower_decl(self, decl: vl_ast.DeclNode) -> "DeclNode":

@@ -12,7 +12,7 @@ from veclang.frontend.parser.parser import (
 )
 
 from veclang.midend.vl_core.vl_type import VlOperation
-from veclang.midend.vl_core import VlType, VlFunctionParameterTypeProfile
+from veclang.midend.vl_core import VlType, VlTypeABC, VlFunctionParameterTypeProfile
 
 
 class HIRNode(abc.ABC):
@@ -78,62 +78,19 @@ class IdentifierExprNode(ExprNode):
         self.identifier = identifier
 
 
-class ArrayLiteralExprNode(ExprNode):
-
-    def __init__(
-        self,
-        elements: list[ExprNode],
-        constexpr: bool,
-        vl_type: VlType,
-        ast_position_info: ASTPositionInfo,
-    ) -> None:
-        super().__init__(constexpr, vl_type, ast_position_info)
-        self.elements = elements
-
-
-class MemberAccessExprNode(ExprNode):
-
-    def __init__(
-        self,
-        target: ExprNode,
-        identifier: str,
-        constexpr: bool,
-        vl_type: VlType,
-        ast_position_info: ASTPositionInfo,
-    ) -> None:
-        super().__init__(constexpr, vl_type, ast_position_info)
-        self.target = target
-        self.identifier = identifier
-
-
-class IndexExprNode(ExprNode):
-
-    def __init__(
-        self,
-        target: ExprNode,
-        indices: list[ExprNode],
-        constexpr: bool,
-        vl_type: VlType,
-        ast_position_info: ASTPositionInfo,
-    ) -> None:
-        super().__init__(constexpr, vl_type, ast_position_info)
-        self.target = target
-        self.indices = indices
-
-
 class FunctionCallExprNode(ExprNode):
     """A HIR node for a function call"""
 
     def __init__(
         self,
-        callee: str,
+        callee_fn_id: int,
         arguments: list[ExprNode],
         constexpr: bool,
         vl_type: VlType,
         ast_position_info: ASTPositionInfo,
     ) -> None:
         super().__init__(constexpr, vl_type, ast_position_info)
-        self.callee = callee
+        self.callee_fn_id = callee_fn_id
         self.arguments = arguments
 
 
@@ -182,13 +139,13 @@ class ConstantExprNode(ExprNode):
 
     def __init__(
         self,
-        constant_value: vl_ast.ConstantValue,
+        constant_value: VlTypeABC,
         constexpr: bool,
         vl_type: VlType,
         ast_position_info: ASTPositionInfo,
     ) -> None:
         super().__init__(constexpr, vl_type, ast_position_info)
-        self.value: vl_ast.ConstantValue = constant_value
+        self.value: VlTypeABC = constant_value
 
 
 # Stmts

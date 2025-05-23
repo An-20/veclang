@@ -11,6 +11,13 @@ from veclang.midend.vl_core.vl_type import (
 
 class VlComplex(VlTypeABC):
 
+    def __init__(self, underlying: complex) -> None:
+        if not isinstance(underlying, complex):
+            raise ValueError(
+                f"Underlying value of VlComplex must be a Python complex, not '{type(underlying)}'"
+            )
+        self.underlying: complex = underlying
+
     @staticmethod
     def get_info() -> tuple[VlTypeStr, VlTypeType, tuple[int, int]]:
         return "complex", "OBJ", (8, 16)
@@ -86,11 +93,30 @@ class VlComplex(VlTypeABC):
 
     @staticmethod
     def get_methods() -> list[VlMethod]:
-        pass
+        return []
+
+    @staticmethod
+    def get_properties() -> list[VlMethod]:
+        return [
+            VlMethod(
+                "re",
+                ["complex"],
+                "real",
+                0x1000,
+                "Returns a `real` representing the real component of a `complex`.",
+            ),
+            VlMethod(
+                "im",
+                ["complex"],
+                "real",
+                0x1001,
+                "Returns a `real` representing the real component of a `complex`.",
+            ),
+        ]
 
     @staticmethod
     def get_casts() -> list[VlCast]:
-        pass
+        return []
 
 
 class VlMat2(VlTypeABC):
@@ -105,11 +131,15 @@ class VlMat2(VlTypeABC):
 
     @staticmethod
     def get_methods() -> list[VlMethod]:
-        pass
+        return []
+
+    @staticmethod
+    def get_properties() -> list[VlMethod]:
+        return []
 
     @staticmethod
     def get_casts() -> list[VlCast]:
-        pass
+        return []
 
 
 class VlMat3(VlTypeABC):
@@ -124,11 +154,15 @@ class VlMat3(VlTypeABC):
 
     @staticmethod
     def get_methods() -> list[VlMethod]:
-        pass
+        return []
+
+    @staticmethod
+    def get_properties() -> list[VlMethod]:
+        return []
 
     @staticmethod
     def get_casts() -> list[VlCast]:
-        pass
+        return []
 
 
 class VlMat4(VlTypeABC):
@@ -143,11 +177,15 @@ class VlMat4(VlTypeABC):
 
     @staticmethod
     def get_methods() -> list[VlMethod]:
-        pass
+        return []
+
+    @staticmethod
+    def get_properties() -> list[VlMethod]:
+        return []
 
     @staticmethod
     def get_casts() -> list[VlCast]:
-        pass
+        return []
 
 
 class VlVec2(VlTypeABC):
@@ -162,11 +200,15 @@ class VlVec2(VlTypeABC):
 
     @staticmethod
     def get_methods() -> list[VlMethod]:
-        pass
+        return []
+
+    @staticmethod
+    def get_properties() -> list[VlMethod]:
+        return []
 
     @staticmethod
     def get_casts() -> list[VlCast]:
-        pass
+        return []
 
 
 class VlVec3(VlTypeABC):
@@ -181,11 +223,15 @@ class VlVec3(VlTypeABC):
 
     @staticmethod
     def get_methods() -> list[VlMethod]:
-        pass
+        return []
+
+    @staticmethod
+    def get_properties() -> list[VlMethod]:
+        return []
 
     @staticmethod
     def get_casts() -> list[VlCast]:
-        pass
+        return []
 
 
 class VlVec4(VlTypeABC):
@@ -200,8 +246,12 @@ class VlVec4(VlTypeABC):
 
     @staticmethod
     def get_methods() -> list[VlMethod]:
-        pass
+        return []
+
+    @staticmethod
+    def get_properties() -> list[VlMethod]:
+        return []
 
     @staticmethod
     def get_casts() -> list[VlCast]:
-        pass
+        return []

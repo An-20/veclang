@@ -460,14 +460,17 @@ class FunctionCallExprNode(ExprNode):
         return "FunctionCallExprNode"
 
     def _to_dict(self) -> dict:
-        return {"callee": self.callee.to_dict(), "arguments": self.arguments.to_dict()}
+        return {
+            "callee_fn_id": self.callee.to_dict(),
+            "arguments": self.arguments.to_dict(),
+        }
 
     @classmethod
     def _from_dict(
         cls, input_dict: dict, ast_position_info: ASTPositionInfo
     ) -> "FunctionCallExprNode":
         return cls(
-            IdentifierNode.from_dict(input_dict["callee"]),
+            IdentifierNode.from_dict(input_dict["callee_fn_id"]),
             FunctionCallArgumentsNode.from_dict(input_dict["arguments"]),
             ast_position_info,
         )
@@ -585,7 +588,7 @@ class ConstantValue:
 
     def __init__(
         self,
-        value: int | bool | float | complex | str | None,
+        value: int | bool | float | complex | str | list[float] | None,
         value_type: typing.Literal["int", "bool", "real", "complex", "str", "null"],
     ) -> None:
         self.value = value

@@ -28,11 +28,15 @@ class VlNull(VlTypeABC):
 
     @staticmethod
     def get_methods() -> list[VlMethod]:
-        pass
+        return []
+
+    @staticmethod
+    def get_properties() -> list[VlMethod]:
+        return []
 
     @staticmethod
     def get_casts() -> list[VlCast]:
-        pass
+        return []
 
 
 class VlInt(VlTypeABC):
@@ -128,7 +132,7 @@ class VlInt(VlTypeABC):
                 "BINARY",
                 "DIVIDE",
                 ["int"],
-                "int",
+                "real",
                 lambda x, y: x // y,
                 "OP_INT_DIV",
             ),
@@ -211,8 +215,12 @@ class VlInt(VlTypeABC):
         return []
 
     @staticmethod
-    def get_casts() -> list[VlCast]:
+    def get_properties() -> list[VlMethod]:
         return []
+
+    @staticmethod
+    def get_casts() -> list[VlCast]:
+        return [VlCast("real", 0x1000), VlCast("complex", 0x1001)]
 
 
 class VlBool(VlTypeABC):
@@ -275,11 +283,15 @@ class VlBool(VlTypeABC):
 
     @staticmethod
     def get_methods() -> list[VlMethod]:
-        pass
+        return []
+
+    @staticmethod
+    def get_properties() -> list[VlMethod]:
+        return []
 
     @staticmethod
     def get_casts() -> list[VlCast]:
-        pass
+        return []
 
 
 class VlReal(VlTypeABC):
@@ -412,8 +424,12 @@ class VlReal(VlTypeABC):
 
     @staticmethod
     def get_methods() -> list[VlMethod]:
-        pass
+        return []
+
+    @staticmethod
+    def get_properties() -> list[VlMethod]:
+        return []
 
     @staticmethod
     def get_casts() -> list[VlCast]:
-        pass
+        return [VlCast("complex", 0x1100)]

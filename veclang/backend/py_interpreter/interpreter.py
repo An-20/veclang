@@ -1,3 +1,8 @@
+"""
+A standalone tree-walk interpreter for a basic subset of the Veclang language
+written in about 4 hours.
+"""
+
 import typing
 
 import io
@@ -55,7 +60,7 @@ from veclang.frontend.parser.vl_ast import (
     ContinueStmtNode,
 )
 
-from veclang.frontend.parser.parser import parse
+from veclang.frontend.parser.vl_parser import parse
 
 
 import abc

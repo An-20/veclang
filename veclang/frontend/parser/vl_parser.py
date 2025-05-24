@@ -4,7 +4,7 @@ import veclang.frontend.ply.lex as lex
 import veclang.frontend.ply.yacc as yacc
 
 
-from veclang.frontend.parser.lexer import (
+from veclang.frontend.parser.vl_lexer import (
     LEXER_TOKEN_SPEC_STR,
     LEXER_FUNCTION_SPEC,
     lexer,

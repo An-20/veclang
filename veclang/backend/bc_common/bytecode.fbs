@@ -3,9 +3,11 @@ enum VlOpcode : uint8 {
     OP_CONSTANT_OBJ_DIRECT=0x01,
     OP_CONSTANT_VAL_TABLE=0x02,
     OP_CONSTANT_OBJ_TABLE=0x03,
-    OP_POP=0x04,
-
-    OP_CALL=0x0F,
+    OP_POP_VAL=0x04,
+    OP_POP_OBJ=0x05,
+    OP_CALL_BUILTIN=0x06,
+    OP_CALL=0x07,
+    OP_RETURN=0x08,
 
     OP_GET_LOCAL_VAL=0x10,
     OP_SET_LOCAL_VAL=0x11,
@@ -15,6 +17,7 @@ enum VlOpcode : uint8 {
     OP_SET_LOCAL_OBJ=0x15,
     OP_GET_GLOBAL_OBJ=0x16,
     OP_SET_GLOBAL_OBJ=0x17,
+
     OP_INT_EQUAL=0x80,
     OP_INT_NOT_EQUAL=0x81,
     OP_INT_GREATER=0x82,
@@ -31,6 +34,7 @@ enum VlOpcode : uint8 {
     OP_INT_AND=0x8D,
     OP_INT_OR=0x8E,
     OP_INT_XOR=0x8F,
+
     OP_INT_NOT=0x90,
     OP_INT_LEFT_SHIFT=0x91,
     OP_INT_RIGHT_SHIFT=0x92,
@@ -43,6 +47,7 @@ enum VlOpcode : uint8 {
     OP_BOOLEAN_AND=0x9C,
     OP_BOOLEAN_OR=0x9D,
     OP_BOOLEAN_NOT=0x9E,
+
     OP_REAL_EQUAL=0xA0,
     OP_REAL_NOT_EQUAL=0xA1,
     OP_REAL_GREATER=0xA2,
@@ -56,6 +61,7 @@ enum VlOpcode : uint8 {
     OP_REAL_MOD=0xAA,
     OP_REAL_EXP=0xAB,
     OP_REAL_NEG=0xAC,
+
     OP_COMPLEX_EQUAL=0xB0,
     OP_COMPLEX_NOT_EQUAL=0xB1,
     OP_COMPLEX_ADD=0xB2,
@@ -70,6 +76,7 @@ enum VlOpcode : uint8 {
     OP_REAL_JMP_IF_GREATER_OR_EQUAL=0xBD,
     OP_REAL_JMP_IF_LESS=0xBE,
     OP_REAL_JMP_IF_LESS_OR_EQUAL=0xBF,
+
     OP_VECTOR_ADD=0xC0,
     OP_VECTOR_SUB=0xC1,
     OP_VECTOR_MUL=0xC2,

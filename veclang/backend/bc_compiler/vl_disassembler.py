@@ -1,4 +1,4 @@
-from veclang.backend.bc_compiler.instruction import OpcodeMap
+from veclang.backend.bc_compiler.vl_instruction import OpcodeMap
 
 
 def disassemble(bytecode: list[bytes]):
@@ -18,8 +18,8 @@ def disassemble(bytecode: list[bytes]):
                 f"{idx:04} 0x{opcode:02X} {info.opcode_hr.ljust(30)} 0x{operand_1:04X}"
             )
         else:
-            operand_1 = int.from_bytes(operation[2])
-            operand_2 = int.from_bytes(operation[3:])
+            operand_1 = operation[1]
+            operand_2 = int.from_bytes(operation[2:])
             print(
-                f"{idx:04} 0x{opcode:02X} {info.opcode_hr.ljust(30)} 0x{operand_1:02X} 0x{operand_2:04X}"
+                f"{idx:04} 0x{opcode:02X} {info.opcode_hr.ljust(30)} 0x{operand_1:02X}   0x{operand_2:04X}"
             )

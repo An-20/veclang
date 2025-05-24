@@ -7,7 +7,11 @@ class VlOpcode(object):
     OP_CONSTANT_OBJ_DIRECT = 1
     OP_CONSTANT_VAL_TABLE = 2
     OP_CONSTANT_OBJ_TABLE = 3
-    OP_POP = 4
+    OP_POP_VAL = 4
+    OP_POP_OBJ = 5
+    OP_CALL_BUILTIN = 6
+    OP_CALL = 7
+    OP_RETURN = 8
     OP_GET_LOCAL_VAL = 16
     OP_SET_LOCAL_VAL = 17
     OP_GET_GLOBAL_VAL = 18

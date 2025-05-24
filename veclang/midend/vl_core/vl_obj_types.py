@@ -1,12 +1,22 @@
+import struct
 from veclang.midend.vl_core.vl_type import (
     VlTypeABC,
     VlTypeStr,
+    VlTypeCode,
     VlTypeType,
     VlOperation,
     VlConstOperation,
     VlMethod,
     VlCast,
 )
+
+
+def obj_to_bytes_32(values: list[float]) -> bytes:
+    return b"".join(struct.pack("!f", x) for x in values)
+
+
+def obj_to_bytes_64(values: list[float]) -> bytes:
+    return b"".join(struct.pack("!f", x) for x in values)
 
 
 class VlComplex(VlTypeABC):
@@ -18,9 +28,15 @@ class VlComplex(VlTypeABC):
             )
         self.underlying: complex = underlying
 
+    def to_bytes_32(self) -> bytes:
+        return obj_to_bytes_32([self.underlying.real, self.underlying.imag])
+
+    def to_bytes_64(self) -> bytes:
+        return obj_to_bytes_32([self.underlying.real, self.underlying.imag])
+
     @staticmethod
-    def get_info() -> tuple[VlTypeStr, VlTypeType, tuple[int, int]]:
-        return "complex", "OBJ", (8, 16)
+    def get_info() -> tuple[VlTypeStr, VlTypeCode, VlTypeType, tuple[int, int]]:
+        return "complex", 0x03, "OBJ", (8, 16)
 
     @staticmethod
     def get_operations() -> list[VlOperation]:
@@ -121,9 +137,15 @@ class VlComplex(VlTypeABC):
 
 class VlMat2(VlTypeABC):
 
+    def to_bytes_32(self) -> bytes:
+        pass  # TODO: FIXME
+
+    def to_bytes_64(self) -> bytes:
+        pass  # TODO: FIXME
+
     @staticmethod
-    def get_info() -> tuple[VlTypeStr, VlTypeType, tuple[int, int]]:
-        return "mat2", "OBJ", (16, 32)
+    def get_info() -> tuple[VlTypeStr, VlTypeCode, VlTypeType, tuple[int, int]]:
+        return "mat2", 0x07, "OBJ", (16, 32)
 
     @staticmethod
     def get_operations() -> list[VlOperation]:
@@ -144,9 +166,15 @@ class VlMat2(VlTypeABC):
 
 class VlMat3(VlTypeABC):
 
+    def to_bytes_32(self) -> bytes:
+        pass  # TODO: FIXME
+
+    def to_bytes_64(self) -> bytes:
+        pass  # TODO: FIXME
+
     @staticmethod
-    def get_info() -> tuple[VlTypeStr, VlTypeType, tuple[int, int]]:
-        return "mat3", "OBJ", (36, 72)
+    def get_info() -> tuple[VlTypeStr, VlTypeCode, VlTypeType, tuple[int, int]]:
+        return "mat3", 0x08, "OBJ", (36, 72)
 
     @staticmethod
     def get_operations() -> list[VlOperation]:
@@ -167,9 +195,15 @@ class VlMat3(VlTypeABC):
 
 class VlMat4(VlTypeABC):
 
+    def to_bytes_32(self) -> bytes:
+        pass  # TODO: FIXME
+
+    def to_bytes_64(self) -> bytes:
+        pass  # TODO: FIXME
+
     @staticmethod
-    def get_info() -> tuple[VlTypeStr, VlTypeType, tuple[int, int]]:
-        return "mat4", "OBJ", (64, 128)
+    def get_info() -> tuple[VlTypeStr, VlTypeCode, VlTypeType, tuple[int, int]]:
+        return "mat4", 0x09, "OBJ", (64, 128)
 
     @staticmethod
     def get_operations() -> list[VlOperation]:
@@ -190,9 +224,15 @@ class VlMat4(VlTypeABC):
 
 class VlVec2(VlTypeABC):
 
+    def to_bytes_32(self) -> bytes:
+        pass  # TODO: FIXME
+
+    def to_bytes_64(self) -> bytes:
+        pass  # TODO: FIXME
+
     @staticmethod
-    def get_info() -> tuple[VlTypeStr, VlTypeType, tuple[int, int]]:
-        return "vec2", "OBJ", (8, 16)
+    def get_info() -> tuple[VlTypeStr, VlTypeCode, VlTypeType, tuple[int, int]]:
+        return "vec2", 0x04, "OBJ", (8, 16)
 
     @staticmethod
     def get_operations() -> list[VlOperation]:
@@ -213,9 +253,15 @@ class VlVec2(VlTypeABC):
 
 class VlVec3(VlTypeABC):
 
+    def to_bytes_32(self) -> bytes:
+        pass  # TODO: FIXME
+
+    def to_bytes_64(self) -> bytes:
+        pass  # TODO: FIXME
+
     @staticmethod
-    def get_info() -> tuple[VlTypeStr, VlTypeType, tuple[int, int]]:
-        return "vec3", "OBJ", (12, 24)
+    def get_info() -> tuple[VlTypeStr, VlTypeCode, VlTypeType, tuple[int, int]]:
+        return "vec3", 0x05, "OBJ", (12, 24)
 
     @staticmethod
     def get_operations() -> list[VlOperation]:
@@ -236,9 +282,15 @@ class VlVec3(VlTypeABC):
 
 class VlVec4(VlTypeABC):
 
+    def to_bytes_32(self) -> bytes:
+        pass  # TODO: FIXME
+
+    def to_bytes_64(self) -> bytes:
+        pass  # TODO: FIXME
+
     @staticmethod
-    def get_info() -> tuple[VlTypeStr, VlTypeType, tuple[int, int]]:
-        return "vec4", "OBJ", (16, 32)
+    def get_info() -> tuple[VlTypeStr, VlTypeCode, VlTypeType, tuple[int, int]]:
+        return "vec4", 0x06, "OBJ", (16, 32)
 
     @staticmethod
     def get_operations() -> list[VlOperation]:

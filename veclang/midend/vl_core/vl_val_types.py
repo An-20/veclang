@@ -1,6 +1,8 @@
+import struct
 from veclang.midend.vl_core.vl_type import (
     VlTypeABC,
     VlTypeStr,
+    VlTypeCode,
     VlTypeType,
     VlOperation,
     VlConstOperation,
@@ -18,9 +20,15 @@ class VlNull(VlTypeABC):
             )
         self.underlying: None = None
 
+    def to_bytes_32(self) -> bytes:
+        raise ValueError("UNIMPLEMENTED")
+
+    def to_bytes_64(self) -> bytes:
+        raise ValueError("UNIMPLEMENTED")
+
     @staticmethod
-    def get_info() -> tuple[VlTypeStr, VlTypeType, tuple[int, int]]:
-        return "null", "VAL", (0, 0)
+    def get_info() -> tuple[VlTypeStr, VlTypeCode, VlTypeType, tuple[int, int]]:
+        return "null", 0x00, "VAL", (0, 0)
 
     @staticmethod
     def get_operations() -> list[VlOperation]:
@@ -48,9 +56,25 @@ class VlInt(VlTypeABC):
             )
         self.underlying: int = underlying
 
+    def to_bytes_32(self) -> bytes:
+        if 0 <= self.underlying <= 0xFFFF:
+            return self.underlying.to_bytes().rjust(2, bytes(1))
+        elif self.underlying <= 0xFFFFFFFF:
+            return self.underlying.to_bytes().rjust(4, bytes(1))
+        else:
+            raise ValueError(f"Value too large: {self.underlying}")
+
+    def to_bytes_64(self) -> bytes:
+        if 0 <= self.underlying <= 0xFFFF:
+            return self.underlying.to_bytes().rjust(2, bytes(1))
+        elif self.underlying <= 0xFFFFFFFF_FFFFFFFF:
+            return self.underlying.to_bytes().rjust(8, bytes(1))
+        else:
+            raise ValueError(f"Value too large: {self.underlying}")
+
     @staticmethod
-    def get_info() -> tuple[VlTypeStr, VlTypeType, tuple[int, int]]:
-        return "int", "VAL", (4, 8)
+    def get_info() -> tuple[VlTypeStr, VlTypeCode, VlTypeType, tuple[int, int]]:
+        return "int", 0x00, "VAL", (4, 8)
 
     @staticmethod
     def get_operations() -> list[VlOperation]:
@@ -232,9 +256,25 @@ class VlBool(VlTypeABC):
             )
         self.underlying: bool = underlying
 
+    def to_bytes_32(self) -> bytes:
+        if 0 <= self.underlying <= 0xFFFF:
+            return self.underlying.to_bytes().rjust(2, bytes(1))
+        elif self.underlying <= 0xFFFFFFFF:
+            return self.underlying.to_bytes().rjust(4, bytes(1))
+        else:
+            raise ValueError(f"Value too large: {self.underlying}")
+
+    def to_bytes_64(self) -> bytes:
+        if 0 <= self.underlying <= 0xFFFF:
+            return self.underlying.to_bytes().rjust(2, bytes(1))
+        elif self.underlying <= 0xFFFFFFFF_FFFFFFFF:
+            return self.underlying.to_bytes().rjust(8, bytes(1))
+        else:
+            raise ValueError(f"Value too large: {self.underlying}")
+
     @staticmethod
-    def get_info() -> tuple[VlTypeStr, VlTypeType, tuple[int, int]]:
-        return "bool", "VAL", (4, 8)
+    def get_info() -> tuple[VlTypeStr, VlTypeCode, VlTypeType, tuple[int, int]]:
+        return "bool", 0x01, "VAL", (4, 8)
 
     @staticmethod
     def get_operations() -> list[VlOperation]:
@@ -303,9 +343,15 @@ class VlReal(VlTypeABC):
             )
         self.underlying: float = underlying
 
+    def to_bytes_32(self) -> bytes:
+        return bytes(struct.pack("!f", self.underlying))
+
+    def to_bytes_64(self) -> bytes:
+        return bytes(struct.pack("!d", self.underlying))
+
     @staticmethod
-    def get_info() -> tuple[VlTypeStr, VlTypeType, tuple[int, int]]:
-        return "real", "VAL", (4, 8)
+    def get_info() -> tuple[VlTypeStr, VlTypeCode, VlTypeType, tuple[int, int]]:
+        return "real", 0x02, "VAL", (4, 8)
 
     @staticmethod
     def get_operations() -> list[VlOperation]:

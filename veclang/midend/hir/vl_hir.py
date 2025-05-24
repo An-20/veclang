@@ -4,7 +4,7 @@ import abc
 import dataclasses
 
 from veclang.frontend.parser import vl_ast
-from veclang.frontend.parser.parser import (
+from veclang.frontend.parser.vl_parser import (
     AugmentedAssignmentOperatorType,
     BinaryOperatorType,
     UnaryOperatorType,
@@ -64,8 +64,11 @@ class ProgramNode(HIRNode):
 
 # Exprs
 # ----------------------------------------
-class IdentifierExprNode(ExprNode):
-    """A HIR node for an identifier expression. Note this is not a general vl_ast.IdentifierNode"""
+class RvalueIdentifierExprNode(ExprNode):
+    """
+    A HIR node for an identifier expression when used in a rvalue.
+    Note this is not a general vl_ast.IdentifierNode.
+    """
 
     def __init__(
         self,
@@ -187,22 +190,6 @@ class DataDeclNode(DeclNode):
         self.target: str = target
         self.vl_type: VlType = vl_type
         self.value: ExprNode = value
-
-
-class UsingDeclNode(DeclNode, abc.ABC):
-    """A HIR node for a using declaration"""
-
-    def __init__(
-        self,
-        namespace_identifiers: list[str] | None,
-        scoped_identifiers: list[tuple[str, str]] | None,
-        ast_position_info: ASTPositionInfo,
-    ) -> None:
-        super().__init__(ast_position_info)
-        # namespace_identifiers: a list of namespaces that have been imported
-        # scoped_identifiers: a list of tuples of (namespace, identifier) that have been imported
-        self.namespace_identifiers: list[str] | None = namespace_identifiers
-        self.scoped_identifiers: list[tuple[str, str]] | None = scoped_identifiers
 
 
 class AssignmentStmtNode(StmtNode):

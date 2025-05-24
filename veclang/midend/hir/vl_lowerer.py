@@ -1,11 +1,12 @@
 """High-level intermediate representation lowerer"""
 
 import abc
+import collections
 import dataclasses
 import typing
 
 from veclang.frontend.parser import vl_ast
-from veclang.frontend.parser.parser import (
+from veclang.frontend.parser.vl_parser import (
     AugmentedAssignmentOperatorType,
     BinaryOperatorType,
     UnaryOperatorType,
@@ -18,14 +19,13 @@ from veclang.midend.hir.vl_hir import (
     StmtNode,
     DeclNode,
     ProgramNode,
-    IdentifierExprNode,
+    RvalueIdentifierExprNode,
     FunctionCallExprNode,
     BinaryOperationExprNode,
     UnaryOperatorExprNode,
     ConstantExprNode,
     FunctionDeclNode,
     DataDeclNode,
-    UsingDeclNode,
     AssignmentStmtNode,
     AugmentedAssignmentStmtNode,
     ExprStmtNode,
@@ -94,13 +94,15 @@ class Lowerer:
             "vec4": VlVec4,
         }[vl_type_str]
 
-    def lower_identifier_expr(self, expr: vl_ast.IdentifierNode) -> IdentifierExprNode:
+    def lower_identifier_expr(
+        self, expr: vl_ast.IdentifierNode
+    ) -> RvalueIdentifierExprNode:
         # Not to be called when the identifier identifies a function
         identifier = expr.name
         vl_type_or_val, is_variable = self.ctx_scopes.resolve(identifier)
         vl_type = vl_type_or_val if is_variable else vl_type_or_val.__class__
         # TODO: FIXME FOR CONSTEXPR
-        return IdentifierExprNode(identifier, False, vl_type, expr.position_info)
+        return RvalueIdentifierExprNode(identifier, False, vl_type, expr.position_info)
 
     @classmethod
     def try_widen_cast_expr(
@@ -341,14 +343,21 @@ class Lowerer:
         ]
         return_type = self.lower_vl_type(decl.return_type.name)
 
-        # TODO: Check for duplicate parameter identifiers
-        self.ctx_scopes.scope_in(decl.identifier.name, decl.position_info)
+        # Check for duplicate parameter identifiers
+        parameters_counter = collections.Counter([x.identifier for x in parameters])
+        has_duplicates = any([x > 1 for x in parameters_counter.values()])
+        if has_duplicates:
+            raise ValueError(
+                f"Duplicate parameters given to function: {', '.join([k for k, v in parameters_counter.items() if v > 1])}"
+            )
+
+        self.ctx_scopes.scope_in_fn(decl.identifier.name, decl.position_info)
         for parameter in decl.parameters.parameters:
             self.ctx_scopes.init_variable(
                 parameter.name.name, self.lower_vl_type(parameter.type.name)
             )
         stmts = self.lower_stmts(decl.stmts)
-        self.ctx_scopes.scope_out()
+        self.ctx_scopes.scope_out_fn()
 
         return FunctionDeclNode(
             attribute_tags_dict,
@@ -380,7 +389,9 @@ class Lowerer:
             decl.position_info,
         )
 
-    def lower_using_decl(self, decl: vl_ast.UsingDeclNode) -> UsingDeclNode:
+    def lower_using_decl(self, decl: vl_ast.UsingDeclNode) -> None:
+        # TODO: FIXME, add the identifiers to the ProgramNode
+
         # namespace_identifiers: a list of namespaces that have been imported
         # scoped_identifiers: a list of tuples of (namespace, identifier) that have been imported
         namespace_identifiers: list[str] | None = None
@@ -401,16 +412,12 @@ class Lowerer:
                 "TODO: Expected exactly one non-None argument for initializing UsingDeclNode from AST UsingDeclNode"
             )
 
-        # TODO: ADD TO SCOPE
-
-        return UsingDeclNode(
-            namespace_identifiers, scoped_identifiers, decl.position_info
-        )
+        # TODO: RUN THE IMPORT then add to context
 
     def lower_assignment_stmt(self, stmt: vl_ast.AssignmentStmtNode) -> StmtNode:
         target = self.lower_expr(stmt.target)
-        # TODO: add special handling for indexing and member access
-        if not isinstance(target, IdentifierExprNode):
+        # TODO: add special handling for indexing and member access (lvalues)
+        if not isinstance(target, RvalueIdentifierExprNode):
             raise ValueError("TODO")
 
         value = self.lower_expr(stmt.value)
@@ -418,8 +425,17 @@ class Lowerer:
         vl_type = vl_type_or_val if is_variable else vl_type_or_val.__class__
         if not is_variable:
             raise ValueError("Cant assign to a constant!")
-        if not value.vl_type == vl_type.to_vl_type_str():
-            raise ValueError("value.vl_type == vl_type.to_vl_type_str()")
+
+        if not value.vl_type.to_vl_type_str() == vl_type.to_vl_type_str():
+            # Attempt a type widening cast
+            value_widened = self.try_widen_cast_expr(value, vl_type.to_vl_type_str())
+            if value_widened:
+                value = value_widened
+            else:
+                raise ValueError(
+                    "value.vl_type == vl_type.to_vl_type_str(), could not widen cast"
+                )
+
         return AssignmentStmtNode(target.identifier, value, stmt.position_info)
 
     def lower_selection_stack_stmt(
@@ -447,14 +463,30 @@ class Lowerer:
 
         # noinspection PyTypeChecker
         conditioned: list[vl_ast.IfStmtNode] = stmts[:-1] if has_else else stmts
-        blocks = [
-            SelectionStackStmt.SelectionBlock(
-                self.lower_expr(x.condition), self.lower_stmts(x.stmts)
+        blocks = []
+        for block in conditioned:
+            self.ctx_scopes.scope_in_selection(
+                "elseif" if isinstance(block, vl_ast.ElseifStmtNode) else "if",
+                block.position_info,
             )
-            for x in conditioned
-        ]
-        # else stmt must have stmts
-        else_stmts = self.lower_stmts(stmts[-1].stmts) if has_else else None
+            blocks.append(
+                SelectionStackStmt.SelectionBlock(
+                    self.lower_expr(block.condition), self.lower_stmts(block.stmts)
+                )
+            )
+            self.ctx_scopes.scope_out_selection()
+
+        if has_else:
+            else_stmt = stmts[-1]
+            if not isinstance(else_stmt, vl_ast.ElseStmtNode):
+                raise ValueError("UNREACHABLE")
+            self.ctx_scopes.scope_in_selection("else", else_stmt.position_info)
+            else_stmts = self.lower_stmts(else_stmt.stmts)
+            self.ctx_scopes.scope_out_selection()
+
+        else:
+            else_stmts = None
+
         return SelectionStackStmt(blocks, else_stmts, stmts[0].position_info)
 
     def lower_ranged_for_stmt(self, stmt: vl_ast.ForStmtNode) -> RangedForStmtNode:
@@ -467,10 +499,10 @@ class Lowerer:
             raise ValueError("TODO")
 
         # lower stmts with updated loop context
-        self.ctx_scopes.scope_in("for_loop", stmt.position_info)
+        self.ctx_scopes.scope_in_loop("for", stmt.position_info)
         self.ctx_scopes.init_variable(identifier, self.lower_vl_type(vl_type_str))
         stmts = self.lower_stmts(stmt.stmts)
-        self.ctx_scopes.scope_out()
+        self.ctx_scopes.scope_out_loop()
 
         return RangedForStmtNode(
             identifier,
@@ -512,8 +544,7 @@ class Lowerer:
                 out_stmts.append(self.lower_decl(stmt))
 
             elif isinstance(stmt, vl_ast.AssignmentStmtNode):
-                # TODO: FIXME
-                pass
+                out_stmts.append(self.lower_assignment_stmt(stmt))
 
             elif isinstance(stmt, vl_ast.AugmentedAssignmentStmtNode):
                 # TODO: FIXME
@@ -562,6 +593,7 @@ class Lowerer:
             raise ValueError(f"Unknown decl type '{type(decl)}'")
 
     def lower_expr(self, expr: vl_ast.ExprNode) -> "ExprNode":
+        """Only to be called on rvalue exprs"""
         if isinstance(expr, vl_ast.IdentifierNode):
             return self.lower_identifier_expr(expr)
         elif isinstance(expr, vl_ast.ArrayLiteralExprNode):

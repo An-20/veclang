@@ -1,4 +1,4 @@
-from veclang.frontend.parser.parser import parse
+from veclang.frontend.parser.vl_parser import parse
 from veclang.frontend.parser.vl_ast_io import print_ast, format_ast
 from veclang.midend.hir import lower
 from veclang.midend.hir.vl_hlr_io import print_hir, format_hir

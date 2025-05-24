@@ -20,7 +20,7 @@ VlTypeStr = typing.Literal[
     "mat3",
     "mat4",
 ]
-VlTypeStrs = [
+VlTypeStrs: list[VlTypeStr] = [
     "null",
     "int",
     "bool",
@@ -32,6 +32,23 @@ VlTypeStrs = [
     "mat2",
     "mat3",
     "mat4",
+]
+
+VlTypeCode = typing.Literal[
+    0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x06, 0x07, 0x08, 0x09
+]
+VlTypeCodes: list[VlTypeCode] = [
+    0x00,
+    0x01,
+    0x02,
+    0x03,
+    0x04,
+    0x05,
+    0x06,
+    0x06,
+    0x07,
+    0x08,
+    0x09,
 ]
 
 VlTypeType = typing.Literal["VAL", "OBJ"]
@@ -114,12 +131,13 @@ class VlTypeABC(abc.ABC):
 
     @staticmethod
     @abc.abstractmethod
-    def get_info() -> tuple[VlTypeStr, VlTypeType, tuple[int, int]]:
+    def get_info() -> tuple[VlTypeStr, VlTypeCode, VlTypeType, tuple[int, int]]:
         """
         Gets basic information about the type, including:
         - its identifier
+        - its type code
         - its type ("VAL" or "OBJ")
-        - its size in bytes in 32-bit and 64-bit modes
+        - its size in bytes in 32-bit and 64-bit mode
         :return: tuple[type_name, type_type, tuple[32bit_bytes, 64bit_byte]]
         """
         pass
@@ -129,11 +147,15 @@ class VlTypeABC(abc.ABC):
         return cls.get_info()[0]
 
     @classmethod
+    def to_vl_type_code(cls):
+        return cls.get_info()[1]
+
+    @classmethod
     def is_val(cls) -> bool:
-        if cls.get_info()[1] in ["VAL", "OBJ"]:
-            return cls.get_info()[1] == "VAL"
+        if cls.get_info()[2] in ["VAL", "OBJ"]:
+            return cls.get_info()[2] == "VAL"
         else:
-            raise ValueError(f"Unknown VlTypeType '{cls.get_info()[1]}'")
+            raise ValueError(f"Unknown VlTypeType '{cls.get_info()[2]}'")
 
     @classmethod
     def is_obj(cls) -> bool:
@@ -161,6 +183,14 @@ class VlTypeABC(abc.ABC):
     @staticmethod
     @abc.abstractmethod
     def get_casts() -> list[VlCast]:
+        pass
+
+    @abc.abstractmethod
+    def to_bytes_32(self) -> bytes:
+        pass
+
+    @abc.abstractmethod
+    def to_bytes_64(self) -> bytes:
         pass
 
 

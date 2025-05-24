@@ -7,6 +7,8 @@ from veclang.midend.vl_core import VlType, VlTypeABC
 @dataclasses.dataclass
 class Scope:
     fn_name: str | None
+    loop_name: str | None
+    selection_name: str | None
     ast_position_info: ASTPositionInfo
 
     # Tuple of [type_or_value, is_variable
@@ -17,23 +19,53 @@ class Scope:
 class ScopeTracker:
 
     def __init__(self):
-        # TODO: TRACK LOOP SCOPE (useful for tracking if break / continue used in loop)
         self.scopes: list[Scope] = [
-            self.create_scope("vl::global", ASTPositionInfo(0, 0))
+            self.create_scope("vl::global", None, None, ASTPositionInfo(0, 0))
         ]
 
     @staticmethod
     def create_scope(
-        scope_fn_name: str | None, ast_position_info: ASTPositionInfo
+        scope_fn_name: str | None,
+        loop_name: str | None,
+        selection_name: str | None,
+        ast_position_info: ASTPositionInfo,
     ) -> Scope:
-        return Scope(scope_fn_name, ast_position_info, {}, {})
+        return Scope(
+            scope_fn_name, loop_name, selection_name, ast_position_info, {}, {}
+        )
 
-    def scope_in(self, fn_name: str | None, ast_position_info: ASTPositionInfo) -> None:
-        self.scopes.append(self.create_scope(fn_name, ast_position_info))
+    def scope_in_fn(self, fn_name: str, ast_position_info: ASTPositionInfo) -> None:
+        self.scopes.append(self.create_scope(fn_name, None, None, ast_position_info))
 
-    def scope_out(self) -> None:
+    def scope_out_fn(self) -> None:
         if len(self.scopes) == 1:
             raise ValueError("Cannot scope out of global scope!")
+        if not self.scopes[-1].fn_name:
+            raise ValueError("Mismatched scope: current scope is not a function scope")
+        self.scopes.pop()
+
+    def scope_in_loop(self, loop_name: str, ast_position_info: ASTPositionInfo) -> None:
+        self.scopes.append(self.create_scope(None, loop_name, None, ast_position_info))
+
+    def scope_out_loop(self) -> None:
+        if len(self.scopes) == 1:
+            raise ValueError("Cannot scope out of global scope!")
+        if not self.scopes[-1].loop_name:
+            raise ValueError("Mismatched scope: current scope is not a loop scope")
+        self.scopes.pop()
+
+    def scope_in_selection(
+        self, selection_name: str, ast_position_info: ASTPositionInfo
+    ) -> None:
+        self.scopes.append(
+            self.create_scope(None, None, selection_name, ast_position_info)
+        )
+
+    def scope_out_selection(self) -> None:
+        if len(self.scopes) == 1:
+            raise ValueError("Cannot scope out of global scope!")
+        if not self.scopes[-1].selection_name:
+            raise ValueError("Mismatched scope: current scope is not a selection scope")
         self.scopes.pop()
 
     def resolve(self, identifier: str) -> tuple[VlType | VlTypeABC, bool]:

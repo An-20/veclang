@@ -234,13 +234,14 @@ class ExprStmtNode(StmtNode):
         self.expr: ExprNode = expr
 
 
+@dataclasses.dataclass
+class SelectionBlock:
+    condition: ExprNode
+    stmts: list[StmtNode]
+
+
 class SelectionStackStmt(StmtNode):
     """A HIR node for if, elif, and elseif stmts"""
-
-    @dataclasses.dataclass
-    class SelectionBlock:
-        condition: ExprNode
-        stmts: list[StmtNode]
 
     def __init__(
         self,
@@ -249,7 +250,7 @@ class SelectionStackStmt(StmtNode):
         ast_position_info: ASTPositionInfo,
     ) -> None:
         super().__init__(ast_position_info)
-        self.blocks: list["SelectionBlock"] = blocks
+        self.blocks: list[SelectionBlock] = blocks
         self.else_stmts: list[StmtNode] | None = else_stmts
 
 

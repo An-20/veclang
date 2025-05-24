@@ -29,6 +29,7 @@ from veclang.midend.hir.vl_hir import (
     AssignmentStmtNode,
     AugmentedAssignmentStmtNode,
     ExprStmtNode,
+    SelectionBlock,
     SelectionStackStmt,
     RangedForStmtNode,
     WhileStmtNode,
@@ -470,7 +471,7 @@ class Lowerer:
                 block.position_info,
             )
             blocks.append(
-                SelectionStackStmt.SelectionBlock(
+                SelectionBlock(
                     self.lower_expr(block.condition), self.lower_stmts(block.stmts)
                 )
             )

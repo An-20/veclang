@@ -73,9 +73,9 @@ OpcodeMap: dict[int, Instruction] = {
     0x15: Instruction(0x15, "OP_SET_LOCAL_OBJ", 2),
     0x16: Instruction(0x16, "OP_GET_GLOBAL_OBJ", 2),
     0x17: Instruction(0x17, "OP_SET_GLOBAL_OBJ", 2),
-    0x20: Instruction(0x20, "OP_JMP_IF_TRUE", 0),
-    0x21: Instruction(0x21, "OP_JMP_IF_FALSE", 0),
-    0x22: Instruction(0x22, "OP_JMP", 0),
+    0x20: Instruction(0x22, "OP_JMP", 1),
+    0x21: Instruction(0x20, "OP_JMP_IF_TRUE", 1),
+    0x22: Instruction(0x21, "OP_JMP_IF_FALSE", 1),
     # ========================================
     # 0x80 - 0xDF - OPERATIONS
     # ========================================

@@ -47,6 +47,8 @@ class FunctionSubScope:
     ast_position_info: ASTPositionInfo
 
     instruction_offset: int
+    block_end_update_offsets: list[int]
+    stack_end_update_offsets: list[int]
 
 
 @dataclasses.dataclass
@@ -76,6 +78,10 @@ class BytecodeEmitter:
             FunctionScope("vl::global", ASTPositionInfo(0, 0), {}, 0, 0, [])
         ]
 
+        # some context attributes to keep track of state
+        self.ctx_selection_block_end_updates: list[int]
+        self.ctx_selection_stack_end_updates: list[int]
+
     def scope_in_fn(self, fn_name: str, ast_position_info: ASTPositionInfo) -> None:
         for scope in self.scopes:
             if scope.fn_name != "vl::global":
@@ -91,6 +97,16 @@ class BytecodeEmitter:
             raise ValueError("Mismatched scope: current scope is not a function scope")
         self.scopes.pop()
 
+    def subscope_add_block_end_update(self, instruction_offset: int):
+        self.scopes[-1].sub_scopes[-1].block_end_update_offsets.append(
+            instruction_offset
+        )
+
+    def subscope_add_stack_end_update(self, instruction_offset: int):
+        self.scopes[-1].sub_scopes[-1].stack_end_update_offsets.append(
+            instruction_offset
+        )
+
     def fn_add_data(
         self, identifier: str, type_or_value: VlType | VlTypeABC, is_variable: bool
     ) -> int:
@@ -100,6 +116,12 @@ class BytecodeEmitter:
         # TODO: FIXME FOR 32 / 64
         scope.data_offset_counter += type_or_value.get_info()[3][0]
         return data_offset
+
+    def last_instruction_offset(self) -> int:
+        return len(self.instructions) - 1
+
+    def next_instruction_offset(self) -> int:
+        return len(self.instructions)
 
     def add_instruction(self, opcode_hr: str, *operands: bytes) -> int:
         if opcode_hr not in OpcodeHRMap:
@@ -122,9 +144,9 @@ class BytecodeEmitter:
     def modify_instruction_16b(self, instruction_offset: int, arg_16b: int):
         # TODO: loads more checking
         current_instruction = self.instructions[instruction_offset]
-        self.instructions[instruction_offset] = (
-            current_instruction[:2] + arg_16b.to_bytes()
-        )
+        self.instructions[instruction_offset] = current_instruction[
+            :2
+        ] + int_to_2_bytes(arg_16b)
 
     def emit_stmt(self, node: StmtNode) -> None:
         if isinstance(node, DeclNode):
@@ -194,16 +216,19 @@ class BytecodeEmitter:
             # now process if is variable
             vl_type = vl_type_or_val
             if scope.fn_name == "vl::global":
-                if vl_type.is_val():
-                    instruction = "OP_GET_GLOBAL_VAL"
-                else:
-                    instruction = "OP_GET_GLOBAL_OBJ"
+                instruction_prefix = "OP_GET_GLOBAL_"
             else:
-                if vl_type.is_val():
-                    instruction = "OP_GET_LOCAL_VAL"
-                else:
-                    instruction = "OP_GET_LOCAL_OBJ"
-            self.add_instruction(instruction, int_to_2_bytes(data_offset))
+                instruction_prefix = "OP_GET_LOCAL_"
+            if vl_type.is_val():
+                instruction = instruction_prefix + "VAL"
+                self.add_instruction(instruction, int_to_2_bytes(data_offset))
+            else:
+                instruction = instruction_prefix + "OBJ"
+                self.add_instruction(
+                    instruction,
+                    int_to_1_byte(vl_type.to_vl_type_code()),
+                    int_to_2_bytes(data_offset),
+                )
             return
         raise ValueError(f"Unknown identifier '{identifier}'")
 
@@ -264,7 +289,11 @@ class BytecodeEmitter:
     def emit_data_decl(self, node: DataDeclNode):
         is_variable = not node.constant
         self.emit_expr(node.value)
-        self.fn_add_data(node.target, node.vl_type, is_variable)
+        if is_variable:
+            self.fn_add_data(node.target, node.vl_type, True)
+        else:
+            assert isinstance(node.value, ConstantExprNode)
+            self.fn_add_data(node.target, node.value.value, False)
 
         # TODO: bodge?
         data_offset = self.scopes[-1].data[node.target][2]
@@ -307,10 +336,114 @@ class BytecodeEmitter:
         pass
 
     def emit_selection_stack_stmt(self, node: SelectionStackStmt):
-        pass
+        block_end_updates = []
+        stack_end_updates = []
+        for block in node.blocks:
+            for block_end_update in block_end_updates:
+                self.modify_instruction_16b(
+                    block_end_update, self.next_instruction_offset()
+                )
+
+            self.scopes[-1].sub_scopes.append(
+                FunctionSubScope(
+                    None,
+                    "selection",
+                    node.ast_position_info,
+                    self.next_instruction_offset(),
+                    [],
+                    stack_end_updates,
+                )
+            )
+            self.emit_expr(block.condition)
+            self.add_instruction("OP_JMP_IF_FALSE", int_to_2_bytes(0xFFFF))
+            self.subscope_add_block_end_update(self.last_instruction_offset())
+            self.emit_stmts(block.stmts)
+            self.add_instruction("OP_JMP", int_to_2_bytes(0xFFFF))
+            self.subscope_add_stack_end_update(self.last_instruction_offset())
+
+            block_end_updates = self.scopes[-1].sub_scopes[-1].block_end_update_offsets
+            stack_end_updates = self.scopes[-1].sub_scopes[-1].stack_end_update_offsets
+            self.scopes[-1].sub_scopes.pop()
+
+        if node.else_stmts:
+            self.scopes[-1].sub_scopes.append(
+                FunctionSubScope(
+                    None,
+                    "selection",
+                    node.ast_position_info,
+                    self.next_instruction_offset(),
+                    [],
+                    stack_end_updates,
+                )
+            )
+            self.emit_stmts(node.else_stmts)
+            stack_end_updates = self.scopes[-1].sub_scopes[-1].stack_end_update_offsets
+            self.scopes[-1].sub_scopes.pop()
+
+        for stack_end_update in stack_end_updates:
+            self.modify_instruction_16b(
+                stack_end_update, self.next_instruction_offset()
+            )
 
     def emit_ranged_for_stmt(self, node: RangedForStmtNode):
-        pass
+        block_end_updates = []
+
+        self.fn_add_data(node.loop_var_identifier, node.loop_var_type, True)
+        self.emit_expr(node.loop_var_start)
+        self.add_instruction(
+            "OP_SET_LOCAL_VAL",
+            int_to_2_bytes(self.scopes[-1].data[node.loop_var_identifier][2]),
+        )
+        self.add_instruction(
+            "OP_GET_LOCAL_VAL",
+            int_to_2_bytes(self.scopes[-1].data[node.loop_var_identifier][2]),
+        )
+        loop_start_offset = self.last_instruction_offset()
+
+        # TODO: FIXME
+        self.emit_expr(node.loop_var_end)
+        self.add_instruction("OP_INT_LESS")
+        self.add_instruction("OP_JMP_IF_FALSE", int_to_2_bytes(0xFFFF))
+        block_end_updates.append(self.last_instruction_offset())
+
+        self.scopes[-1].sub_scopes.append(
+            FunctionSubScope(
+                "for",
+                None,
+                node.ast_position_info,
+                loop_start_offset,
+                [],
+                block_end_updates,
+            )
+        )
+        self.emit_stmts(node.stmts)
+        self.emit_assignment_stmt(
+            AssignmentStmtNode(
+                node.loop_var_identifier,
+                BinaryOperationExprNode(
+                    RvalueIdentifierExprNode(
+                        node.loop_var_identifier,
+                        False,
+                        node.loop_var_type,
+                        node.ast_position_info,
+                    ),
+                    node.loop_var_step,
+                    "PLUS",
+                    VlInt.get_operations()[6],
+                    False,
+                    node.loop_var_type,
+                    node.ast_position_info,
+                ),
+                node.ast_position_info,
+            )
+        )
+        self.add_instruction("OP_JMP", int_to_2_bytes(loop_start_offset))
+
+        subscope = self.scopes[-1].sub_scopes.pop()
+        for block_end_update in subscope.block_end_update_offsets:
+            self.modify_instruction_16b(
+                block_end_update, self.next_instruction_offset()
+            )
 
     def emit_while_stmt(self, node: WhileStmtNode):
         pass
@@ -327,7 +460,10 @@ class BytecodeEmitter:
     def emit_continue_stmt(self, node: ContinueStmtNode):
         pass
 
-    def emit(self, hir_node: ProgramNode) -> list[bytes]:
-        for stmt in hir_node.stmts:
+    def emit_stmts(self, stmts: list[StmtNode]) -> None:
+        for stmt in stmts:
             self.emit_stmt(stmt)
+
+    def emit(self, hir_node: ProgramNode) -> list[bytes]:
+        self.emit_stmts(hir_node.stmts)
         return self.instructions

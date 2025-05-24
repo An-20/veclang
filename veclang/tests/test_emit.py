@@ -9,9 +9,6 @@ from veclang.backend.bc_compiler.vl_disassembler import disassemble
 parsed = parse(
     """
 <generate_img>
-fn main(x: int, y: int, res_x: int, res_y: int) -> vec3 { return [255, 255, 255]; }
-
-<generate_img>
 fn mandlebrot(
     x: int,
     y: int,

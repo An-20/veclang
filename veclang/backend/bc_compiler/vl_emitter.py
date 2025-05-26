@@ -1,10 +1,10 @@
 import dataclasses
 
+import veclang.backend.bc_common.py.bytecode as bytecode
 from veclang.backend.bc_compiler.vl_instruction import OpcodeHRMap
 
 from veclang.frontend.parser.vl_ast import ASTPositionInfo
 from veclang.midend.hir.vl_hir import (
-    HIRNode,
     ExprNode,
     StmtNode,
     DeclNode,
@@ -26,7 +26,7 @@ from veclang.midend.hir.vl_hir import (
     BreakStmtNode,
     ContinueStmtNode,
 )
-from veclang.midend.vl_core import VlType, VlTypeABC, VlNull, VlInt, VlReal, VlBool
+from veclang.midend.vl_core import VlType, VlTypeABC, VlInt
 
 from veclang.backend.bc_compiler.vl_emitter_utils import (
     int_to_1_byte,
@@ -60,7 +60,6 @@ class FunctionScope:
     data: dict[str, tuple[VlType | VlTypeABC, bool, int | None]]
     data_offset_counter: int
     instruction_offset: int
-
     sub_scopes: list[FunctionSubScope]
 
 
@@ -69,7 +68,6 @@ class BytecodeEmitter:
     def __init__(self):
         # TODO: add some function that checks the integrity of instructions
         # because by default we will set instruction pointers to 0xFFFF
-
         self.instructions: list[bytes] = []
         self.constants: bytearray = bytearray()
         self.constant_offsets: dict[bytes, int] = {}
@@ -87,7 +85,9 @@ class BytecodeEmitter:
             if scope.fn_name != "vl::global":
                 raise ValueError("Cannot nest function declarations!")
         self.scopes.append(
-            FunctionScope(fn_name, ast_position_info, {}, 0, len(self.instructions), [])
+            FunctionScope(
+                fn_name, ast_position_info, {}, 0, self.next_instruction_offset(), []
+            )
         )
 
     def scope_out_fn(self) -> None:
@@ -400,7 +400,7 @@ class BytecodeEmitter:
         )
         loop_start_offset = self.last_instruction_offset()
 
-        # TODO: FIXME
+        # TODO: FIXME for different loop stmts
         self.emit_expr(node.loop_var_end)
         self.add_instruction("OP_INT_LESS")
         self.add_instruction("OP_JMP_IF_FALSE", int_to_2_bytes(0xFFFF))
@@ -446,7 +446,31 @@ class BytecodeEmitter:
             )
 
     def emit_while_stmt(self, node: WhileStmtNode):
-        pass
+        block_end_updates = []
+
+        loop_start_offset = self.next_instruction_offset()
+        self.emit_expr(node.condition)
+        self.add_instruction("OP_JMP_IF_FALSE", int_to_2_bytes(0xFFFF))
+        block_end_updates.append(self.last_instruction_offset())
+
+        self.scopes[-1].sub_scopes.append(
+            FunctionSubScope(
+                "while",
+                None,
+                node.ast_position_info,
+                loop_start_offset,
+                [],
+                block_end_updates,
+            )
+        )
+        self.emit_stmts(node.stmts)
+        self.add_instruction("OP_JMP", int_to_2_bytes(loop_start_offset))
+
+        subscope = self.scopes[-1].sub_scopes.pop()
+        for block_end_update in subscope.block_end_update_offsets:
+            self.modify_instruction_16b(
+                block_end_update, self.next_instruction_offset()
+            )
 
     def emit_return_stmt(self, node: ReturnStmtNode):
         if self.scopes[-1].fn_name == "vl::global":
@@ -454,11 +478,24 @@ class BytecodeEmitter:
         self.emit_expr(node.value)
         self.add_instruction("OP_RETURN")
 
-    def emit_break_stmt(self, node: BreakStmtNode):
-        pass
+    def emit_break_stmt(self, _node: BreakStmtNode):
+        for subscope in reversed(self.scopes[-1].sub_scopes):
+            if subscope.loop_name:
+                self.add_instruction("OP_JMP", int_to_2_bytes(0xFFFF))
+                subscope.block_end_update_offsets.append(self.last_instruction_offset())
+                return
+        else:
+            raise ValueError("Not in loop scope!")
 
-    def emit_continue_stmt(self, node: ContinueStmtNode):
-        pass
+    def emit_continue_stmt(self, _node: ContinueStmtNode):
+        for subscope in reversed(self.scopes[-1].sub_scopes):
+            if subscope.loop_name:
+                self.add_instruction(
+                    "OP_JMP", int_to_2_bytes(subscope.instruction_offset)
+                )
+                return
+        else:
+            raise ValueError("Not in loop scope!")
 
     def emit_stmts(self, stmts: list[StmtNode]) -> None:
         for stmt in stmts:

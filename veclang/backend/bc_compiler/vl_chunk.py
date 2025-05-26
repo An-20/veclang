@@ -7,6 +7,7 @@ INSTRUCTION_LENGTH: int = 4
 
 @dataclasses.dataclass
 class Chunk:
+    stack_frame_locals_size: int
     instructions: list[bytes]
     constants: bytearray
 
@@ -15,13 +16,14 @@ class Chunk:
         A chunk can be serialized to a binary format with:
         - An int (4 bytes) representing the length of instructions, in bytes
         - An int (4 bytes) representing the length of constants, in bytes
+        - An int (4 bytes) representing the size of the stack frame locals, in bytes
         - Bytes containing instructions
         - Bytes containing constants
         """
         instructions_bytes_length = len(self.instructions) * INSTRUCTION_LENGTH
         constants_bytes_length = len(self.constants)
         header_bytes = struct.pack(
-            "ii", instructions_bytes_length, constants_bytes_length
+            "iii", instructions_bytes_length, constants_bytes_length
         )
         serialized = header_bytes + b"".join(self.instructions) + self.constants
         return serialized
@@ -40,3 +42,9 @@ class Chunk:
         ]
         constants_bytes = serialized[8 + instructions_bytes_length :]
         return Chunk(instruction_list, constants_bytes)
+
+
+@dataclasses.dataclass
+class Program:
+    vl_global: Chunk
+    vl_fns: list[Chunk]

@@ -19,8 +19,8 @@ enum VlOpcode : uint8 {
     OP_SET_GLOBAL_OBJ=0x17,
 
     OP_JMP=0x20,
-    OP_JMP_IF_TRUE=0x20,
-    OP_JMP_IF_FALSE=0x21,
+    OP_JMP_IF_TRUE=0x21,
+    OP_JMP_IF_FALSE=0x22,
 
     OP_INT_EQUAL=0x80,
     OP_INT_NOT_EQUAL=0x81,
@@ -115,9 +115,9 @@ table VlHeader {
 table VlFunction {
     name: string;
     stack_size: uint32;
+    instruction_offset: uint32;
     arg_types: [VlType];
     return_type: VlType;
-    instructions: [byte];
 }
 
 

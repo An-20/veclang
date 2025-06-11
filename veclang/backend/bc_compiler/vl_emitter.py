@@ -1,6 +1,8 @@
 import dataclasses
 
-import veclang.backend.bc_common.py.bytecode as bytecode
+import flatbuffers
+
+import veclang.backend.bc_common.py.bytecode as bc
 from veclang.backend.bc_compiler.vl_instruction import OpcodeHRMap
 
 from veclang.frontend.parser.vl_ast import ASTPositionInfo
@@ -80,6 +82,8 @@ class BytecodeEmitter:
         self.ctx_selection_block_end_updates: list[int]
         self.ctx_selection_stack_end_updates: list[int]
 
+        self.functions: list[FunctionScope] = []
+
     def scope_in_fn(self, fn_name: str, ast_position_info: ASTPositionInfo) -> None:
         for scope in self.scopes:
             if scope.fn_name != "vl::global":
@@ -95,7 +99,7 @@ class BytecodeEmitter:
             raise ValueError("Cannot scope out of global scope!")
         if not self.scopes[-1].fn_name:
             raise ValueError("Mismatched scope: current scope is not a function scope")
-        self.scopes.pop()
+        self.functions.append(self.scopes.pop())
 
     def subscope_add_block_end_update(self, instruction_offset: int):
         self.scopes[-1].sub_scopes[-1].block_end_update_offsets.append(
@@ -233,6 +237,7 @@ class BytecodeEmitter:
         raise ValueError(f"Unknown identifier '{identifier}'")
 
     def emit_function_call_expr(self, node: FunctionCallExprNode) -> None:
+        # TODO: FIXME FOR USER DEFINED FUNCTIONS
         # arguments are pushed onto the stack in reverse order
         for argument in reversed(node.arguments):
             self.emit_expr(argument)
@@ -504,3 +509,15 @@ class BytecodeEmitter:
     def emit(self, hir_node: ProgramNode) -> list[bytes]:
         self.emit_stmts(hir_node.stmts)
         return self.instructions
+
+    def emit_new(self, hir_node: ProgramNode) -> bc.VlProgram:
+        builder = flatbuffers.Builder(1024)
+
+        # header
+        magic = builder.CreateString("VECL")
+        version = 0x0000_1000
+        flags = bc.VlHeaderFlags.CreateVlHeaderFlags(builder, False)
+        bc.VlHeader.Start(builder)
+        bc.VlHeader.AddMagic(builder, magic)
+        bc.VlHeader.AddVersion(builder, version)
+        bc.VlHeader.AddFlags(builder, flags)

@@ -27,7 +27,7 @@ All objects stored in variables are in the call stack.
 
 # Opcodes
 ## Overview
-There are three main types of instructions, classified by how they take operands:
+There are three types of instructions, classified by how they take operands:
 - 0 operand instructions e.g. `OP_POP`.
 - 1 operand instructions e.g. `OP_CONSTANT_VAL_TABLE`, that take 1 16-bit operand.
 - 2 operand instructions e.g. `OP_VECTOR_ADD`, that take 1 8-bit operand and 1 16-bit operand.

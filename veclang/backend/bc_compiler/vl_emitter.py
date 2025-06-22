@@ -356,19 +356,24 @@ class BytecodeEmitter:
                     node.ast_position_info,
                     self.next_instruction_offset(),
                     [],
-                    stack_end_updates,
+                    [],
                 )
             )
             self.emit_expr(block.condition)
             self.add_instruction("OP_JMP_IF_FALSE", int_to_2_bytes(0xFFFF))
-            self.subscope_add_block_end_update(self.last_instruction_offset())
-            self.emit_stmts(block.stmts)
-            self.add_instruction("OP_JMP", int_to_2_bytes(0xFFFF))
             self.subscope_add_stack_end_update(self.last_instruction_offset())
+            self.emit_stmts(block.stmts)
 
-            block_end_updates = self.scopes[-1].sub_scopes[-1].block_end_update_offsets
-            stack_end_updates = self.scopes[-1].sub_scopes[-1].stack_end_update_offsets
-            self.scopes[-1].sub_scopes.pop()
+            # no need to jump if there is just one if statement
+            if len(node.blocks) != 1 or node.else_stmts:
+                self.add_instruction("OP_JMP", int_to_2_bytes(0xFFFF))
+                stack_end_updates.append(self.last_instruction_offset())
+
+            subscope = self.scopes[-1].sub_scopes.pop()
+            for stack_end_update in subscope.stack_end_update_offsets:
+                self.modify_instruction_16b(
+                    stack_end_update, self.next_instruction_offset()
+                )
 
         if node.else_stmts:
             self.scopes[-1].sub_scopes.append(
@@ -382,7 +387,7 @@ class BytecodeEmitter:
                 )
             )
             self.emit_stmts(node.else_stmts)
-            stack_end_updates = self.scopes[-1].sub_scopes[-1].stack_end_update_offsets
+
             self.scopes[-1].sub_scopes.pop()
 
         for stack_end_update in stack_end_updates:
@@ -417,8 +422,8 @@ class BytecodeEmitter:
                 None,
                 node.ast_position_info,
                 loop_start_offset,
-                [],
                 block_end_updates,
+                [],
             )
         )
         self.emit_stmts(node.stmts)
@@ -464,8 +469,8 @@ class BytecodeEmitter:
                 None,
                 node.ast_position_info,
                 loop_start_offset,
-                [],
                 block_end_updates,
+                [],
             )
         )
         self.emit_stmts(node.stmts)

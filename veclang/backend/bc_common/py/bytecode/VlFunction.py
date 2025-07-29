@@ -39,8 +39,15 @@ class VlFunction(object):
         return 0
 
     # VlFunction
-    def ArgTypes(self, j):
+    def InstructionOffset(self):
         o = flatbuffers.number_types.UOffsetTFlags.py_type(self._tab.Offset(8))
+        if o != 0:
+            return self._tab.Get(flatbuffers.number_types.Uint32Flags, o + self._tab.Pos)
+        return 0
+
+    # VlFunction
+    def ArgTypes(self, j):
+        o = flatbuffers.number_types.UOffsetTFlags.py_type(self._tab.Offset(10))
         if o != 0:
             a = self._tab.Vector(o)
             return self._tab.Get(flatbuffers.number_types.Int8Flags, a + flatbuffers.number_types.UOffsetTFlags.py_type(j * 1))
@@ -48,56 +55,29 @@ class VlFunction(object):
 
     # VlFunction
     def ArgTypesAsNumpy(self):
-        o = flatbuffers.number_types.UOffsetTFlags.py_type(self._tab.Offset(8))
+        o = flatbuffers.number_types.UOffsetTFlags.py_type(self._tab.Offset(10))
         if o != 0:
             return self._tab.GetVectorAsNumpy(flatbuffers.number_types.Int8Flags, o)
         return 0
 
     # VlFunction
     def ArgTypesLength(self):
-        o = flatbuffers.number_types.UOffsetTFlags.py_type(self._tab.Offset(8))
+        o = flatbuffers.number_types.UOffsetTFlags.py_type(self._tab.Offset(10))
         if o != 0:
             return self._tab.VectorLen(o)
         return 0
 
     # VlFunction
     def ArgTypesIsNone(self):
-        o = flatbuffers.number_types.UOffsetTFlags.py_type(self._tab.Offset(8))
+        o = flatbuffers.number_types.UOffsetTFlags.py_type(self._tab.Offset(10))
         return o == 0
 
     # VlFunction
     def ReturnType(self):
-        o = flatbuffers.number_types.UOffsetTFlags.py_type(self._tab.Offset(10))
+        o = flatbuffers.number_types.UOffsetTFlags.py_type(self._tab.Offset(12))
         if o != 0:
             return self._tab.Get(flatbuffers.number_types.Int8Flags, o + self._tab.Pos)
         return 0
-
-    # VlFunction
-    def Instructions(self, j):
-        o = flatbuffers.number_types.UOffsetTFlags.py_type(self._tab.Offset(12))
-        if o != 0:
-            a = self._tab.Vector(o)
-            return self._tab.Get(flatbuffers.number_types.Int8Flags, a + flatbuffers.number_types.UOffsetTFlags.py_type(j * 1))
-        return 0
-
-    # VlFunction
-    def InstructionsAsNumpy(self):
-        o = flatbuffers.number_types.UOffsetTFlags.py_type(self._tab.Offset(12))
-        if o != 0:
-            return self._tab.GetVectorAsNumpy(flatbuffers.number_types.Int8Flags, o)
-        return 0
-
-    # VlFunction
-    def InstructionsLength(self):
-        o = flatbuffers.number_types.UOffsetTFlags.py_type(self._tab.Offset(12))
-        if o != 0:
-            return self._tab.VectorLen(o)
-        return 0
-
-    # VlFunction
-    def InstructionsIsNone(self):
-        o = flatbuffers.number_types.UOffsetTFlags.py_type(self._tab.Offset(12))
-        return o == 0
 
 def VlFunctionStart(builder):
     builder.StartObject(5)
@@ -117,8 +97,14 @@ def VlFunctionAddStackSize(builder, stackSize):
 def AddStackSize(builder, stackSize):
     VlFunctionAddStackSize(builder, stackSize)
 
+def VlFunctionAddInstructionOffset(builder, instructionOffset):
+    builder.PrependUint32Slot(2, instructionOffset, 0)
+
+def AddInstructionOffset(builder, instructionOffset):
+    VlFunctionAddInstructionOffset(builder, instructionOffset)
+
 def VlFunctionAddArgTypes(builder, argTypes):
-    builder.PrependUOffsetTRelativeSlot(2, flatbuffers.number_types.UOffsetTFlags.py_type(argTypes), 0)
+    builder.PrependUOffsetTRelativeSlot(3, flatbuffers.number_types.UOffsetTFlags.py_type(argTypes), 0)
 
 def AddArgTypes(builder, argTypes):
     VlFunctionAddArgTypes(builder, argTypes)
@@ -130,22 +116,10 @@ def StartArgTypesVector(builder, numElems):
     return VlFunctionStartArgTypesVector(builder, numElems)
 
 def VlFunctionAddReturnType(builder, returnType):
-    builder.PrependInt8Slot(3, returnType, 0)
+    builder.PrependInt8Slot(4, returnType, 0)
 
 def AddReturnType(builder, returnType):
     VlFunctionAddReturnType(builder, returnType)
-
-def VlFunctionAddInstructions(builder, instructions):
-    builder.PrependUOffsetTRelativeSlot(4, flatbuffers.number_types.UOffsetTFlags.py_type(instructions), 0)
-
-def AddInstructions(builder, instructions):
-    VlFunctionAddInstructions(builder, instructions)
-
-def VlFunctionStartInstructionsVector(builder, numElems):
-    return builder.StartVector(1, numElems, 1)
-
-def StartInstructionsVector(builder, numElems):
-    return VlFunctionStartInstructionsVector(builder, numElems)
 
 def VlFunctionEnd(builder):
     return builder.EndObject()

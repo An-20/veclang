@@ -4,6 +4,7 @@ from veclang.midend.hir import lower
 from veclang.midend.hir.vl_hlr_io import print_hir, format_hir
 from veclang.backend.bc_compiler.vl_emitter import BytecodeEmitter
 from veclang.backend.bc_compiler.vl_disassembler import disassemble
+import veclang.backend.bc_common.py.bytecode as bc
 
 
 parsed = parse(
@@ -16,4 +17,8 @@ hir = lower(parsed)
 print_hir(hir)
 emitter = BytecodeEmitter()
 bytecode = emitter.emit(hir)
-disassemble(bytecode)
+# disassemble(bytecode)
+
+
+x = bc.VlProgram.VlProgram.GetRootAs(bytecode, 0)
+print(x.InstructionsAsNumpy())

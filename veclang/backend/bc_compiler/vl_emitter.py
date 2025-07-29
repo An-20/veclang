@@ -28,7 +28,7 @@ from veclang.midend.hir.vl_hir import (
     BreakStmtNode,
     ContinueStmtNode,
 )
-from veclang.midend.vl_core import VlType, VlTypeABC, VlInt
+from veclang.midend.vl_core import VlType, VlTypeABC, VlInt, VlNull
 
 from veclang.backend.bc_compiler.vl_emitter_utils import (
     int_to_1_byte,
@@ -64,6 +64,9 @@ class FunctionScope:
     instruction_offset: int
     sub_scopes: list[FunctionSubScope]
 
+    arg_types: list[VlType]
+    return_type: VlType
+
 
 class BytecodeEmitter:
 
@@ -75,7 +78,7 @@ class BytecodeEmitter:
         self.constant_offsets: dict[bytes, int] = {}
 
         self.scopes: list[FunctionScope] = [
-            FunctionScope("vl::global", ASTPositionInfo(0, 0), {}, 0, 0, [])
+            FunctionScope("vl::global", ASTPositionInfo(0, 0), {}, 0, 0, [], [], VlNull)
         ]
 
         # some context attributes to keep track of state
@@ -84,13 +87,26 @@ class BytecodeEmitter:
 
         self.functions: list[FunctionScope] = []
 
-    def scope_in_fn(self, fn_name: str, ast_position_info: ASTPositionInfo) -> None:
+    def scope_in_fn(
+        self,
+        fn_name: str,
+        ast_position_info: ASTPositionInfo,
+        arg_types: list[VlType],
+        return_type: VlType,
+    ) -> None:
         for scope in self.scopes:
             if scope.fn_name != "vl::global":
                 raise ValueError("Cannot nest function declarations!")
         self.scopes.append(
             FunctionScope(
-                fn_name, ast_position_info, {}, 0, self.next_instruction_offset(), []
+                fn_name,
+                ast_position_info,
+                {},
+                0,
+                self.next_instruction_offset(),
+                [],
+                arg_types,
+                return_type,
             )
         )
 
@@ -268,7 +284,9 @@ class BytecodeEmitter:
         fn_identifier = node.identifier
 
         # pop arguments off the intermediate value stack and onto the call stack
-        self.scope_in_fn(fn_identifier, node.ast_position_info)
+        arg_types = [p.vl_type for p in node.parameters]
+        return_type = node.return_type
+        self.scope_in_fn(fn_identifier, node.ast_position_info, arg_types, return_type)
         for parameter in node.parameters:
             self.fn_add_data(parameter.identifier, parameter.vl_type, True)
 
@@ -511,18 +529,57 @@ class BytecodeEmitter:
         for stmt in stmts:
             self.emit_stmt(stmt)
 
-    def emit(self, hir_node: ProgramNode) -> list[bytes]:
+    def emit(self, hir_node: ProgramNode) -> bc.VlProgram:
         self.emit_stmts(hir_node.stmts)
-        return self.instructions
 
-    def emit_new(self, hir_node: ProgramNode) -> bc.VlProgram:
         builder = flatbuffers.Builder(1024)
 
         # header
         magic = builder.CreateString("VECL")
         version = 0x0000_1000
-        flags = bc.VlHeaderFlags.CreateVlHeaderFlags(builder, False)
         bc.VlHeader.Start(builder)
         bc.VlHeader.AddMagic(builder, magic)
         bc.VlHeader.AddVersion(builder, version)
-        bc.VlHeader.AddFlags(builder, flags)
+        bc.VlHeader.AddFlags(
+            builder, bc.VlHeaderFlags.CreateVlHeaderFlags(builder, False)
+        )
+        header = bc.VlHeader.End(builder)
+
+        # constants
+        constants = builder.CreateByteVector(self.constants)
+
+        # functions
+        bc.VlProgram.StartFunctionsVector(builder, len(self.functions))
+        for function in reversed(self.functions):
+            fn_name = builder.CreateString(function.fn_name)
+            stack_size = function.data_offset_counter
+            instruction_offset = function.instruction_offset
+            arg_types = [p.to_vl_type_code() for p in function.arg_types]
+            return_type = function.return_type.to_vl_type_code()
+
+            bc.VlFunction.VlFunctionStartArgTypesVector(builder, len(arg_types))
+            for arg_type in reversed(arg_types):
+                builder.PrependUOffsetTRelative(arg_type)
+            arg_types = builder.EndVector()
+
+            bc.VlFunction.Start(builder)
+            bc.VlFunction.AddName(builder, fn_name)
+            bc.VlFunction.VlFunctionAddStackSize(builder, stack_size)
+            bc.VlFunction.VlFunctionAddInstructionOffset(builder, instruction_offset)
+            bc.VlFunction.VlFunctionAddReturnType(builder, return_type)
+            function = bc.VlFunction.End(builder)
+            builder.PrependUOffsetTRelative(function)
+        functions = builder.EndVector()
+
+        # instructions
+        instructions = builder.CreateByteVector(b"".join(self.instructions))
+
+        bc.VlProgram.Start(builder)
+        bc.VlProgram.AddHeader(builder, header)
+        bc.VlProgram.AddConstants(builder, constants)
+        bc.VlProgram.AddFunctions(builder, functions)
+        bc.VlProgram.AddInstructions(builder, instructions)
+        program = bc.VlProgram.End(builder)
+        builder.Finish(program)
+        buf = builder.Output()
+        return buf

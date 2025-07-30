@@ -8,7 +8,10 @@ from veclang.backend.bc_compiler.vl_disassembler import disassemble_vl_program
 
 parsed = parse(
     """
-print(1 + 1);
+    fn main() -> int {
+        print(1 + 1);
+        return 0;
+    }
 """
 )
 print_ast(parsed)

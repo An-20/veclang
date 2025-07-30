@@ -7,7 +7,7 @@ from veclang.utils.cedf.cedf import decode_cedf_from_bytes
 from veclang.utils.cedf.tools import CEDFViewer
 
 from veclang.backend.bc_common.py.vl_sedf import VlProgram, VlSEDF
-from veclang.backend.bc_compiler.vl_disassembler import disassemble
+from veclang.backend.bc_compiler.vl_disassembler import disassemble_vl_program
 
 
 class VlSEDFViewer(CEDFViewer):
@@ -46,8 +46,7 @@ class VlSEDFViewer(CEDFViewer):
     def format(self, vl_program: VlProgram) -> str:
         try:
             out_str = f"Constants:\n{self.default_format(vl_program['constants'])}\n\n"
-            instructions = vl_program["instructions"]
-            out_str += f"Instructions:\n{disassemble([instructions[i:i+4] for i in range(0, len(instructions), 4)])}"
+            out_str += f"Instructions:\n{disassemble_vl_program(vl_program)}"
             return out_str
         except Exception as e:
             return (

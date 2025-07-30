@@ -60,6 +60,7 @@ lexer_input = None
 
 
 LOG: bool = True
+LOG_WARNINGS_AND_BELOW: bool = False
 
 
 class LexError(Exception):
@@ -116,7 +117,7 @@ class PlyLogger:
 
     def warning(self, msg, *args):
         """Emits a warning if logging is enabled"""
-        if LOG:
+        if LOG and LOG_WARNINGS_AND_BELOW:
             self.f.write("WARNING: " + (msg % args) + "\n")
 
     def error(self, msg, *args):
@@ -130,12 +131,12 @@ class PlyLogger:
         *args,
     ):
         """Emits a logging info if logging is enabled"""
-        if LOG:
+        if LOG and LOG_WARNINGS_AND_BELOW:
             self.f.write("INFO: " + (msg % args) + "\n")
 
     def debug(self, msg, *args):
         """Emits a logging debug if logging is enabled"""
-        if LOG:
+        if LOG and LOG_WARNINGS_AND_BELOW:
             self.f.write("DEBUG: " + (msg % args) + "\n")
 
 

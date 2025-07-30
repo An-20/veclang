@@ -31,5 +31,8 @@ target_include_directories(veclang
     veclang/utils  # This includes all headers like veclang/utils/math/*.hpp
 )
 
+if(EMSCRIPTEN)
+  target_link_options(veclang PRIVATE -sNO_DISABLE_EXCEPTION_CATCHING=1)
+endif()
 
 target_compile_options(veclang PRIVATE -Wall -O2 -g)

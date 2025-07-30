@@ -1,7 +1,5 @@
 import dataclasses
 
-import flatbuffers
-
 import veclang.backend.bc_common.py as bc
 from veclang.backend.bc_compiler.vl_instruction import OpcodeHRMap
 

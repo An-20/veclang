@@ -2,7 +2,7 @@ import dataclasses
 
 import flatbuffers
 
-import veclang.backend.bc_common.py.bytecode as bc
+import veclang.backend.bc_common.py as bc
 from veclang.backend.bc_compiler.vl_instruction import OpcodeHRMap
 
 from veclang.frontend.parser.vl_ast import ASTPositionInfo
@@ -532,54 +532,25 @@ class BytecodeEmitter:
     def emit(self, hir_node: ProgramNode) -> bc.VlProgram:
         self.emit_stmts(hir_node.stmts)
 
-        builder = flatbuffers.Builder(1024)
-
-        # header
-        magic = builder.CreateString("VECL")
-        version = 0x0000_1000
-        bc.VlHeader.Start(builder)
-        bc.VlHeader.AddMagic(builder, magic)
-        bc.VlHeader.AddVersion(builder, version)
-        bc.VlHeader.AddFlags(
-            builder, bc.VlHeaderFlags.CreateVlHeaderFlags(builder, False)
-        )
-        header = bc.VlHeader.End(builder)
-
-        # constants
-        constants = builder.CreateByteVector(self.constants)
-
-        # functions
-        bc.VlProgram.StartFunctionsVector(builder, len(self.functions))
-        for function in reversed(self.functions):
-            fn_name = builder.CreateString(function.fn_name)
-            stack_size = function.data_offset_counter
-            instruction_offset = function.instruction_offset
-            arg_types = [p.to_vl_type_code() for p in function.arg_types]
-            return_type = function.return_type.to_vl_type_code()
-
-            bc.VlFunction.VlFunctionStartArgTypesVector(builder, len(arg_types))
-            for arg_type in reversed(arg_types):
-                builder.PrependUOffsetTRelative(arg_type)
-            arg_types = builder.EndVector()
-
-            bc.VlFunction.Start(builder)
-            bc.VlFunction.AddName(builder, fn_name)
-            bc.VlFunction.VlFunctionAddStackSize(builder, stack_size)
-            bc.VlFunction.VlFunctionAddInstructionOffset(builder, instruction_offset)
-            bc.VlFunction.VlFunctionAddReturnType(builder, return_type)
-            function = bc.VlFunction.End(builder)
-            builder.PrependUOffsetTRelative(function)
-        functions = builder.EndVector()
-
-        # instructions
-        instructions = builder.CreateByteVector(b"".join(self.instructions))
-
-        bc.VlProgram.Start(builder)
-        bc.VlProgram.AddHeader(builder, header)
-        bc.VlProgram.AddConstants(builder, constants)
-        bc.VlProgram.AddFunctions(builder, functions)
-        bc.VlProgram.AddInstructions(builder, instructions)
-        program = bc.VlProgram.End(builder)
-        builder.Finish(program)
-        buf = builder.Output()
-        return buf
+        functions: list[bc.VlFunction] = []
+        for function in self.functions:
+            functions.append(
+                {
+                    "name": function.fn_name if function.fn_name else "",
+                    "stack_size": function.data_offset_counter,
+                    "instruction_offset": function.instruction_offset,
+                    "arg_types": [p.to_vl_type_code() for p in function.arg_types],
+                    "return_type": function.return_type.to_vl_type_code(),
+                }
+            )
+        header: bc.VlHeader = {
+            "magic": "VECL",
+            "version": 0x0001_0000,
+            "flags": {},
+            "functions": functions,
+        }
+        return {
+            "header": header,
+            "constants": self.constants,
+            "instructions": b"".join(self.instructions),
+        }

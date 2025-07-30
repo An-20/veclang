@@ -1,4 +1,4 @@
-import os
+import abc
 import json
 import customtkinter as ctk
 import tkinter.filedialog as fd
@@ -12,20 +12,36 @@ from veclang.utils.cedf.cedf import (
 )
 
 
-def format_binary(data: bytes, width=16):
-    lines = []
-    for i in range(0, len(data), width):
-        chunk = data[i : i + width]
-        hex_part = " ".join(f"{b:02X}" for b in chunk)
-        ascii_part = "".join(chr(b) if 32 <= b < 127 else "." for b in chunk)
-        lines.append(f"{i:08X}  {hex_part:<48}  {ascii_part}")
-    return "\n".join(lines)
+class CEDFViewer(ctk.CTk, abc.ABC):
 
+    @staticmethod
+    @abc.abstractmethod
+    def get_title() -> str:
+        """Gets the title for the window"""
 
-class CEDFViewer(ctk.CTk):
+    @staticmethod
+    def get_filetypes() -> list[tuple[str, str]]:
+        """
+        Gets a list of filetypes e.g.:
+        [("SEDF files", "*.sedf"), ("All files", "*.*")]
+        """
+        return [("SEDF files", "*.sedf"), ("All files", "*.*")]
+
+    @staticmethod
+    def default_format(data: bytes) -> str:
+        """Default formatter included in ABC in case subclasses want to use as a fallback."""
+        lines = []
+        width = 16
+        for i in range(0, len(data), width):
+            chunk = data[i : i + width]
+            hex_part = " ".join(f"{b:02X}" for b in chunk)
+            ascii_part = "".join(chr(b) if 32 <= b < 127 else "." for b in chunk)
+            lines.append(f"{i:08X}  {hex_part:<48}  {ascii_part}")
+        return "\n".join(lines)
+
     def __init__(self):
         super().__init__()
-        self.title("CEDF Tools")
+        self.title(self.get_title())
         self.geometry("950x750")
         self.grid_columnconfigure((0, 1), weight=1)
         self.grid_rowconfigure((1, 2, 3), weight=1)
@@ -38,7 +54,7 @@ class CEDFViewer(ctk.CTk):
         ctk.CTkLabel(
             self, text="Header Viewer", font=ctk.CTkFont(size=14, weight="bold")
         ).grid(row=0, column=0, columnspan=2, sticky="w", padx=10, pady=(10, 0))
-        self.header_text = ctk.CTkTextbox(self, height=90)
+        self.header_text = ctk.CTkTextbox(self, height=90, font=("Courier New", 14))
         self.header_text.grid(
             row=1, column=0, columnspan=2, sticky="nsew", padx=10, pady=(0, 10)
         )
@@ -47,13 +63,13 @@ class CEDFViewer(ctk.CTk):
         ctk.CTkLabel(
             self, text="JSON Editor", font=ctk.CTkFont(size=14, weight="bold")
         ).grid(row=2, column=0, sticky="w", padx=10)
-        self.json_editor = ctk.CTkTextbox(self)
+        self.json_editor = ctk.CTkTextbox(self, font=("Courier New", 14))
         self.json_editor.grid(row=3, column=0, sticky="nsew", padx=10, pady=(0, 10))
 
         ctk.CTkLabel(
             self, text="Binary Payload Viewer", font=ctk.CTkFont(size=14, weight="bold")
         ).grid(row=2, column=1, sticky="w", padx=10)
-        self.binary_viewer = ctk.CTkTextbox(self)
+        self.binary_viewer = ctk.CTkTextbox(self, font=("Courier New", 14))
         self.binary_viewer.grid(row=3, column=1, sticky="nsew", padx=10, pady=(0, 10))
         self.binary_viewer.configure(state="disabled")
 
@@ -68,16 +84,9 @@ class CEDFViewer(ctk.CTk):
         )
         self.save_button.grid(row=4, column=1, pady=10, padx=10, sticky="ew")
 
-    def drop_file(self, event):
-        path = event.data.strip().strip("{}")
-        if os.path.isfile(path):
-            self.load_file(path)
-
     def load_file(self, path=None):
         if not path:
-            path = fd.askopenfilename(
-                filetypes=[("SEDF files", "*.sedf"), ("All files", "*.*")]
-            )
+            path = fd.askopenfilename(filetypes=self.get_filetypes())
         if not path:
             return
         try:
@@ -94,7 +103,7 @@ class CEDFViewer(ctk.CTk):
 
             self.binary_viewer.configure(state="normal")
             self.binary_viewer.delete("1.0", "end")
-            self.binary_viewer.insert("1.0", format_binary(binary_payload))
+            self.binary_viewer.insert("1.0", self.default_format(binary_payload))
             self.binary_viewer.configure(state="disabled")
 
         except Exception as e:
@@ -126,8 +135,15 @@ class CEDFViewer(ctk.CTk):
         self.header_text.configure(state="disabled")
 
 
+class CEDFViewerUniversal(CEDFViewer):
+
+    @staticmethod
+    def get_title() -> str:
+        return "Universal CEDF Viewer"
+
+
 if __name__ == "__main__":
     ctk.set_appearance_mode("System")
     ctk.set_default_color_theme("blue")
-    app = CEDFViewer()
+    app = CEDFViewerUniversal()
     app.mainloop()

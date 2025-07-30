@@ -1,3 +1,6 @@
+#ifndef CEDF_HPP
+#define CEDF_HPP
+
 #pragma once
 #include <cstdint>
 #include <cstring>
@@ -110,3 +113,5 @@ namespace au_cedf
         out.write(reinterpret_cast<const char *>(data.data()), data.size());
     }
 };
+
+#endif // CEDF_HPP

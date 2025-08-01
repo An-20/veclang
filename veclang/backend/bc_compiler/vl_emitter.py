@@ -125,6 +125,14 @@ class BytecodeEmitter:
             instruction_offset
         )
 
+    @staticmethod
+    def vl_type_or_val_to_type(vl_type_or_val: VlType | VlTypeABC) -> VlType:
+        """Utility to get the Python type from a vl_type_or_val"""
+        if isinstance(vl_type_or_val, type):
+            # noinspection PyTypeChecker
+            return vl_type_or_val
+        return type(vl_type_or_val)
+
     def fn_add_data(
         self, identifier: str, type_or_value: VlType | VlTypeABC, is_variable: bool
     ) -> int:
@@ -188,6 +196,11 @@ class BytecodeEmitter:
         elif isinstance(node, ExprStmtNode):
             if isinstance(node.expr, FunctionCallExprNode):
                 self.emit_expr(node.expr)
+                # but after we actually need to pop off the stack
+                # TODO: FIXME
+                # uh so we actually need to propagate type information all the way
+                # back up when compiling stmts so then we know whether to pop off
+                # the value or object stack. cool!
             # dead code elimination: only a function call could produce a result
 
     def emit_decl(self, node: DeclNode) -> None:

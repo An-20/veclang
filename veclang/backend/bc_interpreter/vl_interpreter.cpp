@@ -10,6 +10,9 @@
 
 struct StackFrame
 {
+    uint32_t return_address;
+    uint32_t stack_start;
+    uint32_t stack_size;
 };
 
 class Interpreter
@@ -26,6 +29,7 @@ public:
     }
 
 private:
+    uint32_t instruction_pointer = 0;
     std::vector<uint8_t> constants;
     std::vector<uint8_t> stack;
     std::vector<StackFrame> call_stack;
@@ -103,5 +107,48 @@ private:
         vl_data::RawObject object;
         std::memcpy(&object.bits, constants.data() + offset_16b, type_size);
         object_stack.push(object);
+    }
+
+    void op_pop_val(const uint8_t *instruction)
+    {
+        if (value_stack.empty())
+        {
+            std::cerr << "Value stack underflow\n";
+            return;
+        }
+        value_stack.pop();
+    }
+
+    void op_pop_obj(const uint8_t *instruction)
+    {
+        if (object_stack.empty())
+        {
+            std::cerr << "Object stack underflow\n";
+            return;
+        }
+        object_stack.pop();
+    }
+
+    void op_call_builtin(const uint8_t *instruction)
+    {
+        uint16_t builtin_id = get_1_operand(instruction);
+        throw std::runtime_error("Builtin call not implemented yet: " + std::to_string(builtin_id));
+    }
+
+    void op_call(const uint8_t *instruction)
+    {
+        uint16_t func_id = get_1_operand(instruction);
+        throw std::runtime_error("Function call not implemented yet: " + std::to_string(func_id));
+    }
+
+    void op_return(const uint8_t *instruction)
+    {
+        if (call_stack.empty())
+        {
+            std::cerr << "Call stack underflow\n";
+            return;
+        }
+        call_stack.pop_back();
+        // todo: mess with instruction_pointer to return to the caller
     }
 };

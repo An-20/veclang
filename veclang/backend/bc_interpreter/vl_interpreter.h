@@ -6,7 +6,8 @@
 #include <sstream>
 #include <stdexcept>
 #include <iostream>
-#include "vl_types.h"
+#include "vl_types_val.h"
+#include "vl_types_obj.h"
 #include "vl_program.h"
 
 #include "../bc_common/cpp/vl_sedf.h"

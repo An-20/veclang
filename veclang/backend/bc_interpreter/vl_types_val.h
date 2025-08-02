@@ -1,5 +1,5 @@
-#ifndef VL_TYPES_H
-#define VL_TYPES_H
+#ifndef VL_TYPES_VAL_H
+#define VL_TYPES_VAL_H
 
 #include <cstdint>
 #include <cstring>
@@ -8,49 +8,9 @@
 
 namespace vl_types
 {
-    struct VlMat2
-    {
-        float data[4];
-    };
-
-    struct VlMat3
-    {
-        float data[9];
-    };
-
-    struct VlMat4
-    {
-        float data[16];
-    };
-
-    struct VlVec2
-    {
-        float x, y;
-    };
-
-    struct VlVec3
-    {
-        float x, y, z;
-    };
-
-    struct VlVec4
-    {
-        float x, y, z, w;
-    };
-
-    struct VlComplex
-    {
-        float real, imag;
-    };
-
     struct RawValue
     {
         uint32_t bits;
-    };
-
-    struct RawObject
-    {
-        uint32_t bits[16];
     };
 
     inline RawValue null()
@@ -86,6 +46,11 @@ namespace vl_types
         return static_cast<int32_t>(rv.bits);
     }
 
+    inline bool rv_to_bool(const RawValue &rv)
+    {
+        return rv.bits != 0;
+    }
+
     inline float rv_to_float(const RawValue &rv)
     {
         float value;
@@ -93,31 +58,12 @@ namespace vl_types
         return value;
     }
 
-    inline VlComplex ro_to_complex(const RawObject &ro)
-    {
-        float real, imag;
-        std::memcpy(&real, &ro.bits[0], sizeof(float));
-        std::memcpy(&imag, &ro.bits[1], sizeof(float));
-        VlComplex complex;
-        complex.real = real;
-        complex.imag = imag;
-        return complex;
-    }
-
-    inline RawObject complex_to_ro(const VlComplex &complex)
-    {
-        RawObject obj;
-        std::memcpy(&obj.bits[0], &complex.real, sizeof(float));
-        std::memcpy(&obj.bits[1], &complex.imag, sizeof(float));
-        return obj;
-    }
-
     RawValue int_equal(const RawValue &a, const RawValue &b);
     RawValue int_not_equal(const RawValue &a, const RawValue &b);
     RawValue int_greater(const RawValue &a, const RawValue &b);
+    RawValue int_greater_or_equal(const RawValue &a, const RawValue &b);
     RawValue int_less(const RawValue &a, const RawValue &b);
-    RawValue int_greater_equal(const RawValue &a, const RawValue &b);
-    RawValue int_less_equal(const RawValue &a, const RawValue &b);
+    RawValue int_less_or_equal(const RawValue &a, const RawValue &b);
     RawValue int_add(const RawValue &a, const RawValue &b);
     RawValue int_sub(const RawValue &a, const RawValue &b);
     RawValue int_mul(const RawValue &a, const RawValue &b);
@@ -135,14 +81,20 @@ namespace vl_types
     RawValue boolean_or(const RawValue &a, const RawValue &b);
     RawValue boolean_not(const RawValue &a);
 
-    RawValue complex_equal(const RawObject &a, const RawObject &b);
-    RawValue complex_not_equal(const RawObject &a, const RawObject &b);
-    RawObject complex_add(const RawObject &a, const RawObject &b);
-    RawObject complex_sub(const RawObject &a, const RawObject &b);
-    RawObject complex_mul(const RawObject &a, const RawObject &b);
-    RawObject complex_div(const RawObject &a, const RawObject &b);
-    RawObject complex_exp(const RawObject &a);
-    RawObject complex_neg(const RawObject &a);
+    RawValue real_equal(const RawValue &a, const RawValue &b);
+    RawValue real_not_equal(const RawValue &a, const RawValue &b);
+    RawValue real_greater(const RawValue &a, const RawValue &b);
+    RawValue real_greater_or_equal(const RawValue &a, const RawValue &b);
+    RawValue real_less(const RawValue &a, const RawValue &b);
+    RawValue real_less_or_equal(const RawValue &a, const RawValue &b);
+    RawValue real_add(const RawValue &a, const RawValue &b);
+    RawValue real_sub(const RawValue &a, const RawValue &b);
+    RawValue real_mul(const RawValue &a, const RawValue &b);
+    RawValue real_div(const RawValue &a, const RawValue &b);
+    RawValue real_mod(const RawValue &a, const RawValue &b);
+    RawValue real_exp(const RawValue &a, const RawValue &b);
+    RawValue real_neg(const RawValue &a);
+
 }
 
-#endif // VL_TYPES_H
+#endif // VL_TYPES_VAL_H

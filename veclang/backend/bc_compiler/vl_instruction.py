@@ -139,9 +139,6 @@ OpcodeMap: dict[int, Instruction] = {
     0xCA: MatVecInstruction(0xCA, "OP_MATRIX_MUL", 1),
     0xCB: MatVecInstruction(0xCB, "OP_MATRIX_NEG", 1),
     0xCC: MatVecInstruction(0xCC, "OP_MATRIX_SCL", 1),
-    0xCD: MatVecInstruction(0xCD, "OP_MATRIX_TRA", 1),
-    0xCE: MatVecInstruction(0xCE, "OP_MATRIX_DET", 1),
-    0xCF: MatVecInstruction(0xCF, "OP_MATRIX_INV", 1),
     # ========================================
     # 0xD0 - 0xFF - RESERVED
     # ========================================

@@ -3,7 +3,8 @@
 
 #include <cstdint>
 
-#include "vl_types.h"
+#include "vl_types_val.h"
+#include "vl_types_obj.h"
 #include "vl_interpreter.h"
 
 namespace vl_builtins

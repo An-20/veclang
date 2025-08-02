@@ -1,19 +1,7 @@
-#include "vl_types.h"
-
-#include <cstdint>
-#include <cstring>
-#include <cmath>
-#include <stdexcept>
+#include "vl_types_obj.h"
 
 namespace vl_types
 {
-    RawValue int_add(const RawValue &a, const RawValue &b)
-    {
-        int32_t x = rv_to_int(a);
-        int32_t y = rv_to_int(b);
-        return int_to_rv(x + y);
-    }
-
     RawValue complex_equal(const RawObject &a, const RawObject &b)
     {
         bool result = (a.bits[0] == b.bits[0] && a.bits[1] == b.bits[1]);

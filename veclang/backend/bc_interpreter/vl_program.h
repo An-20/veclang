@@ -96,10 +96,7 @@ namespace vl_program
         OP_MATRIX_SUB = 0xC9,
         OP_MATRIX_MUL = 0xCA,
         OP_MATRIX_NEG = 0xCB,
-        OP_MATRIX_SCL = 0xCC,
-        OP_MATRIX_TRA = 0xCD,
-        OP_MATRIX_DET = 0xCE,
-        OP_MATRIX_INV = 0xCF
+        OP_MATRIX_SCL = 0xCC
     };
 
     enum type_code : uint8_t

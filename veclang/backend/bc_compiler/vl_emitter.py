@@ -561,6 +561,7 @@ class BytecodeEmitter:
             "version": 0x0001_0000,
             "flags": {},
             "functions": functions,
+            "globals_stack_size": self.scopes[0].data_offset_counter,
         }
         return {
             "header": header,

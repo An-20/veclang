@@ -49,10 +49,20 @@ namespace vl_interpreter
         uint32_t instruction_pointer = 0;
         std::vector<uint8_t> constants;
         std::vector<uint8_t> instructions;
-        std::vector<uint8_t> stack;
+
+        std::vector<uint8_t> global_stack;
+        std::vector<uint8_t> local_stack;
         std::vector<StackFrame> call_stack;
+
         std::stack<vl_types::RawValue> value_stack;
         std::stack<vl_types::RawObject> object_stack;
+
+        uint32_t get_local_stack_offset()
+        {
+            if (call_stack.empty())
+                return 0;
+            return call_stack.back().stack_start;
+        }
 
         void interpret_instruction(const uint8_t *instruction)
         {
@@ -65,8 +75,11 @@ namespace vl_interpreter
             case vl_program::OP_CONSTANT_OBJ_DIRECT:
                 op_constant_obj_direct(instruction);
                 break;
-            case vl_program::OP_CALL_BUILTIN:
-                op_call_builtin(instruction);
+            case vl_program::OP_CONSTANT_VAL_TABLE:
+                op_constant_val_table(instruction);
+                break;
+            case vl_program::OP_CONSTANT_OBJ_TABLE:
+                op_constant_obj_table(instruction);
                 break;
             case vl_program::OP_POP_VAL:
                 op_pop_val(instruction);
@@ -74,7 +87,49 @@ namespace vl_interpreter
             case vl_program::OP_POP_OBJ:
                 op_pop_obj(instruction);
                 break;
-            // Handle other opcodes...
+            case vl_program::OP_CALL:
+                op_call(instruction);
+                break;
+            case vl_program::OP_CALL_BUILTIN:
+                op_call_builtin(instruction);
+                break;
+            case vl_program::OP_RETURN:
+                op_return(instruction);
+                break;
+            case vl_program::OP_GET_LOCAL_VAL:
+                op_get_local_val(instruction);
+                break;
+            case vl_program::OP_SET_LOCAL_VAL:
+                op_set_local_val(instruction);
+                break;
+            case vl_program::OP_GET_GLOBAL_VAL:
+                op_get_global_val(instruction);
+                break;
+            case vl_program::OP_SET_GLOBAL_VAL:
+                op_set_global_val(instruction);
+                break;
+            case vl_program::OP_GET_LOCAL_OBJ:
+                op_get_local_obj(instruction);
+                break;
+            case vl_program::OP_SET_LOCAL_OBJ:
+                op_set_local_obj(instruction);
+                break;
+            case vl_program::OP_GET_GLOBAL_OBJ:
+                op_get_global_obj(instruction);
+                break;
+            case vl_program::OP_SET_GLOBAL_OBJ:
+                op_set_global_obj(instruction);
+                break;
+            case vl_program::OP_JMP:
+                op_jmp(instruction);
+                break;
+            case vl_program::OP_JMP_IF_TRUE:
+                op_jmp_if_true(instruction);
+                break;
+            case vl_program::OP_JMP_IF_FALSE:
+                op_jmp_if_false(instruction);
+                break;
+
             default:
                 std::cerr << "Unknown opcode: " << static_cast<int>(opcode) << std::endl;
                 break;
@@ -90,6 +145,17 @@ namespace vl_interpreter
         void op_call_builtin(const uint8_t *instruction);
         void op_call(const uint8_t *instruction);
         void op_return(const uint8_t *instruction);
+        void op_get_local_val(const uint8_t *instruction);
+        void op_set_local_val(const uint8_t *instruction);
+        void op_get_global_val(const uint8_t *instruction);
+        void op_set_global_val(const uint8_t *instruction);
+        void op_get_local_obj(const uint8_t *instruction);
+        void op_set_local_obj(const uint8_t *instruction);
+        void op_get_global_obj(const uint8_t *instruction);
+        void op_set_global_obj(const uint8_t *instruction);
+        void op_jmp(const uint8_t *instruction);
+        void op_jmp_if_true(const uint8_t *instruction);
+        void op_jmp_if_false(const uint8_t *instruction);
 
         friend class vl_builtins::BuiltinsDelegate;
     };

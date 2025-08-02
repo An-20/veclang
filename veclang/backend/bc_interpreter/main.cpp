@@ -28,6 +28,7 @@ int main()
     }
     std::cout << "Constants size: " << program.constants.size() << "\n";
     std::cout << "Instructions size: " << program.instructions.size() << "\n";
+    std::cout << "Globals Stack Size: " << program.header.globals_stack_size << "\n\n";
     // print constants bytes and instructions bytes
     std::cout << "Constants bytes: ";
     for (auto byte : program.constants)

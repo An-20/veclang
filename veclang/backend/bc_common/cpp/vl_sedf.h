@@ -14,8 +14,8 @@ namespace vl_sedf
     struct VlFunction
     {
         std::string name;
-        int stack_size;
-        int instruction_offset;
+        uint32_t stack_size;
+        uint32_t instruction_offset;
         std::vector<uint8_t> arg_types;
         uint8_t return_type;
     };
@@ -23,9 +23,10 @@ namespace vl_sedf
     struct VlHeader
     {
         std::string magic; // Should always be "VECL"
-        int version;
+        uint32_t version;
         std::map<std::string, uint32_t> flags;
         std::vector<VlFunction> functions;
+        uint32_t globals_stack_size;
     };
 
     struct VlProgram

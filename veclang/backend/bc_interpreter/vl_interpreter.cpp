@@ -110,4 +110,106 @@ namespace vl_interpreter
         call_stack.pop_back();
         // todo: mess with instruction_pointer to return to the caller
     }
+
+    void Interpreter::op_get_local_val(const uint8_t *instruction)
+    {
+        uint32_t offset = get_1_operand(instruction) + get_local_stack_offset();
+        vl_types::RawValue value;
+        memcpy(&value.bits, local_stack.data() + offset, sizeof(vl_types::RawValue));
+        value_stack.push(value);
+    }
+
+    void Interpreter::op_set_local_val(const uint8_t *instruction)
+    {
+        uint32_t offset = get_1_operand(instruction) + get_local_stack_offset();
+        vl_types::RawValue value = value_stack.top();
+        memcpy(local_stack.data() + offset, &value.bits, sizeof(vl_types::RawValue));
+        value_stack.pop();
+    }
+
+    void Interpreter::op_get_global_val(const uint8_t *instruction)
+    {
+        uint32_t offset = get_1_operand(instruction);
+        vl_types::RawValue value;
+        memcpy(&value.bits, global_stack.data() + offset, sizeof(vl_types::RawValue));
+        value_stack.push(value);
+    }
+
+    void Interpreter::op_set_global_val(const uint8_t *instruction)
+    {
+        uint32_t offset = get_1_operand(instruction);
+        vl_types::RawValue value = value_stack.top();
+        memcpy(global_stack.data() + offset, &value.bits, sizeof(vl_types::RawValue));
+        value_stack.pop();
+    }
+
+    void Interpreter::op_get_local_obj(const uint8_t *instruction)
+    {
+        uint32_t offset = get_1_operand(instruction) + get_local_stack_offset();
+        vl_types::RawObject object;
+        memcpy(&object.bits, local_stack.data() + offset, sizeof(vl_types::RawObject));
+        object_stack.push(object);
+    }
+
+    void Interpreter::op_set_local_obj(const uint8_t *instruction)
+    {
+        uint32_t offset = get_1_operand(instruction) + get_local_stack_offset();
+        vl_types::RawObject object = object_stack.top();
+        memcpy(local_stack.data() + offset, &object.bits, sizeof(vl_types::RawObject));
+        object_stack.pop();
+    }
+
+    void Interpreter::op_get_global_obj(const uint8_t *instruction)
+    {
+        uint32_t offset = get_1_operand(instruction);
+        vl_types::RawObject object;
+        memcpy(&object.bits, global_stack.data() + offset, sizeof(vl_types::RawObject));
+        object_stack.push(object);
+    }
+
+    void Interpreter::op_set_global_obj(const uint8_t *instruction)
+    {
+        uint32_t offset = get_1_operand(instruction);
+        vl_types::RawObject object = object_stack.top();
+        memcpy(global_stack.data() + offset, &object.bits, sizeof(vl_types::RawObject));
+        object_stack.pop();
+    }
+
+    void Interpreter::op_jmp(const uint8_t *instruction)
+    {
+        uint16_t offset = get_1_operand(instruction);
+        instruction_pointer = offset;
+    }
+
+    void Interpreter::op_jmp_if_true(const uint8_t *instruction)
+    {
+        uint16_t offset = get_1_operand(instruction);
+        if (value_stack.empty())
+        {
+            std::cerr << "Value stack underflow\n";
+            return;
+        }
+        vl_types::RawValue condition = value_stack.top();
+        if (condition.bits != 0)
+        {
+            instruction_pointer = offset;
+        }
+        value_stack.pop();
+    }
+
+    void Interpreter::op_jmp_if_false(const uint8_t *instruction)
+    {
+        uint16_t offset = get_1_operand(instruction);
+        if (value_stack.empty())
+        {
+            std::cerr << "Value stack underflow\n";
+            return;
+        }
+        vl_types::RawValue condition = value_stack.top();
+        if (condition.bits == 0)
+        {
+            instruction_pointer = offset;
+        }
+        value_stack.pop();
+    }
 }

@@ -18,6 +18,7 @@ class VlHeader(typing.TypedDict):
     version: int
     flags: dict
     functions: list[VlFunction]
+    globals_stack_size: int
 
 
 class VlProgram(typing.TypedDict):

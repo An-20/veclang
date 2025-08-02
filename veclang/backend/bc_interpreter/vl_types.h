@@ -67,6 +67,13 @@ namespace vl_types
         return rv;
     }
 
+    inline RawValue bool_to_rv(bool value)
+    {
+        RawValue rv;
+        rv.bits = value ? 1 : 0;
+        return rv;
+    }
+
     inline RawValue float_to_rv(float value)
     {
         RawValue rv;
@@ -97,77 +104,45 @@ namespace vl_types
         return complex;
     }
 
-    inline bool complex_equal(const RawObject &a, const RawObject &b)
+    inline RawObject complex_to_ro(const VlComplex &complex)
     {
-        return a.bits[0] == b.bits[0] && a.bits[1] == b.bits[1];
+        RawObject obj;
+        std::memcpy(&obj.bits[0], &complex.real, sizeof(float));
+        std::memcpy(&obj.bits[1], &complex.imag, sizeof(float));
+        return obj;
     }
 
-    inline bool complex_not_equal(const RawObject &a, const RawObject &b)
-    {
-        return !complex_equal(a, b);
-    }
+    RawValue int_equal(const RawValue &a, const RawValue &b);
+    RawValue int_not_equal(const RawValue &a, const RawValue &b);
+    RawValue int_greater(const RawValue &a, const RawValue &b);
+    RawValue int_less(const RawValue &a, const RawValue &b);
+    RawValue int_greater_equal(const RawValue &a, const RawValue &b);
+    RawValue int_less_equal(const RawValue &a, const RawValue &b);
+    RawValue int_add(const RawValue &a, const RawValue &b);
+    RawValue int_sub(const RawValue &a, const RawValue &b);
+    RawValue int_mul(const RawValue &a, const RawValue &b);
+    RawValue int_div(const RawValue &a, const RawValue &b);
+    RawValue int_mod(const RawValue &a, const RawValue &b);
+    RawValue int_exp(const RawValue &a, const RawValue &b);
+    RawValue int_neg(const RawValue &a);
+    RawValue int_and(const RawValue &a, const RawValue &b);
+    RawValue int_or(const RawValue &a, const RawValue &b);
+    RawValue int_xor(const RawValue &a, const RawValue &b);
+    RawValue int_not(const RawValue &a);
+    RawValue int_left_shift(const RawValue &a, const RawValue &b);
+    RawValue int_right_shift(const RawValue &a, const RawValue &b);
+    RawValue boolean_and(const RawValue &a, const RawValue &b);
+    RawValue boolean_or(const RawValue &a, const RawValue &b);
+    RawValue boolean_not(const RawValue &a);
 
-    inline VlComplex complex_add(const RawObject &a, const RawObject &b)
-    {
-        VlComplex x = ro_to_complex(a);
-        VlComplex y = ro_to_complex(b);
-        VlComplex result;
-        result.real = x.real + y.real;
-        result.imag = x.imag + y.imag;
-        return result;
-    }
-
-    inline VlComplex complex_sub(const RawObject &a, const RawObject &b)
-    {
-        VlComplex x = ro_to_complex(a);
-        VlComplex y = ro_to_complex(b);
-        VlComplex result;
-        result.real = x.real - y.real;
-        result.imag = x.imag - y.imag;
-        return result;
-    }
-
-    inline VlComplex complex_mul(const RawObject &a, const RawObject &b)
-    {
-        VlComplex x = ro_to_complex(a);
-        VlComplex y = ro_to_complex(b);
-        VlComplex result;
-        result.real = x.real * y.real - x.imag * y.imag;
-        result.imag = x.real * y.imag + x.imag * y.real;
-        return result;
-    }
-
-    inline VlComplex complex_div(const RawObject &a, const RawObject &b)
-    {
-        VlComplex x = ro_to_complex(a);
-        VlComplex y = ro_to_complex(b);
-        VlComplex result;
-        float denom = y.real * y.real + y.imag * y.imag;
-        if (denom == 0.0f)
-            throw std::runtime_error("Division by zero in complex division");
-        result.real = (x.real * y.real + x.imag * y.imag) / denom;
-        result.imag = (x.imag * y.real - x.real * y.imag) / denom;
-        return result;
-    }
-
-    inline VlComplex complex_exp(const RawObject &a)
-    {
-        VlComplex x = ro_to_complex(a);
-        VlComplex result;
-        float exp_real = std::exp(x.real);
-        result.real = exp_real * std::cos(x.imag);
-        result.imag = exp_real * std::sin(x.imag);
-        return result;
-    }
-
-    inline VlComplex complex_neg(const RawObject &a)
-    {
-        VlComplex x = ro_to_complex(a);
-        VlComplex result;
-        result.real = -x.real;
-        result.imag = -x.imag;
-        return result;
-    }
+    RawValue complex_equal(const RawObject &a, const RawObject &b);
+    RawValue complex_not_equal(const RawObject &a, const RawObject &b);
+    RawObject complex_add(const RawObject &a, const RawObject &b);
+    RawObject complex_sub(const RawObject &a, const RawObject &b);
+    RawObject complex_mul(const RawObject &a, const RawObject &b);
+    RawObject complex_div(const RawObject &a, const RawObject &b);
+    RawObject complex_exp(const RawObject &a);
+    RawObject complex_neg(const RawObject &a);
 }
 
 #endif // VL_TYPES_H

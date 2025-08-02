@@ -85,6 +85,9 @@ class BytecodeEmitter:
 
         self.functions: list[FunctionScope] = []
 
+    def is_global_scope(self):
+        return len(self.scopes) == 1
+
     def scope_in_fn(
         self,
         fn_name: str,
@@ -422,18 +425,29 @@ class BytecodeEmitter:
 
         self.fn_add_data(node.loop_var_identifier, node.loop_var_type, True)
         self.emit_expr(node.loop_var_start)
-        self.add_instruction(
-            "OP_SET_LOCAL_VAL",
-            int_to_2_bytes(self.scopes[-1].data[node.loop_var_identifier][2]),
-        )
-        self.add_instruction(
-            "OP_GET_LOCAL_VAL",
-            int_to_2_bytes(self.scopes[-1].data[node.loop_var_identifier][2]),
-        )
-        loop_start_offset = self.last_instruction_offset()
+        if self.is_global_scope():
+            # fortunately this is the only construct outside of initialisation that means
+            # we have to find a place for a new variable (I think?)
+            set_val_instruction = "OP_SET_GLOBAL_VAL"
+            get_val_instruction = "OP_GET_GLOBAL_VAL"
+        else:
+            set_val_instruction = "OP_SET_LOCAL_VAL"
+            get_val_instruction = "OP_GET_LOCAL_VAL"
 
+        self.add_instruction(
+            set_val_instruction,
+            int_to_2_bytes(self.scopes[-1].data[node.loop_var_identifier][2]),
+        )
+        loop_start_offset = self.next_instruction_offset()
+
+        # so now we start the loop
         # TODO: FIXME for different loop stmts
+        # uh we might
         self.emit_expr(node.loop_var_end)
+        self.add_instruction(
+            get_val_instruction,
+            int_to_2_bytes(self.scopes[-1].data[node.loop_var_identifier][2]),
+        )
         self.add_instruction("OP_INT_LESS")
         self.add_instruction("OP_JMP_IF_FALSE", int_to_2_bytes(0xFFFF))
         block_end_updates.append(self.last_instruction_offset())

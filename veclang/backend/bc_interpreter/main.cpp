@@ -1,4 +1,3 @@
-
 #include <cstdint>
 #include <vector>
 #include <cstring>
@@ -13,7 +12,7 @@
 
 int main()
 {
-    vl_sedf::VlProgram program = vl_sedf::load("C:\\Users\\xiada\\Documents\\veclang\\veclang\\tests\\out2.sedf");
+    vl_sedf::VlProgram program = vl_sedf::load("C:\\Users\\xiada\\Documents\\veclang\\veclang\\tests\\outloop.sedf");
     std::cout << "Loaded VL SEDF program with magic: " << program.header.magic << "\n";
     std::cout << "Version: " << program.header.version << "\n";
     std::cout << "Functions:\n";
@@ -28,7 +27,7 @@ int main()
     }
     std::cout << "Constants size: " << program.constants.size() << "\n";
     std::cout << "Instructions size: " << program.instructions.size() << "\n";
-    std::cout << "Globals Stack Size: " << program.header.globals_stack_size << "\n\n";
+    std::cout << "Globals stack Size: " << program.header.globals_stack_size << "\n\n";
     // print constants bytes and instructions bytes
     std::cout << "Constants bytes: ";
     for (auto byte : program.constants)

@@ -34,15 +34,19 @@ namespace vl_interpreter
             constants = program.constants;
             instructions = program.instructions;
             instruction_pointer = 0;
+            uint32_t num_instructions = instructions.size() / 4;
+
+            global_stack = std::vector<uint8_t>(program.header.globals_stack_size);
+            local_stack = std::vector<uint8_t>();
             call_stack.clear();
             value_stack = std::stack<vl_types::RawValue>();
             object_stack = std::stack<vl_types::RawObject>();
 
-            while (instruction_pointer < instructions.size())
+            while (instruction_pointer < num_instructions)
             {
-                const uint8_t *instruction = &instructions[instruction_pointer];
+                const uint8_t *instruction = &instructions[instruction_pointer * 4];
+                instruction_pointer += 1;
                 interpret_instruction(instruction);
-                instruction_pointer += 4;
             }
         }
 
@@ -129,6 +133,174 @@ namespace vl_interpreter
                 break;
             case vl_program::OP_JMP_IF_FALSE:
                 op_jmp_if_false(instruction);
+                break;
+            case vl_program::OP_INT_EQUAL:
+                op_int_equal(instruction);
+                break;
+            case vl_program::OP_INT_NOT_EQUAL:
+                op_int_not_equal(instruction);
+                break;
+            case vl_program::OP_INT_GREATER:
+                op_int_greater(instruction);
+                break;
+            case vl_program::OP_INT_GREATER_OR_EQUAL:
+                op_int_greater_or_equal(instruction);
+                break;
+            case vl_program::OP_INT_LESS:
+                op_int_less(instruction);
+                break;
+            case vl_program::OP_INT_LESS_OR_EQUAL:
+                op_int_less_or_equal(instruction);
+                break;
+            case vl_program::OP_INT_ADD:
+                op_int_add(instruction);
+                break;
+            case vl_program::OP_INT_SUB:
+                op_int_sub(instruction);
+                break;
+            case vl_program::OP_INT_MUL:
+                op_int_mul(instruction);
+                break;
+            case vl_program::OP_INT_DIV:
+                op_int_div(instruction);
+                break;
+            case vl_program::OP_INT_MOD:
+                op_int_mod(instruction);
+                break;
+            case vl_program::OP_INT_POW:
+                op_int_pow(instruction);
+                break;
+            case vl_program::OP_INT_NEG:
+                op_int_neg(instruction);
+                break;
+            case vl_program::OP_INT_AND:
+                op_int_and(instruction);
+                break;
+            case vl_program::OP_INT_OR:
+                op_int_or(instruction);
+                break;
+            case vl_program::OP_INT_XOR:
+                op_int_xor(instruction);
+                break;
+            case vl_program::OP_INT_NOT:
+                op_int_not(instruction);
+                break;
+            case vl_program::OP_INT_LEFT_SHIFT:
+                op_int_left_shift(instruction);
+                break;
+            case vl_program::OP_INT_RIGHT_SHIFT:
+                op_int_right_shift(instruction);
+                break;
+            case vl_program::OP_BOOLEAN_AND:
+                op_boolean_and(instruction);
+                break;
+            case vl_program::OP_BOOLEAN_OR:
+                op_boolean_or(instruction);
+                break;
+            case vl_program::OP_BOOLEAN_NOT:
+                op_boolean_not(instruction);
+                break;
+            case vl_program::OP_REAL_EQUAL:
+                op_real_equal(instruction);
+                break;
+            case vl_program::OP_REAL_NOT_EQUAL:
+                op_real_not_equal(instruction);
+                break;
+            case vl_program::OP_REAL_GREATER:
+                op_real_greater(instruction);
+                break;
+            case vl_program::OP_REAL_GREATER_OR_EQUAL:
+                op_real_greater_or_equal(instruction);
+                break;
+            case vl_program::OP_REAL_LESS:
+                op_real_less(instruction);
+                break;
+            case vl_program::OP_REAL_LESS_OR_EQUAL:
+                op_real_less_or_equal(instruction);
+                break;
+            case vl_program::OP_REAL_ADD:
+                op_real_add(instruction);
+                break;
+            case vl_program::OP_REAL_SUB:
+                op_real_sub(instruction);
+                break;
+            case vl_program::OP_REAL_MUL:
+                op_real_mul(instruction);
+                break;
+            case vl_program::OP_REAL_DIV:
+                op_real_div(instruction);
+                break;
+            case vl_program::OP_REAL_MOD:
+                op_real_mod(instruction);
+                break;
+            case vl_program::OP_REAL_POW:
+                op_real_pow(instruction);
+                break;
+            case vl_program::OP_REAL_NEG:
+                op_real_neg(instruction);
+                break;
+            case vl_program::OP_COMPLEX_EQUAL:
+                op_complex_equal(instruction);
+                break;
+            case vl_program::OP_COMPLEX_NOT_EQUAL:
+                op_complex_not_equal(instruction);
+                break;
+            case vl_program::OP_COMPLEX_ADD:
+                op_complex_add(instruction);
+                break;
+            case vl_program::OP_COMPLEX_SUB:
+                op_complex_sub(instruction);
+                break;
+            case vl_program::OP_COMPLEX_MUL:
+                op_complex_mul(instruction);
+                break;
+            case vl_program::OP_COMPLEX_DIV:
+                op_complex_div(instruction);
+                break;
+            case vl_program::OP_COMPLEX_POW:
+                op_complex_pow(instruction);
+                break;
+            case vl_program::OP_COMPLEX_NEG:
+                op_complex_neg(instruction);
+                break;
+            case vl_program::OP_VECTOR_ADD:
+                op_vector_add(instruction);
+                break;
+            case vl_program::OP_VECTOR_SUB:
+                op_vector_sub(instruction);
+                break;
+            case vl_program::OP_VECTOR_MUL:
+                op_vector_mul(instruction);
+                break;
+            case vl_program::OP_VECTOR_DIV:
+                op_vector_div(instruction);
+                break;
+            case vl_program::OP_VECTOR_NEG:
+                op_vector_neg(instruction);
+                break;
+            case vl_program::OP_VECTOR_SCL:
+                op_vector_scl(instruction);
+                break;
+            case vl_program::OP_VECTOR_DOT:
+                op_vector_dot(instruction);
+                break;
+            case vl_program::OP_VECTOR_CRS:
+                op_vector_crs(instruction);
+                break;
+            case vl_program::OP_MATRIX_ADD:
+                op_matrix_add(instruction);
+                break;
+            case vl_program::OP_MATRIX_SUB:
+                op_matrix_sub(instruction);
+                break;
+            case vl_program::OP_MATRIX_MUL:
+                op_matrix_mul(instruction);
+                break;
+            case vl_program::OP_MATRIX_NEG:
+                op_matrix_neg(instruction);
+                break;
+            case vl_program::OP_MATRIX_SCL:
+                op_matrix_scl(instruction);
                 break;
 
             default:

@@ -278,4 +278,27 @@ namespace vl_interpreter
 
 #undef DEFINE_UNARY_VALUE_OP
 
+    void Interpreter::op_complex_equal(const uint8_t *instruction) { std::cerr << "op_complex_equal unimplemented"; }
+    void Interpreter::op_complex_not_equal(const uint8_t *instruction) { std::cerr << "op_complex_not_equal unimplemented"; }
+    void Interpreter::op_complex_add(const uint8_t *instruction) { std::cerr << "op_complex_add unimplemented"; }
+    void Interpreter::op_complex_sub(const uint8_t *instruction) { std::cerr << "op_complex_sub unimplemented"; }
+    void Interpreter::op_complex_mul(const uint8_t *instruction) { std::cerr << "op_complex_mul unimplemented"; }
+    void Interpreter::op_complex_div(const uint8_t *instruction) { std::cerr << "op_complex_div unimplemented"; }
+    void Interpreter::op_complex_pow(const uint8_t *instruction) { std::cerr << "op_complex_pow unimplemented"; }
+    void Interpreter::op_complex_neg(const uint8_t *instruction) { std::cerr << "op_complex_neg unimplemented"; }
+
+    void Interpreter::op_vector_add(const uint8_t *instruction) { std::cerr << "op_vector_add unimplemented"; }
+    void Interpreter::op_vector_sub(const uint8_t *instruction) { std::cerr << "op_vector_sub unimplemented"; }
+    void Interpreter::op_vector_mul(const uint8_t *instruction) { std::cerr << "op_vector_mul unimplemented"; }
+    void Interpreter::op_vector_div(const uint8_t *instruction) { std::cerr << "op_vector_div unimplemented"; }
+    void Interpreter::op_vector_neg(const uint8_t *instruction) { std::cerr << "op_vector_neg unimplemented"; }
+    void Interpreter::op_vector_scl(const uint8_t *instruction) { std::cerr << "op_vector_scl unimplemented"; }
+    void Interpreter::op_vector_dot(const uint8_t *instruction) { std::cerr << "op_vector_dot unimplemented"; }
+    void Interpreter::op_vector_crs(const uint8_t *instruction) { std::cerr << "op_vector_crs unimplemented"; }
+    void Interpreter::op_matrix_add(const uint8_t *instruction) { std::cerr << "op_matrix_add unimplemented"; }
+    void Interpreter::op_matrix_sub(const uint8_t *instruction) { std::cerr << "op_matrix_sub unimplemented"; }
+    void Interpreter::op_matrix_mul(const uint8_t *instruction) { std::cerr << "op_matrix_mul unimplemented"; }
+    void Interpreter::op_matrix_neg(const uint8_t *instruction) { std::cerr << "op_matrix_neg unimplemented"; }
+    void Interpreter::op_matrix_scl(const uint8_t *instruction) { std::cerr << "op_matrix_scl unimplemented"; }
+
 }

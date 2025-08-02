@@ -1,10 +1,11 @@
+#include "vl_program.h"
+
 #include <cstdint>
 #include <vector>
 #include <cstring>
 #include <fstream>
 #include <iostream>
 
-#include "vl_program.h"
 #include "../bc_common/cpp/vl_sedf.h"
 
 namespace vl_program

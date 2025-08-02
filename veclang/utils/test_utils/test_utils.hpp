@@ -1,10 +1,13 @@
-#include <filesystem>
-#include <fstream>
+#ifndef AU_TEST_UTILS_HPP
+#define AU_TEST_UTILS_HPP
+
 #include <random>
 #include <string>
 #include <vector>
-#include <iostream>
 #include <sstream>
+#include <fstream>
+#include <iostream>
+#include <filesystem>
 
 namespace fs = std::filesystem;
 
@@ -47,3 +50,5 @@ namespace au_test_utils
         return full_path.string();
     }
 }
+
+#endif // AU_TEST_UTILS_HPP

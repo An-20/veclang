@@ -8,7 +8,6 @@ from veclang.backend.bc_common.py.vl_sedf import VlSEDF
 
 parsed = parse(
     """
-    let a: int = 12;
     print(42);
 """
 )

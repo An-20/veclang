@@ -168,7 +168,7 @@ namespace vl_types
     RawObject complex_sub(const RawObject &a, const RawObject &b);
     RawObject complex_mul(const RawObject &a, const RawObject &b);
     RawObject complex_div(const RawObject &a, const RawObject &b);
-    RawObject complex_exp(const RawObject &a);
+    RawObject complex_pow(const RawObject &a);
     RawObject complex_neg(const RawObject &a);
 
     RawObject vector_add(const RawObject &a, const RawObject &b);

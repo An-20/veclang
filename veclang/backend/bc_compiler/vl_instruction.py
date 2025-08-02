@@ -91,7 +91,7 @@ OpcodeMap: dict[int, Instruction] = {
     0x88: Instruction(0x88, "OP_INT_MUL", 0),
     0x89: Instruction(0x89, "OP_INT_DIV", 0),
     0x8A: Instruction(0x8A, "OP_INT_MOD", 0),
-    0x8B: Instruction(0x8B, "OP_INT_EXP", 0),
+    0x8B: Instruction(0x8B, "OP_INT_POW", 0),
     0x8C: Instruction(0x8C, "OP_INT_NEG", 0),
     0x8D: Instruction(0x8D, "OP_INT_AND", 0),
     0x8E: Instruction(0x8E, "OP_INT_OR", 0),
@@ -114,7 +114,7 @@ OpcodeMap: dict[int, Instruction] = {
     0xA8: Instruction(0xA8, "OP_REAL_MUL", 0),
     0xA9: Instruction(0xA9, "OP_REAL_DIV", 0),
     0xAA: Instruction(0xAA, "OP_REAL_MOD", 0),
-    0xAB: Instruction(0xAB, "OP_REAL_EXP", 0),
+    0xAB: Instruction(0xAB, "OP_REAL_POW", 0),
     0xAC: Instruction(0xAC, "OP_REAL_NEG", 0),
     # 0xB0 - 0xBF - COMPLEX OPERATIONS AND EXTENDED REAL COMPARISONS
     0xB0: Instruction(0xB0, "OP_COMPLEX_EQUAL", 0),
@@ -123,7 +123,7 @@ OpcodeMap: dict[int, Instruction] = {
     0xB3: Instruction(0xB3, "OP_COMPLEX_SUB", 0),
     0xB4: Instruction(0xB4, "OP_COMPLEX_MUL", 0),
     0xB5: Instruction(0xB5, "OP_COMPLEX_DIV", 0),
-    0xB6: Instruction(0xB6, "OP_COMPLEX_EXP", 0),
+    0xB6: Instruction(0xB6, "OP_COMPLEX_POW", 0),
     0xB7: Instruction(0xB7, "OP_COMPLEX_NEG", 0),
     # 0xC0 - 0xCF - VECTOR AND MATRIX OPERATIONS
     0xC0: MatVecInstruction(0xC0, "OP_VECTOR_ADD", 1),

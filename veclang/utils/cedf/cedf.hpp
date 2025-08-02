@@ -1,7 +1,6 @@
-#ifndef CEDF_HPP
-#define CEDF_HPP
+#ifndef AU_CEDF_HPP
+#define AU_CEDF_HPP
 
-#pragma once
 #include <cstdint>
 #include <cstring>
 #include <vector>
@@ -114,4 +113,4 @@ namespace au_cedf
     }
 };
 
-#endif // CEDF_HPP
+#endif // AU_CEDF_HPP

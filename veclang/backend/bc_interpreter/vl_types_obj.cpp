@@ -57,7 +57,7 @@ namespace vl_types
         return complex_to_ro(result);
     }
 
-    RawObject complex_exp(const RawObject &a)
+    RawObject complex_pow(const RawObject &a)
     {
         VlComplex x = ro_to_complex(a);
         VlComplex result;

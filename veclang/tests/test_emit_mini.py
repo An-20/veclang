@@ -9,7 +9,7 @@ from veclang.backend.bc_compiler.vl_disassembler import disassemble_vl_program
 parsed = parse(
     """
     fn main() -> int {
-        print(1 + 1);
+        print(1 + 2);
         return 0;
     }
 """

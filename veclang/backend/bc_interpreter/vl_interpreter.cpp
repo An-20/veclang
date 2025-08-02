@@ -1,14 +1,15 @@
+#include "vl_interpreter.h"
+
 #include <iostream>
 #include <string>
-#include <unordered_map>
 #include <sstream>
 #include <vector>
 #include <stack>
 
-#include "vl_types.h"
 #include "vl_program.h"
 #include "vl_builtins.h"
-#include "vl_interpreter.h"
+#include "vl_types_val.h"
+#include "vl_types_obj.h"
 
 uint16_t get_1_operand(const uint8_t *instruction)
 {
@@ -212,4 +213,69 @@ namespace vl_interpreter
         }
         value_stack.pop();
     }
+
+// Macro to define binary value operations using vl_types functions
+#define DEFINE_BINARY_VALUE_OP(opname)                        \
+    void Interpreter::op_##opname(const uint8_t *instruction) \
+    {                                                         \
+        vl_types::RawValue a = value_stack.top();             \
+        value_stack.pop();                                    \
+        vl_types::RawValue b = value_stack.top();             \
+        value_stack.pop();                                    \
+        vl_types::RawValue result = vl_types::opname(a, b);   \
+        value_stack.push(result);                             \
+    }
+
+    DEFINE_BINARY_VALUE_OP(int_equal)
+    DEFINE_BINARY_VALUE_OP(int_not_equal)
+    DEFINE_BINARY_VALUE_OP(int_greater)
+    DEFINE_BINARY_VALUE_OP(int_greater_or_equal)
+    DEFINE_BINARY_VALUE_OP(int_less)
+    DEFINE_BINARY_VALUE_OP(int_less_or_equal)
+    DEFINE_BINARY_VALUE_OP(int_add)
+    DEFINE_BINARY_VALUE_OP(int_sub)
+    DEFINE_BINARY_VALUE_OP(int_mul)
+    DEFINE_BINARY_VALUE_OP(int_div)
+    DEFINE_BINARY_VALUE_OP(int_mod)
+    DEFINE_BINARY_VALUE_OP(int_pow)
+    DEFINE_BINARY_VALUE_OP(int_and)
+    DEFINE_BINARY_VALUE_OP(int_or)
+    DEFINE_BINARY_VALUE_OP(int_xor)
+    DEFINE_BINARY_VALUE_OP(int_left_shift)
+    DEFINE_BINARY_VALUE_OP(int_right_shift)
+    DEFINE_BINARY_VALUE_OP(boolean_and)
+    DEFINE_BINARY_VALUE_OP(boolean_or)
+
+    DEFINE_BINARY_VALUE_OP(real_equal)
+    DEFINE_BINARY_VALUE_OP(real_not_equal)
+    DEFINE_BINARY_VALUE_OP(real_greater)
+    DEFINE_BINARY_VALUE_OP(real_greater_or_equal)
+    DEFINE_BINARY_VALUE_OP(real_less)
+    DEFINE_BINARY_VALUE_OP(real_less_or_equal)
+    DEFINE_BINARY_VALUE_OP(real_add)
+    DEFINE_BINARY_VALUE_OP(real_sub)
+    DEFINE_BINARY_VALUE_OP(real_mul)
+    DEFINE_BINARY_VALUE_OP(real_div)
+    DEFINE_BINARY_VALUE_OP(real_mod)
+    DEFINE_BINARY_VALUE_OP(real_pow)
+
+#undef DEFINE_BINARY_VALUE_OP
+
+// Macro to define unary value operations using vl_types functions
+#define DEFINE_UNARY_VALUE_OP(opname)                         \
+    void Interpreter::op_##opname(const uint8_t *instruction) \
+    {                                                         \
+        vl_types::RawValue value = value_stack.top();         \
+        value_stack.pop();                                    \
+        vl_types::RawValue result = vl_types::opname(value);  \
+        value_stack.push(result);                             \
+    }
+
+    DEFINE_UNARY_VALUE_OP(int_neg)
+    DEFINE_UNARY_VALUE_OP(int_not)
+    DEFINE_UNARY_VALUE_OP(real_neg)
+    DEFINE_UNARY_VALUE_OP(boolean_not)
+
+#undef DEFINE_UNARY_VALUE_OP
+
 }

@@ -69,7 +69,7 @@ namespace vl_types
     RawValue int_mul(const RawValue &a, const RawValue &b);
     RawValue int_div(const RawValue &a, const RawValue &b);
     RawValue int_mod(const RawValue &a, const RawValue &b);
-    RawValue int_exp(const RawValue &a, const RawValue &b);
+    RawValue int_pow(const RawValue &a, const RawValue &b);
     RawValue int_neg(const RawValue &a);
     RawValue int_and(const RawValue &a, const RawValue &b);
     RawValue int_or(const RawValue &a, const RawValue &b);
@@ -92,7 +92,7 @@ namespace vl_types
     RawValue real_mul(const RawValue &a, const RawValue &b);
     RawValue real_div(const RawValue &a, const RawValue &b);
     RawValue real_mod(const RawValue &a, const RawValue &b);
-    RawValue real_exp(const RawValue &a, const RawValue &b);
+    RawValue real_pow(const RawValue &a, const RawValue &b);
     RawValue real_neg(const RawValue &a);
 
 }

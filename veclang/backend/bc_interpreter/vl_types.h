@@ -1,8 +1,12 @@
+#ifndef VL_TYPES_H
+#define VL_TYPES_H
+
 #include <cstdint>
 #include <cstring>
 #include <cmath>
+#include <stdexcept>
 
-namespace vl_data
+namespace vl_types
 {
     struct VlMat2
     {
@@ -49,36 +53,61 @@ namespace vl_data
         uint32_t bits[16];
     };
 
-    uint32_t rv_to_int(const RawValue &rv)
+    inline RawValue null()
     {
-        return rv.bits;
+        RawValue value;
+        value.bits = 0;
+        return value;
     }
 
-    float rv_to_float(const RawValue &rv)
+    inline RawValue int_to_rv(int32_t value)
+    {
+        RawValue rv;
+        rv.bits = static_cast<uint32_t>(value);
+        return rv;
+    }
+
+    inline RawValue float_to_rv(float value)
+    {
+        RawValue rv;
+        std::memcpy(&rv.bits, &value, sizeof(float));
+        return rv;
+    }
+
+    inline int32_t rv_to_int(const RawValue &rv)
+    {
+        return static_cast<int32_t>(rv.bits);
+    }
+
+    inline float rv_to_float(const RawValue &rv)
     {
         float value;
         std::memcpy(&value, &rv.bits, sizeof(float));
         return value;
     }
 
-    VlComplex ro_to_complex(const RawObject &ro)
+    inline VlComplex ro_to_complex(const RawObject &ro)
     {
+        float real, imag;
+        std::memcpy(&real, &ro.bits[0], sizeof(float));
+        std::memcpy(&imag, &ro.bits[1], sizeof(float));
         VlComplex complex;
-        std::memcpy(&complex, ro.bits, sizeof(VlComplex));
+        complex.real = real;
+        complex.imag = imag;
         return complex;
     }
 
-    bool complex_equal(const RawObject &a, const RawObject &b)
+    inline bool complex_equal(const RawObject &a, const RawObject &b)
     {
         return a.bits[0] == b.bits[0] && a.bits[1] == b.bits[1];
     }
 
-    bool complex_not_equal(const RawObject &a, const RawObject &b)
+    inline bool complex_not_equal(const RawObject &a, const RawObject &b)
     {
         return !complex_equal(a, b);
     }
 
-    VlComplex complex_add(const RawObject &a, const RawObject &b)
+    inline VlComplex complex_add(const RawObject &a, const RawObject &b)
     {
         VlComplex x = ro_to_complex(a);
         VlComplex y = ro_to_complex(b);
@@ -88,7 +117,7 @@ namespace vl_data
         return result;
     }
 
-    VlComplex complex_sub(const RawObject &a, const RawObject &b)
+    inline VlComplex complex_sub(const RawObject &a, const RawObject &b)
     {
         VlComplex x = ro_to_complex(a);
         VlComplex y = ro_to_complex(b);
@@ -98,7 +127,7 @@ namespace vl_data
         return result;
     }
 
-    VlComplex complex_mul(const RawObject &a, const RawObject &b)
+    inline VlComplex complex_mul(const RawObject &a, const RawObject &b)
     {
         VlComplex x = ro_to_complex(a);
         VlComplex y = ro_to_complex(b);
@@ -108,7 +137,7 @@ namespace vl_data
         return result;
     }
 
-    VlComplex complex_div(const RawObject &a, const RawObject &b)
+    inline VlComplex complex_div(const RawObject &a, const RawObject &b)
     {
         VlComplex x = ro_to_complex(a);
         VlComplex y = ro_to_complex(b);
@@ -121,7 +150,7 @@ namespace vl_data
         return result;
     }
 
-    VlComplex complex_exp(const RawObject &a)
+    inline VlComplex complex_exp(const RawObject &a)
     {
         VlComplex x = ro_to_complex(a);
         VlComplex result;
@@ -131,7 +160,7 @@ namespace vl_data
         return result;
     }
 
-    VlComplex complex_neg(const RawObject &a)
+    inline VlComplex complex_neg(const RawObject &a)
     {
         VlComplex x = ro_to_complex(a);
         VlComplex result;
@@ -140,3 +169,5 @@ namespace vl_data
         return result;
     }
 }
+
+#endif // VL_TYPES_H

@@ -13,7 +13,11 @@ namespace vl_program
         OP_CONSTANT_OBJ_DIRECT = 0x01,
         OP_CONSTANT_VAL_TABLE = 0x02,
         OP_CONSTANT_OBJ_TABLE = 0x03,
-        OP_POP = 0x04,
+        OP_POP_VAL = 0x04,
+        OP_POP_OBJ = 0x05,
+        OP_CALL_BUILTIN = 0x06,
+        OP_CALL = 0x07,
+        OP_RETURN = 0x08,
         OP_GET_LOCAL_VAL = 0x10,
         OP_SET_LOCAL_VAL = 0x11,
         OP_GET_GLOBAL_VAL = 0x12,
@@ -22,6 +26,9 @@ namespace vl_program
         OP_SET_LOCAL_OBJ = 0x15,
         OP_GET_GLOBAL_OBJ = 0x16,
         OP_SET_GLOBAL_OBJ = 0x17,
+        OP_JMP = 0x20,
+        OP_JMP_IF_TRUE = 0x21,
+        OP_JMP_IF_FALSE = 0x22,
         OP_INT_EQUAL = 0x80,
         OP_INT_NOT_EQUAL = 0x81,
         OP_INT_GREATER = 0x82,
@@ -109,34 +116,7 @@ namespace vl_program
         VL_MAT4 = 0x09
     };
 
-    size_t get_type_canonical_size(type_code type)
-    {
-        switch (type)
-        {
-        case VL_INT:
-            return 4;
-        case VL_BOOL:
-            return 1;
-        case VL_REAL:
-            return 4;
-        case VL_COMPLEX:
-            return 8;
-        case VL_VEC2:
-            return 8;
-        case VL_VEC3:
-            return 12;
-        case VL_VEC4:
-            return 16;
-        case VL_MAT2:
-            return 16;
-        case VL_MAT3:
-            return 36;
-        case VL_MAT4:
-            return 64;
-        default:
-            throw std::runtime_error("Unknown type code");
-        }
-    }
+    size_t get_type_canonical_size(type_code type);
 
 }
 

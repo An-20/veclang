@@ -194,14 +194,7 @@ class BytecodeEmitter:
         elif isinstance(node, ContinueStmtNode):
             self.emit_continue_stmt(node)
         elif isinstance(node, ExprStmtNode):
-            if isinstance(node.expr, FunctionCallExprNode):
-                self.emit_expr(node.expr)
-                # but after we actually need to pop off the stack
-                # TODO: FIXME
-                # uh so we actually need to propagate type information all the way
-                # back up when compiling stmts so then we know whether to pop off
-                # the value or object stack. cool!
-            # dead code elimination: only a function call could produce a result
+            self.emit_expr_stmt(node)
 
     def emit_decl(self, node: DeclNode) -> None:
         if isinstance(node, FunctionDeclNode):
@@ -268,7 +261,7 @@ class BytecodeEmitter:
         # arguments are pushed onto the stack in reverse order
         for argument in reversed(node.arguments):
             self.emit_expr(argument)
-        self.add_instruction("OP_CALL", int_to_2_bytes(node.callee_fn_id))
+        self.add_instruction("OP_CALL_BUILTIN", int_to_2_bytes(node.callee_fn_id))
 
     def emit_unary_operator_expr(self, node: UnaryOperatorExprNode) -> None:
         self.emit_expr(node.operand)
@@ -535,6 +528,15 @@ class BytecodeEmitter:
                 return
         else:
             raise ValueError("Not in loop scope!")
+
+    def emit_expr_stmt(self, node: ExprStmtNode):
+        if isinstance(node.expr, FunctionCallExprNode):
+            self.emit_expr(node.expr)
+            if node.expr.vl_type.is_val():
+                self.add_instruction("OP_POP_VAL")
+            else:
+                self.add_instruction("OP_POP_OBJ")
+        # dead code elimination: only a function call could produce a result
 
     def emit_stmts(self, stmts: list[StmtNode]) -> None:
         for stmt in stmts:

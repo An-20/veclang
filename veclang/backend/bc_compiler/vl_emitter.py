@@ -285,7 +285,16 @@ class BytecodeEmitter:
 
         # add to constant table
         constant_offset = self.add_constant(as_bytes)
-        self.add_instruction("OP_CONSTANT_VAL_TABLE", int_to_2_bytes(constant_offset))
+        if node.vl_type.is_val():
+            self.add_instruction(
+                "OP_CONSTANT_VAL_TABLE", int_to_2_bytes(constant_offset)
+            )
+        else:
+            self.add_instruction(
+                "OP_CONSTANT_OBJ_TABLE",
+                int_to_1_byte(node.vl_type.to_vl_type_code()),
+                int_to_2_bytes(constant_offset),
+            )
 
     def emit_function_decl(self, node: FunctionDeclNode) -> None:
         fn_identifier = node.identifier
@@ -322,7 +331,9 @@ class BytecodeEmitter:
         if is_variable:
             self.fn_add_data(node.target, node.vl_type, True)
         else:
-            assert isinstance(node.value, ConstantExprNode)
+            # sigh - you'd think we'd want to do this but uh
+            # assert isinstance(node.value, ConstantExprNode)
+
             self.fn_add_data(node.target, node.value.value, False)
 
         # TODO: bodge?

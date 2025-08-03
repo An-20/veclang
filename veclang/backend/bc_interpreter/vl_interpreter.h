@@ -38,7 +38,7 @@ namespace vl_interpreter
 
             global_stack = std::vector<uint8_t>(program.header.globals_stack_size);
             local_stack = std::vector<uint8_t>();
-            call_stack.clear();
+            call_stack = std::stack<StackFrame>();
             value_stack = std::stack<vl_types::RawValue>();
             object_stack = std::stack<vl_types::RawObject>();
 
@@ -50,6 +50,39 @@ namespace vl_interpreter
             }
         }
 
+        vl_types::RawObject interpret_tl_fn(const vl_sedf::VlProgram &program, int32_t x, int32_t y, int32_t res_x, int32_t res_y)
+        {
+            constants = program.constants;
+            instructions = program.instructions;
+            instruction_pointer = 0;
+            uint32_t num_instructions = instructions.size() / 4;
+
+            uint32_t local_stack_size = program.header.functions.at(0).stack_size;
+
+            global_stack = std::vector<uint8_t>(program.header.globals_stack_size);
+            local_stack = std::vector<uint8_t>(local_stack_size);
+            call_stack = std::stack<StackFrame>();
+            call_stack.push(StackFrame(num_instructions, 0, local_stack_size));
+            value_stack = std::stack<vl_types::RawValue>();
+            object_stack = std::stack<vl_types::RawObject>();
+
+            value_stack.push(vl_types::int_to_rv(x));
+            value_stack.push(vl_types::int_to_rv(y));
+            value_stack.push(vl_types::int_to_rv(res_x));
+            value_stack.push(vl_types::int_to_rv(res_y));
+
+            while (instruction_pointer < num_instructions)
+            {
+                const uint8_t *instruction = &instructions[instruction_pointer * 4];
+                instruction_pointer += 1;
+                interpret_instruction(instruction);
+            }
+
+            vl_types::RawObject return_val = object_stack.top();
+            object_stack.pop();
+            return return_val;
+        }
+
     private:
         uint32_t instruction_pointer = 0;
         std::vector<uint8_t> constants;
@@ -57,7 +90,7 @@ namespace vl_interpreter
 
         std::vector<uint8_t> global_stack;
         std::vector<uint8_t> local_stack;
-        std::vector<StackFrame> call_stack;
+        std::stack<StackFrame> call_stack;
 
         std::stack<vl_types::RawValue> value_stack;
         std::stack<vl_types::RawObject> object_stack;
@@ -66,7 +99,7 @@ namespace vl_interpreter
         {
             if (call_stack.empty())
                 return 0;
-            return call_stack.back().stack_start;
+            return call_stack.top().stack_start;
         }
 
         void interpret_instruction(const uint8_t *instruction)

@@ -3,6 +3,7 @@
 
 #include <cstdint>
 #include <cstring>
+#include <complex>
 #include "vl_types_val.h"
 
 namespace vl_types
@@ -168,7 +169,7 @@ namespace vl_types
     RawObject complex_sub(const RawObject &a, const RawObject &b);
     RawObject complex_mul(const RawObject &a, const RawObject &b);
     RawObject complex_div(const RawObject &a, const RawObject &b);
-    RawObject complex_pow(const RawObject &a);
+    RawObject complex_pow(const RawObject &a, const RawObject &b);
     RawObject complex_neg(const RawObject &a);
 
     RawObject vector_add(const RawObject &a, const RawObject &b);

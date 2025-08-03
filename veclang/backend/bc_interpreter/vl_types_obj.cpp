@@ -57,13 +57,18 @@ namespace vl_types
         return complex_to_ro(result);
     }
 
-    RawObject complex_pow(const RawObject &a)
+    RawObject complex_pow(const RawObject &a, const RawObject &b)
     {
         VlComplex x = ro_to_complex(a);
+        std::complex<float> w(x.real, x.imag);
+        VlComplex y = ro_to_complex(b);
+        std::complex<float> z(y.real, y.imag);
+
+        std::complex<float> powed = std::pow(w, z);
+
         VlComplex result;
-        float exp_real = std::exp(x.real);
-        result.real = exp_real * std::cos(x.imag);
-        result.imag = exp_real * std::sin(x.imag);
+        result.real = powed.real();
+        result.imag = powed.imag();
         return complex_to_ro(result);
     }
 

@@ -12,7 +12,7 @@
 
 int main()
 {
-    vl_sedf::VlProgram program = vl_sedf::load("C:\\Users\\xiada\\Documents\\veclang\\veclang\\tests\\outloop.sedf");
+    vl_sedf::VlProgram program = vl_sedf::load("C:\\Users\\xiada\\Documents\\veclang\\veclang\\tests\\outmandle.sedf");
     std::cout << "Loaded VL SEDF program with magic: " << program.header.magic << "\n";
     std::cout << "Version: " << program.header.version << "\n";
     std::cout << "Functions:\n";
@@ -40,7 +40,7 @@ int main()
     std::cout << "\n\n";
 
     vl_interpreter::Interpreter interpreter;
-    interpreter.interpret(program);
+    interpreter.interpret_tl_fn(program, 0, 0, 512, 512);
 
     return 0;
 }

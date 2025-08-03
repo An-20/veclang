@@ -73,7 +73,7 @@ namespace vl_builtins
         bool returned_ = false;
     };
 
-    void call_builtin(BuiltinsDelegate delegate, uint8_t builtin_id);
+    void call_builtin(BuiltinsDelegate delegate, uint16_t builtin_id);
 }
 
 #endif // VL_BUILTINS_H

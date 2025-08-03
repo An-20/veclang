@@ -108,8 +108,9 @@ namespace vl_interpreter
             std::cerr << "Call stack underflow\n";
             return;
         }
-        call_stack.pop_back();
-        // todo: mess with instruction_pointer to return to the caller
+        instruction_pointer = call_stack.top().return_address;
+        call_stack.pop();
+        // TODO: mess with instruction_pointer to return to the caller
     }
 
     void Interpreter::op_get_local_val(const uint8_t *instruction)
@@ -215,7 +216,7 @@ namespace vl_interpreter
     }
 
 // Macro to define binary value operations using vl_types functions
-#define DEFINE_BINARY_VALUE_OP(opname)                        \
+#define DEFINE_BINARY_VAL_OP(opname)                          \
     void Interpreter::op_##opname(const uint8_t *instruction) \
     {                                                         \
         vl_types::RawValue a = value_stack.top();             \
@@ -226,43 +227,43 @@ namespace vl_interpreter
         value_stack.push(result);                             \
     }
 
-    DEFINE_BINARY_VALUE_OP(int_equal)
-    DEFINE_BINARY_VALUE_OP(int_not_equal)
-    DEFINE_BINARY_VALUE_OP(int_greater)
-    DEFINE_BINARY_VALUE_OP(int_greater_or_equal)
-    DEFINE_BINARY_VALUE_OP(int_less)
-    DEFINE_BINARY_VALUE_OP(int_less_or_equal)
-    DEFINE_BINARY_VALUE_OP(int_add)
-    DEFINE_BINARY_VALUE_OP(int_sub)
-    DEFINE_BINARY_VALUE_OP(int_mul)
-    DEFINE_BINARY_VALUE_OP(int_div)
-    DEFINE_BINARY_VALUE_OP(int_mod)
-    DEFINE_BINARY_VALUE_OP(int_pow)
-    DEFINE_BINARY_VALUE_OP(int_and)
-    DEFINE_BINARY_VALUE_OP(int_or)
-    DEFINE_BINARY_VALUE_OP(int_xor)
-    DEFINE_BINARY_VALUE_OP(int_left_shift)
-    DEFINE_BINARY_VALUE_OP(int_right_shift)
-    DEFINE_BINARY_VALUE_OP(boolean_and)
-    DEFINE_BINARY_VALUE_OP(boolean_or)
+    DEFINE_BINARY_VAL_OP(int_equal)
+    DEFINE_BINARY_VAL_OP(int_not_equal)
+    DEFINE_BINARY_VAL_OP(int_greater)
+    DEFINE_BINARY_VAL_OP(int_greater_or_equal)
+    DEFINE_BINARY_VAL_OP(int_less)
+    DEFINE_BINARY_VAL_OP(int_less_or_equal)
+    DEFINE_BINARY_VAL_OP(int_add)
+    DEFINE_BINARY_VAL_OP(int_sub)
+    DEFINE_BINARY_VAL_OP(int_mul)
+    DEFINE_BINARY_VAL_OP(int_div)
+    DEFINE_BINARY_VAL_OP(int_mod)
+    DEFINE_BINARY_VAL_OP(int_pow)
+    DEFINE_BINARY_VAL_OP(int_and)
+    DEFINE_BINARY_VAL_OP(int_or)
+    DEFINE_BINARY_VAL_OP(int_xor)
+    DEFINE_BINARY_VAL_OP(int_left_shift)
+    DEFINE_BINARY_VAL_OP(int_right_shift)
+    DEFINE_BINARY_VAL_OP(boolean_and)
+    DEFINE_BINARY_VAL_OP(boolean_or)
 
-    DEFINE_BINARY_VALUE_OP(real_equal)
-    DEFINE_BINARY_VALUE_OP(real_not_equal)
-    DEFINE_BINARY_VALUE_OP(real_greater)
-    DEFINE_BINARY_VALUE_OP(real_greater_or_equal)
-    DEFINE_BINARY_VALUE_OP(real_less)
-    DEFINE_BINARY_VALUE_OP(real_less_or_equal)
-    DEFINE_BINARY_VALUE_OP(real_add)
-    DEFINE_BINARY_VALUE_OP(real_sub)
-    DEFINE_BINARY_VALUE_OP(real_mul)
-    DEFINE_BINARY_VALUE_OP(real_div)
-    DEFINE_BINARY_VALUE_OP(real_mod)
-    DEFINE_BINARY_VALUE_OP(real_pow)
+    DEFINE_BINARY_VAL_OP(real_equal)
+    DEFINE_BINARY_VAL_OP(real_not_equal)
+    DEFINE_BINARY_VAL_OP(real_greater)
+    DEFINE_BINARY_VAL_OP(real_greater_or_equal)
+    DEFINE_BINARY_VAL_OP(real_less)
+    DEFINE_BINARY_VAL_OP(real_less_or_equal)
+    DEFINE_BINARY_VAL_OP(real_add)
+    DEFINE_BINARY_VAL_OP(real_sub)
+    DEFINE_BINARY_VAL_OP(real_mul)
+    DEFINE_BINARY_VAL_OP(real_div)
+    DEFINE_BINARY_VAL_OP(real_mod)
+    DEFINE_BINARY_VAL_OP(real_pow)
 
-#undef DEFINE_BINARY_VALUE_OP
+#undef DEFINE_BINARY_VAL_OP
 
 // Macro to define unary value operations using vl_types functions
-#define DEFINE_UNARY_VALUE_OP(opname)                         \
+#define DEFINE_UNARY_VAL_OP(opname)                           \
     void Interpreter::op_##opname(const uint8_t *instruction) \
     {                                                         \
         vl_types::RawValue value = value_stack.top();         \
@@ -271,21 +272,55 @@ namespace vl_interpreter
         value_stack.push(result);                             \
     }
 
-    DEFINE_UNARY_VALUE_OP(int_neg)
-    DEFINE_UNARY_VALUE_OP(int_not)
-    DEFINE_UNARY_VALUE_OP(real_neg)
-    DEFINE_UNARY_VALUE_OP(boolean_not)
+    DEFINE_UNARY_VAL_OP(int_neg)
+    DEFINE_UNARY_VAL_OP(int_not)
+    DEFINE_UNARY_VAL_OP(real_neg)
+    DEFINE_UNARY_VAL_OP(boolean_not)
 
-#undef DEFINE_UNARY_VALUE_OP
+#undef DEFINE_UNARY_VAL_OP
 
-    void Interpreter::op_complex_equal(const uint8_t *instruction) { std::cerr << "op_complex_equal unimplemented"; }
-    void Interpreter::op_complex_not_equal(const uint8_t *instruction) { std::cerr << "op_complex_not_equal unimplemented"; }
-    void Interpreter::op_complex_add(const uint8_t *instruction) { std::cerr << "op_complex_add unimplemented"; }
-    void Interpreter::op_complex_sub(const uint8_t *instruction) { std::cerr << "op_complex_sub unimplemented"; }
-    void Interpreter::op_complex_mul(const uint8_t *instruction) { std::cerr << "op_complex_mul unimplemented"; }
-    void Interpreter::op_complex_div(const uint8_t *instruction) { std::cerr << "op_complex_div unimplemented"; }
-    void Interpreter::op_complex_pow(const uint8_t *instruction) { std::cerr << "op_complex_pow unimplemented"; }
-    void Interpreter::op_complex_neg(const uint8_t *instruction) { std::cerr << "op_complex_neg unimplemented"; }
+// Macro to define binary object operations returning a value using vl_types functions
+#define DEFINE_BINARY_OBJ_OP_RET_VAL(opname)                  \
+    void Interpreter::op_##opname(const uint8_t *instruction) \
+    {                                                         \
+        vl_types::RawObject a = object_stack.top();           \
+        object_stack.pop();                                   \
+        vl_types::RawObject b = object_stack.top();           \
+        object_stack.pop();                                   \
+        vl_types::RawValue result = vl_types::opname(a, b);   \
+        value_stack.push(result);                             \
+    }
+
+    DEFINE_BINARY_OBJ_OP_RET_VAL(complex_equal);
+    DEFINE_BINARY_OBJ_OP_RET_VAL(complex_not_equal);
+
+#undef DEFINE_BINARY_OBJ_OP_RET_VAL
+
+// Macro to define binary object operations using vl_types functions
+#define DEFINE_BINARY_OBJ_OP_RET_OBJ(opname)                  \
+    void Interpreter::op_##opname(const uint8_t *instruction) \
+    {                                                         \
+        vl_types::RawObject a = object_stack.top();           \
+        object_stack.pop();                                   \
+        vl_types::RawObject b = object_stack.top();           \
+        object_stack.pop();                                   \
+        vl_types::RawObject result = vl_types::opname(a, b);  \
+        object_stack.push(result);                            \
+    }
+
+    DEFINE_BINARY_OBJ_OP_RET_OBJ(complex_add);
+    DEFINE_BINARY_OBJ_OP_RET_OBJ(complex_sub);
+    DEFINE_BINARY_OBJ_OP_RET_OBJ(complex_mul);
+    DEFINE_BINARY_OBJ_OP_RET_OBJ(complex_div);
+    DEFINE_BINARY_OBJ_OP_RET_OBJ(complex_pow);
+
+    void Interpreter::op_complex_neg(const uint8_t *instruction)
+    {
+        vl_types::RawObject a = object_stack.top();
+        object_stack.pop();
+        vl_types::RawObject result = vl_types::complex_neg(a);
+        object_stack.push(result);
+    }
 
     void Interpreter::op_vector_add(const uint8_t *instruction) { std::cerr << "op_vector_add unimplemented"; }
     void Interpreter::op_vector_sub(const uint8_t *instruction) { std::cerr << "op_vector_sub unimplemented"; }

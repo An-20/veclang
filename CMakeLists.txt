@@ -22,17 +22,19 @@ foreach(FILE IN LISTS ALL_SOURCES)
 endforeach()
 
 
-# Add executable
-add_executable(veclang ${SOURCES})
-
 # Add include directories (recursive headers)
-target_include_directories(veclang
-    PRIVATE
-    veclang/utils  # This includes all headers like veclang/utils/math/*.hpp
-)
+include_directories(veclang/utils)
 
-if(EMSCRIPTEN)
-  target_link_options(veclang PRIVATE -sNO_DISABLE_EXCEPTION_CATCHING=1)
-endif()
-
+# Native build
+add_executable(veclang ${SOURCES})
 target_compile_options(veclang PRIVATE -Wall -O3 -g)
+target_link_options(veclang PRIVATE --bind -lembind)
+
+# if(EMSCRIPTEN)
+#   add_executable(veclang_wasm veclang/backend/bc_interpreter/bindings.cpp ${SOURCES})
+
+#   target_compile_options(veclang_wasm PRIVATE -Wall -O3 -g)
+
+#   target_link_options(veclang_wasm PRIVATE --bind -lembind)
+# endif()
+

@@ -6,6 +6,7 @@ from veclang.midend.hir import lower
 from veclang.midend.hir.vl_hlr_io import print_hir
 from veclang.backend.bc_compiler.vl_emitter import BytecodeEmitter
 from veclang.backend.bc_compiler.vl_disassembler import disassemble_vl_program
+from veclang.backend.bc_common.py.vl_sedf import VlSEDF
 
 
 def default_format(data: bytes) -> str:
@@ -20,21 +21,26 @@ def default_format(data: bytes) -> str:
     return "\n".join(lines)
 
 
-def disassemble(input_str: str) -> tuple[str, str]:
+def disassemble(input_str: str) -> tuple[str, str, bytes]:
     parsed = parse(input_str)
     print_ast(parsed)
     hir = lower(parsed)
     print_hir(hir)
     emitter = BytecodeEmitter()
     vl_program = emitter.emit(hir)
+    as_bytes = VlSEDF.dumpb(vl_program)
 
     header_dumped = json.dumps(vl_program["header"], indent=2)
     try:
         out_str = f"Constants:\n{default_format(vl_program['constants'])}\n\n"
         out_str += f"Instructions:\n{disassemble_vl_program(vl_program)}"
-        return header_dumped, out_str
+        return header_dumped, out_str, as_bytes
     except Exception as e:
-        return header_dumped, (
-            f"Exception when disassembling: {e}\nRaw data:"
-            f"\n{default_format(vl_program['constants'] + vl_program['instructions'])}"
+        return (
+            header_dumped,
+            (
+                f"Exception when disassembling: {e}\nRaw data:"
+                f"\n{default_format(vl_program['constants'] + vl_program['instructions'])}"
+            ),
+            as_bytes,
         )

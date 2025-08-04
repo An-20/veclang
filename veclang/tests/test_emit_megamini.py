@@ -8,7 +8,7 @@ from veclang.backend.bc_common.py.vl_sedf import VlSEDF
 
 parsed = parse(
     """
-    print(42);
+    printr(42.0 + 3.0);
 """
 )
 print_ast(parsed)

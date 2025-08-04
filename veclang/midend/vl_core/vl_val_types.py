@@ -344,10 +344,10 @@ class VlReal(VlTypeABC):
         self.underlying: float = underlying
 
     def to_bytes_32(self) -> bytes:
-        return bytes(struct.pack("!f", self.underlying))
+        return bytes(struct.pack("<f", self.underlying))
 
     def to_bytes_64(self) -> bytes:
-        return bytes(struct.pack("!d", self.underlying))
+        return bytes(struct.pack("<d", self.underlying))
 
     @staticmethod
     def get_info() -> tuple[VlTypeStr, VlTypeCode, VlTypeType, tuple[int, int]]:

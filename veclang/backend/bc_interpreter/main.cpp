@@ -89,7 +89,7 @@ void writeBMPToFile(const std::string &filename, const std::vector<vl_types::VlV
 
 int main()
 {
-    vl_sedf::VlProgram program = vl_sedf::load("C:\\Users\\xiada\\Documents\\veclang\\veclang\\tests\\outmandle.sedf");
+    vl_sedf::VlProgram program = vl_sedf::load("C:\\Users\\xiada\\Documents\\veclang\\veclang\\tests\\out2.sedf");
     std::cout << "Loaded VL SEDF program with magic: " << program.header.magic << "\n";
     std::cout << "Version: " << program.header.version << "\n";
     std::cout << "Functions:\n";
@@ -120,8 +120,7 @@ int main()
     const uint32_t WIDTH = 256;
 
     vl_interpreter::Interpreter interpreter;
-    std::vector<vl_types::VlVec3> data = interpreter.generate_img(program, HEIGHT, WIDTH);
-    writeBMPToFile("out.bmp", data, HEIGHT, WIDTH);
+    interpreter.interpret(program);
 
     return 0;
 }

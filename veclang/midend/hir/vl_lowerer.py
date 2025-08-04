@@ -197,6 +197,7 @@ class Lowerer:
         self.add_diagnostic(
             "E200", f"Unresolved identifier '{identifier}'", ast_position_info
         )
+        raise
 
     def check_if_identifier_declared(
         self, identifier: str, ast_position_info: ASTPositionInfo

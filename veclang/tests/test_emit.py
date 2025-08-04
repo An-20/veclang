@@ -18,7 +18,7 @@ fn mandlebrot(
 ) -> vec3 {
     const ITERATIONS: int = 50;
     const THRESHOLD: real = 100;
-    let c: complex = x / res_x + (y / res_y) * 1i;
+    let c: complex = (x / res_x - 0.5) + (y / res_y) * 1i;
     let z: complex = 0;
     for (_: int in 0:ITERATIONS) {
         if (z.re * z.re + z.im * z.im > THRESHOLD) {

@@ -1,7 +1,17 @@
+import re
+import typing
 import dataclasses
 
-from veclang.frontend.parser.vl_ast import ASTPositionInfo
+from veclang.frontend.parser.vl_ast import ASTPositionInfo, VlOperatorType
 from veclang.midend.vl_core import VlType, VlTypeABC
+
+
+@dataclasses.dataclass
+class IdentifierData:
+    ast_position_info: ASTPositionInfo
+    type_or_value: VlType | VlTypeABC
+    is_variable: bool
+    ref_count: int
 
 
 @dataclasses.dataclass
@@ -12,101 +22,119 @@ class Scope:
     ast_position_info: ASTPositionInfo
 
     # Tuple of [type_or_value, is_variable
-    data: dict[str, tuple[VlType | VlTypeABC, bool]]
-    ref_counts: dict[str, int]
+    data: dict[str, IdentifierData]
 
 
-class ScopeTracker:
+DiagnosticCode = typing.Literal[
+    "E100",
+    "E101",
+    "E102",
+    "E103",
+    "E110",
+    "E111",
+    "E112",
+    "E120",
+    "E121",
+    "E122",
+    "E123",
+    "E124",
+    "E200",
+    "E201",
+    "E202",
+    "E210",
+    "E300",
+    "E310",
+    "E311",
+    "E320",
+    "E321",
+    "E330",
+    "E331",
+    "E900",
+    "W001",
+    "W010",
+    "W011",
+    "W012",
+    "X000",
+    "X001",
+    "X002",
+    "X003",
+]
 
-    def __init__(self):
-        self.scopes: list[Scope] = [
-            self.create_scope("vl::global", None, None, ASTPositionInfo(0, 0))
-        ]
 
-    @staticmethod
-    def create_scope(
-        scope_fn_name: str | None,
-        loop_name: str | None,
-        selection_name: str | None,
-        ast_position_info: ASTPositionInfo,
-    ) -> Scope:
-        return Scope(
-            scope_fn_name, loop_name, selection_name, ast_position_info, {}, {}
-        )
+@dataclasses.dataclass
+class Diagnostic:
 
-    def scope_in_fn(self, fn_name: str, ast_position_info: ASTPositionInfo) -> None:
-        self.scopes.append(self.create_scope(fn_name, None, None, ast_position_info))
-
-    def scope_out_fn(self) -> None:
-        if len(self.scopes) == 1:
-            raise ValueError("Cannot scope out of global scope!")
-        if not self.scopes[-1].fn_name:
-            raise ValueError("Mismatched scope: current scope is not a function scope")
-        self.scopes.pop()
-
-    def scope_in_loop(self, loop_name: str, ast_position_info: ASTPositionInfo) -> None:
-        self.scopes.append(self.create_scope(None, loop_name, None, ast_position_info))
-
-    def scope_out_loop(self) -> None:
-        if len(self.scopes) == 1:
-            raise ValueError("Cannot scope out of global scope!")
-        if not self.scopes[-1].loop_name:
-            raise ValueError("Mismatched scope: current scope is not a loop scope")
-        self.scopes.pop()
-
-    def scope_in_selection(
-        self, selection_name: str, ast_position_info: ASTPositionInfo
+    def __init__(
+        self,
+        position_info: ASTPositionInfo,
+        code: DiagnosticCode,
+        stack_trace: str,
+        message: str,
     ) -> None:
-        self.scopes.append(
-            self.create_scope(None, None, selection_name, ast_position_info)
+        self.line_no: int = position_info.line_number
+        self.char_no: int = position_info.line_character_number
+        self.code: DiagnosticCode = code
+        self.stack_trace: str = stack_trace
+        self.message: str = message
+
+    def __str__(self) -> str:
+        if self.code.startswith("X"):
+            diagnostic_type = "weak warning"
+        elif self.code.startswith("W"):
+            diagnostic_type = "warning"
+        elif self.code.startswith("E"):
+            diagnostic_type = "error"
+        else:
+            raise ValueError(f"Unknown diagnostic code '{self.code}'")
+        return (
+            f"{diagnostic_type.capitalize()} {self.code} at {self.line_no}:{self.char_no}:"
+            f" '{self.message}'"
         )
 
-    def scope_out_selection(self) -> None:
-        if len(self.scopes) == 1:
-            raise ValueError("Cannot scope out of global scope!")
-        if not self.scopes[-1].selection_name:
-            raise ValueError("Mismatched scope: current scope is not a selection scope")
-        self.scopes.pop()
 
-    def resolve(self, identifier: str) -> tuple[VlType | VlTypeABC, bool]:
-        """
-        Resolves a variable / constant, returning a tuple of:
-        - VlType of the class of the variable / constant
-        - VlTypeABC of the actual constant value, or None if is a variable
-        :return:
-        """
-        for scope in reversed(self.scopes):
-            if identifier in scope.data:
-                scope.ref_counts[identifier] += 1
-                type_or_value, is_variable = scope.data[identifier]
-                return type_or_value, is_variable
-        # FIXME
-        raise ValueError(f"Could not resolve identifier `{identifier}`")
+def format_operator(operator: VlOperatorType) -> str:
+    return {
+        "PLUS_ASSIGNMENT": "+=",
+        "MINUS_ASSIGNMENT": "-=",
+        "TIMES_ASSIGNMENT": "*=",
+        "DIVIDE_ASSIGNMENT": "/=",
+        "MODULUS_ASSIGNMENT": "%=",
+        "PLUS": "+",
+        "MINUS": "-",
+        "TIMES": "*",
+        "DIVIDE": "/",
+        "MODULUS": "%",
+        "INTEGER_DIVIDE": "//",
+        "EXPONENTIATION": "^",
+        "BOOLEAN_AND": "&&",
+        "BOOLEAN_OR": "||",
+        "BITWISE_AND": "&",
+        "BITWISE_OR": "|",
+        "BITWISE_XOR": "^",
+        "BITWISE_LEFT_SHIFT": "<<",
+        "BITWISE_RIGHT_SHIFT": ">>",
+        "EQUAL_TO": "==",
+        "NOT_EQUAL_TO": "!=",
+        "LESS_THAN": "<",
+        "LESS_THAN_OR_EQUAL": "<=",
+        "GREATER_THAN": ">",
+        "GREATER_THAN_OR_EQUAL": ">=",
+        "BOOLEAN_NOT": "!",
+        "BITWISE_NOT": "~",
+        "UNARY_PLUS": "+",
+        "UNARY_MINUS": "-",
+    }.get(operator, __default=operator)
 
-    def raise_if_identifier_declared(self, identifier: str):
-        for parent_scope in reversed(self.scopes[:-1]):
-            if identifier in parent_scope.data:
-                type_or_value, is_variable = parent_scope.data[identifier]
-                raise ValueError(
-                    f"{'Variable' if is_variable else 'Constant'} `{identifier}` "
-                    f"already declared in parent scope with ASTPositionInfo {parent_scope.ast_position_info}"
-                )
 
-        scope = self.scopes[-1]
-        if identifier in scope.data:
-            type_or_value, is_variable = scope.data[identifier]
-            raise ValueError(
-                f"{'Variable' if is_variable else 'Constant'} `{identifier}` already declared in this scope"
-            )
+def check_constant_case(input_str: str) -> bool:
+    """Checks if a string uses constant case"""
+    allowed_characters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ" "0123456789" "_"
+    return all([char in allowed_characters for char in input_str])
 
-    def init_variable(self, identifier: str, vl_type: VlType):
-        self.raise_if_identifier_declared(identifier)
-        scope = self.scopes[-1]
-        scope.data[identifier] = (vl_type, True)
-        scope.ref_counts[identifier] = 0
 
-    def init_constant(self, identifier: str, vl_val: VlTypeABC):
-        self.raise_if_identifier_declared(identifier)
-        scope = self.scopes[-1]
-        scope.data[identifier] = (vl_val, False)
-        scope.ref_counts[identifier] = 0
+def check_snake_case(input_str: str) -> bool:
+    """Checks if a string uses snake case"""
+    if input_str == "_":
+        return True
+    pattern = r"^[a-z0-9]+(_[a-z0-9]+)*$"
+    return bool(re.match(pattern, input_str))

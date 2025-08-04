@@ -1,20 +1,12 @@
 """High-level intermediate representation lowerer"""
 
-import abc
+import traceback
 import collections
-import dataclasses
-import typing
 
 from veclang.frontend.parser import vl_ast
-from veclang.frontend.parser.vl_parser import (
-    AugmentedAssignmentOperatorType,
-    BinaryOperatorType,
-    UnaryOperatorType,
-    ASTPositionInfo,
-)
+from veclang.frontend.parser.vl_ast import ASTPositionInfo
 
 from veclang.midend.hir.vl_hir import (
-    HIRNode,
     ExprNode,
     StmtNode,
     DeclNode,
@@ -27,12 +19,10 @@ from veclang.midend.hir.vl_hir import (
     FunctionDeclNode,
     DataDeclNode,
     AssignmentStmtNode,
-    AugmentedAssignmentStmtNode,
     ExprStmtNode,
     SelectionBlock,
     SelectionStackStmt,
     RangedForStmtNode,
-    WhileStmtNode,
     ReturnStmtNode,
     BreakStmtNode,
     ContinueStmtNode,
@@ -58,7 +48,15 @@ from veclang.midend.vl_core import (
     VlVec4,
 )
 
-from veclang.midend.hir.vl_lowerer_utils import ScopeTracker
+from veclang.midend.hir.vl_lowerer_utils import (
+    Scope,
+    IdentifierData,
+    Diagnostic,
+    DiagnosticCode,
+    format_operator,
+    check_snake_case,
+    check_constant_case,
+)
 
 
 class Lowerer:
@@ -79,15 +77,208 @@ class Lowerer:
         }
 
         self.ctx_function_name: str | None = None
-        self.ctx_scopes: ScopeTracker = ScopeTracker()
+        self.scopes: list[Scope] = [
+            self.create_scope("vl::global", None, None, ASTPositionInfo(0, 0))
+        ]
 
-    def lower(self, ast_node: vl_ast.ProgramNode) -> ProgramNode:
-        return ProgramNode(self.lower_stmts(ast_node.stmts), ast_node.position_info)
+        self.error: bool = False
+        self.diagnostics: list[Diagnostic] = []
+
+    def add_diagnostic(
+        self, code: DiagnosticCode, message: str, ast_position_info: ASTPositionInfo
+    ):
+        if code.startswith("E"):
+            self.error = True
+        self.diagnostics.append(
+            Diagnostic(ast_position_info, code, self.get_stack_trace_hr(), message)
+        )
+
+    # Scope tracking
+    # ====================
+    # These functions are also convenient for linting because all new scopes / variables
+    # have to go through them
+
+    @staticmethod
+    def create_scope(
+        scope_fn_name: str | None,
+        loop_name: str | None,
+        selection_name: str | None,
+        ast_position_info: ASTPositionInfo,
+    ) -> Scope:
+        return Scope(scope_fn_name, loop_name, selection_name, ast_position_info, {})
+
+    def get_stack_trace_hr(self) -> str:
+        def ast_position_info_to_hr(ast_position_info: ASTPositionInfo) -> str:
+            return f"{ast_position_info.line_number}:{ast_position_info.line_character_number}"
+
+        out_lines = []
+        fn_name = ""
+        for scope in self.scopes:
+            if scope.fn_name:
+                fn_name = fn_name
+                line = f"Function '{fn_name}' at {ast_position_info_to_hr(scope.ast_position_info)}"
+            elif scope.loop_name:
+                line = f"Loop '{scope.loop_name}' at {ast_position_info_to_hr(scope.ast_position_info)}"
+            elif scope.selection_name:
+                line = f"Selection '{scope.selection_name}' at {ast_position_info_to_hr(scope.ast_position_info)}"
+            else:
+                raise ValueError(f"IE: Unknown scope: {self}")
+            out_lines.append(line)
+        return "\n".join(out_lines)
+
+    def check_unused_identifiers(self):
+        for identifier, data in self.scopes[-1].data.items():
+            if data.ref_count == 0 and identifier[0] != "_":
+                self.add_diagnostic(
+                    "W001",
+                    f"Unused identifier '{identifier}' - prefix with '_' to suppress",
+                    data.ast_position_info,
+                )
+            elif data.ref_count != 0 and identifier[0] == "_":
+                self.add_diagnostic(
+                    "X003",
+                    f"Identifier '{identifier}' - only unused identifiers should be prefixed with '_'",
+                    data.ast_position_info,
+                )
+
+    def scope_in_fn(self, fn_name: str, ast_position_info: ASTPositionInfo) -> None:
+        self.scopes.append(self.create_scope(fn_name, None, None, ast_position_info))
+
+    def scope_out_fn(self) -> None:
+        if len(self.scopes) == 1:
+            raise ValueError("IE: Cannot scope out of global scope!")
+        if not self.scopes[-1].fn_name:
+            raise ValueError(
+                "IE: Mismatched scope: current scope is not a function scope"
+            )
+        self.check_unused_identifiers()
+        self.scopes.pop()
+
+    def scope_in_loop(self, loop_name: str, ast_position_info: ASTPositionInfo) -> None:
+        self.scopes.append(self.create_scope(None, loop_name, None, ast_position_info))
+
+    def scope_out_loop(self) -> None:
+        if len(self.scopes) == 1:
+            raise ValueError("IE: Cannot scope out of global scope!")
+        if not self.scopes[-1].loop_name:
+            raise ValueError("IE: Mismatched scope: current scope is not a loop scope")
+        self.check_unused_identifiers()
+        self.scopes.pop()
+
+    def scope_in_selection(
+        self, selection_name: str, ast_position_info: ASTPositionInfo
+    ) -> None:
+        self.scopes.append(
+            self.create_scope(None, None, selection_name, ast_position_info)
+        )
+
+    def scope_out_selection(self) -> None:
+        if len(self.scopes) == 1:
+            raise ValueError("IE: Cannot scope out of global scope!")
+        if not self.scopes[-1].selection_name:
+            raise ValueError(
+                "IE: Mismatched scope: current scope is not a selection scope"
+            )
+        self.check_unused_identifiers()
+        self.scopes.pop()
+
+    def resolve(
+        self, identifier: str, ast_position_info: ASTPositionInfo
+    ) -> IdentifierData:
+        """
+        Resolves a variable / constant, returning a IdentifierData
+        :return:
+        """
+        for scope in reversed(self.scopes):
+            if identifier in scope.data:
+                scope.data[identifier].ref_count += 1
+                return scope.data[identifier]
+        # FIXME
+        self.add_diagnostic(
+            "E200", f"Unresolved identifier '{identifier}'", ast_position_info
+        )
+
+    def check_if_identifier_declared(
+        self, identifier: str, ast_position_info: ASTPositionInfo
+    ):
+        for parent_scope in reversed(self.scopes[:-1]):
+            if identifier in parent_scope.data:
+                identifier_data = parent_scope.data[identifier]
+                self.add_diagnostic(
+                    "E201",
+                    f"{'Variable' if identifier_data.is_variable else 'Constant'} '{identifier}' "
+                    f"already declared in parent scope with ASTPositionInfo {parent_scope.ast_position_info}",
+                    ast_position_info,
+                )
+
+        scope = self.scopes[-1]
+        if identifier in scope.data:
+            identifier_data = scope.data[identifier]
+            self.add_diagnostic(
+                "E201",
+                f"{'Variable' if identifier_data.is_variable else 'Constant'} '{identifier}' "
+                f"already declared in this scope",
+                ast_position_info,
+            )
+
+    def init_variable(
+        self, identifier: str, vl_type: VlType, ast_position_info: ASTPositionInfo
+    ):
+        if not check_snake_case(identifier):
+            self.add_diagnostic(
+                "X001",
+                f"Variable identifier '{identifier}' should be lowercase snake_case",
+                ast_position_info,
+            )
+        self.check_if_identifier_declared(identifier, ast_position_info)
+        scope = self.scopes[-1]
+        scope.data[identifier] = IdentifierData(ast_position_info, vl_type, True, 0)
+
+    def init_constant(
+        self, identifier: str, vl_val: VlTypeABC, ast_position_info: ASTPositionInfo
+    ):
+        if not check_constant_case(identifier):
+            self.add_diagnostic(
+                "X000",
+                f"Constant identifier '{identifier}' should be uppercase CONSTANT_CASE",
+                ast_position_info,
+            )
+        self.check_if_identifier_declared(identifier, ast_position_info)
+        scope = self.scopes[-1]
+        scope.data[identifier] = IdentifierData(ast_position_info, vl_val, False, 0)
+
+    # Lowering
+    # ====================
+
+    def lower(
+        self, ast_node: vl_ast.ProgramNode
+    ) -> tuple[ProgramNode | None, list[Diagnostic]]:
+        self.error = False
+        self.diagnostics = []
+
+        stmts_lowered = None
+        try:
+            stmts_lowered = self.lower_stmts(ast_node.stmts)
+        except Exception as e:
+            self.add_diagnostic(
+                "E900",
+                f"Internal error: {e}; {traceback.format_exc()}",
+                ast_node.position_info,
+            )
+
+        self.diagnostics = sorted(
+            self.diagnostics, key=lambda x: (x.line_no, x.char_no)
+        )
+
+        if self.error:
+            return None, self.diagnostics
+
+        return ProgramNode(stmts_lowered, ast_node.position_info), self.diagnostics
 
     @staticmethod
     def lower_vl_type(vl_type_str: str) -> VlType:
         if vl_type_str not in VlTypeStrs:
-            raise ValueError(f"Unknown type '{vl_type_str}'")
+            raise ValueError(f"IE: Unknown type '{vl_type_str}'")
         return {
             "int": VlInt,
             "real": VlReal,
@@ -106,7 +297,9 @@ class Lowerer:
     ) -> RvalueIdentifierExprNode:
         # Not to be called when the identifier identifies a function
         identifier = expr.name
-        vl_type_or_val, is_variable = self.ctx_scopes.resolve(identifier)
+        identifier_data = self.resolve(identifier, expr.position_info)
+        vl_type_or_val = identifier_data.type_or_value
+        is_variable = identifier_data.is_variable
         vl_type = vl_type_or_val if is_variable else vl_type_or_val.__class__
         # TODO: FIXME FOR CONSTEXPR
         return RvalueIdentifierExprNode(identifier, False, vl_type, expr.position_info)
@@ -185,7 +378,8 @@ class Lowerer:
             )
         else:
             raise ValueError(
-                f"Member access on resolved type '{target.vl_type.to_vl_type_str()}' which does not have identifier '{identifier}'"
+                f"Member access on resolved type '{target.vl_type.to_vl_type_str()}' "
+                f"which does not have identifier '{identifier}'"
             )
 
     def lower_index_expr(self, expr: vl_ast.IndexExprNode) -> FunctionCallExprNode:
@@ -196,17 +390,33 @@ class Lowerer:
         self, expr: vl_ast.FunctionCallExprNode
     ) -> FunctionCallExprNode:
         if expr.callee.name not in self.functions:
-            raise ValueError("asdfas")
+            self.add_diagnostic(
+                "E200",
+                f"Unresolved identifier '{expr.callee.name}'",
+                expr.position_info,
+            )
         function = self.functions[expr.callee.name]
 
         arguments: list[ExprNode] = [
             self.lower_expr(x) for x in expr.arguments.arguments
         ]
         if len(arguments) != len(function.parameters):
-            raise ValueError("len(arguments) != len(function.parameters)")
-        for argument, parameter in zip(arguments, function.parameters):
+            self.add_diagnostic(
+                "E110",
+                f"Function {expr.callee.name} expected {len(function.parameters)} arguments, got {len(arguments)}",
+                expr.position_info,
+            )
+
+        for idx, (argument, parameter) in enumerate(
+            zip(arguments, function.parameters)
+        ):
             if argument.vl_type != parameter.vl_type:
-                raise ValueError("argument.vl_type != parameter.vl_type")
+                self.add_diagnostic(
+                    "E111",
+                    f"Function '{expr.callee.name}' expects argument #{idx} "
+                    f"to be type {parameter.vl_type}, got {argument.vl_type}",
+                    expr.position_info,
+                )
 
         function_profile = self.functions[expr.callee.name]
         return FunctionCallExprNode(
@@ -233,7 +443,10 @@ class Lowerer:
             and x.operand_types == [right.vl_type.to_vl_type_str()]
         ]
         if len(operation) > 1:
-            raise ValueError("Internal error: multiple operations found")
+            raise ValueError(
+                f"IE: Multiple operations found for '{operator}' with left "
+                f"'{left.vl_type.to_vl_type_str()}', right '{right.vl_type.to_vl_type_str()}'"
+            )
         if operation:
             operation = operation[0]
             return BinaryOperationExprNode(
@@ -278,6 +491,14 @@ class Lowerer:
                     expr.position_info,
                 )
 
+        self.add_diagnostic(
+            "E103",
+            f"Operator {format_operator(expr.operator)} "
+            f"not supported between instances of {left.vl_type.to_vl_type_str()} "
+            f"and {right.vl_type.to_vl_type_str()} (after attempted widening)",
+            expr.position_info,
+        )
+
     def lower_unary_operation_expr(
         self, expr: vl_ast.UnaryOperatorExprNode
     ) -> UnaryOperatorExprNode:
@@ -291,11 +512,16 @@ class Lowerer:
             if x.op_arity == "UNARY" and x.op_type == operator
         ]
         if not operation:
-            raise ValueError(
-                f"Unsupported operation '{operator}' for '{operand.vl_type.to_vl_type_str()}'"
+            self.add_diagnostic(
+                "E103",
+                f"Operator {format_operator(expr.operator)} "
+                f"not supported for instance of {operand.vl_type.to_vl_type_str()}",
+                expr.position_info,
             )
         elif len(operation) > 1:
-            raise ValueError("Internal error: multiple operations found")
+            raise ValueError(
+                f"IE: Multiple operations found for '{operator}' with operand {operand.vl_type.to_vl_type_str()}"
+            )
         operation = operation[0]
 
         return UnaryOperatorExprNode(
@@ -317,7 +543,9 @@ class Lowerer:
         elif isinstance(expr.value.value, complex):
             value = VlComplex(expr.value.value)
         else:
-            raise ValueError("TODO")
+            raise ValueError(
+                f"IE: Unknown constant expr value type {type(expr.value.value)}"
+            )
 
         return ConstantExprNode(
             value,
@@ -346,6 +574,13 @@ class Lowerer:
                 attribute_tags_dict[tag.key.name] = tag_values
 
         identifier = decl.identifier.name
+        if identifier in self.functions:
+            self.add_diagnostic(
+                "E202",
+                f"Function '{decl.identifier.name}' has already been declared",
+                decl.position_info,
+            )
+
         parameters = [
             VlFunctionParameterTypeProfile(x.name.name, self.lower_vl_type(x.type.name))
             for x in decl.parameters.parameters
@@ -356,17 +591,29 @@ class Lowerer:
         parameters_counter = collections.Counter([x.identifier for x in parameters])
         has_duplicates = any([x > 1 for x in parameters_counter.values()])
         if has_duplicates:
-            raise ValueError(
-                f"Duplicate parameters given to function: {', '.join([k for k, v in parameters_counter.items() if v > 1])}"
+            self.add_diagnostic(
+                "E210",
+                f"Duplicate parameter(s) '{', '.join([k for k, v in parameters_counter.items() if v > 1])}' "
+                f"in declaration for function '{decl.identifier.name}'",
+                decl.position_info,
             )
 
-        self.ctx_scopes.scope_in_fn(decl.identifier.name, decl.position_info)
+        self.scope_in_fn(decl.identifier.name, decl.position_info)
         for parameter in decl.parameters.parameters:
-            self.ctx_scopes.init_variable(
-                parameter.name.name, self.lower_vl_type(parameter.type.name)
+            self.init_variable(
+                parameter.name.name,
+                self.lower_vl_type(parameter.type.name),
+                parameter.position_info,
             )
         stmts = self.lower_stmts(decl.stmts)
-        self.ctx_scopes.scope_out_fn()
+        self.scope_out_fn()
+
+        if not isinstance(decl.stmts.stmts[-1], vl_ast.ReturnStmtNode):
+            self.add_diagnostic(
+                "E320",
+                "No return statement at end of statement list in function",
+                decl.stmts.stmts[-1].position_info,
+            )
 
         return FunctionDeclNode(
             attribute_tags_dict,
@@ -384,7 +631,7 @@ class Lowerer:
         vl_type = self.lower_vl_type(decl._type.name)
 
         if isinstance(decl, vl_ast.VariableDeclNode):
-            self.ctx_scopes.init_variable(decl.target.name, vl_type)
+            self.init_variable(decl.target.name, vl_type, decl.position_info)
         else:
             # check that we are assigning a ConstantValue
             # major bodge: it is acceptable to lower a constant to a variable instead
@@ -392,12 +639,14 @@ class Lowerer:
             # complex literals, etc, until compile time constant folding / type casts
             # are implemented: TODO!
             if isinstance(value_lowered, ConstantExprNode):
-                self.ctx_scopes.init_constant(decl.target.name, value_lowered.value)
+                self.init_constant(
+                    decl.target.name, value_lowered.value, decl.position_info
+                )
             elif isinstance(value_lowered, FunctionCallExprNode):
                 # FIXME!
                 if not value_lowered.is_type_cast:
                     raise ValueError
-                self.ctx_scopes.init_variable(decl.target.name, vl_type)
+                self.init_variable(decl.target.name, vl_type, decl.position_info)
             else:
                 raise ValueError
 
@@ -409,8 +658,11 @@ class Lowerer:
             if value_widened:
                 value_lowered = value_widened
             else:
-                raise ValueError(
-                    "value_lowered.vl_type == vl_type.to_vl_type_str(), could not widen cast"
+                self.add_diagnostic(
+                    "E100",
+                    f"Data '{decl.target.name}' is type {vl_type.to_vl_type_str()}, got "
+                    f"{value_lowered.vl_type.to_vl_type_str()}",
+                    decl.position_info,
                 )
 
         return DataDeclNode(
@@ -453,10 +705,17 @@ class Lowerer:
             raise ValueError("TODO")
 
         value_lowered = self.lower_expr(stmt.value)
-        vl_type_or_val, is_variable = self.ctx_scopes.resolve(target.identifier)
+
+        identifier_data = self.resolve(target.identifier, stmt.position_info)
+        vl_type_or_val = identifier_data.type_or_value
+        is_variable = identifier_data.is_variable
         vl_type = vl_type_or_val if is_variable else vl_type_or_val.__class__
         if not is_variable:
-            raise ValueError("Cant assign to a constant!")
+            self.add_diagnostic(
+                "E102",
+                f"Assignment to constant '{target.identifier}' after initialization",
+                stmt.position_info,
+            )
 
         if not value_lowered.vl_type.to_vl_type_str() == vl_type.to_vl_type_str():
             # Attempt a type widening cast
@@ -466,8 +725,11 @@ class Lowerer:
             if value_widened:
                 value_lowered = value_widened
             else:
-                raise ValueError(
-                    "value_lowered.vl_type == vl_type.to_vl_type_str(), could not widen cast"
+                self.add_diagnostic(
+                    "E100",
+                    f"Data '{stmt.target}' is type {vl_type.to_vl_type_str()}, got "
+                    f"{value_lowered.vl_type.to_vl_type_str()}",
+                    stmt.position_info,
                 )
 
         return AssignmentStmtNode(target.identifier, value_lowered, stmt.position_info)
@@ -492,14 +754,17 @@ class Lowerer:
 
         has_else = isinstance(stmts[-1], vl_ast.ElseStmtNode)
         if has_else and len(stmts) == 1:
-            # TODO: FIXME
-            pass
+            self.add_diagnostic(
+                "E331",
+                f"Use of `else` statement not in an `if-elseif-else` stack",
+                stmts[0].position_info,
+            )
 
         # noinspection PyTypeChecker
         conditioned: list[vl_ast.IfStmtNode] = stmts[:-1] if has_else else stmts
         blocks = []
         for block in conditioned:
-            self.ctx_scopes.scope_in_selection(
+            self.scope_in_selection(
                 "elseif" if isinstance(block, vl_ast.ElseifStmtNode) else "if",
                 block.position_info,
             )
@@ -508,15 +773,15 @@ class Lowerer:
                     self.lower_expr(block.condition), self.lower_stmts(block.stmts)
                 )
             )
-            self.ctx_scopes.scope_out_selection()
+            self.scope_out_selection()
 
         if has_else:
             else_stmt = stmts[-1]
             if not isinstance(else_stmt, vl_ast.ElseStmtNode):
                 raise ValueError("UNREACHABLE")
-            self.ctx_scopes.scope_in_selection("else", else_stmt.position_info)
+            self.scope_in_selection("else", else_stmt.position_info)
             else_stmts = self.lower_stmts(else_stmt.stmts)
-            self.ctx_scopes.scope_out_selection()
+            self.scope_out_selection()
 
         else:
             else_stmts = None
@@ -533,10 +798,12 @@ class Lowerer:
             raise ValueError("TODO")
 
         # lower stmts with updated loop context
-        self.ctx_scopes.scope_in_loop("for", stmt.position_info)
-        self.ctx_scopes.init_variable(identifier, self.lower_vl_type(vl_type_str))
+        self.scope_in_loop("for", stmt.position_info)
+        self.init_variable(
+            identifier, self.lower_vl_type(vl_type_str), stmt.position_info
+        )
         stmts = self.lower_stmts(stmt.stmts)
-        self.ctx_scopes.scope_out_loop()
+        self.scope_out_loop()
 
         return RangedForStmtNode(
             identifier,
@@ -559,16 +826,23 @@ class Lowerer:
             if isinstance(stmt, vl_ast.ElseifStmtNode):
                 selection_stmts.append(stmt)
                 continue
+
             if isinstance(stmt, vl_ast.ElseStmtNode):
                 if selection_stmts and isinstance(
                     selection_stmts[-1], vl_ast.ElseStmtNode
                 ):
-                    raise ValueError("Multiple else statements in one selection block")
+                    self.add_diagnostic(
+                        "E331",
+                        f"Use of `else` statement not in an `if-elseif-else` stack",
+                        stmt.position_info,
+                    )
                 selection_stmts.append(stmt)
                 continue
+
             if selection_stmts:
                 out_stmts.append(self.lower_selection_stack_stmt(selection_stmts))
                 selection_stmts = []
+
             if isinstance(stmt, vl_ast.IfStmtNode):
                 selection_stmts.append(stmt)
                 continue
@@ -648,6 +922,6 @@ class Lowerer:
             raise ValueError(f"Unknown expr type '{type(expr)}'")
 
 
-def lower(ast_node: vl_ast.ProgramNode) -> ProgramNode:
+def lower(ast_node: vl_ast.ProgramNode) -> tuple[ProgramNode | None, list[Diagnostic]]:
     lowerer = Lowerer()
     return lowerer.lower(ast_node)

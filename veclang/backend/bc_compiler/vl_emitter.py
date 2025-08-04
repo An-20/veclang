@@ -261,8 +261,8 @@ class BytecodeEmitter:
 
     def emit_function_call_expr(self, node: FunctionCallExprNode) -> None:
         # TODO: FIXME FOR USER DEFINED FUNCTIONS
-        # arguments are pushed onto the stack in reverse order
-        for argument in reversed(node.arguments):
+        # arguments are pushed onto the stack in order
+        for argument in node.arguments:
             self.emit_expr(argument)
         self.add_instruction("OP_CALL_BUILTIN", int_to_2_bytes(node.callee_fn_id))
 

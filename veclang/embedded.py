@@ -21,11 +21,13 @@ def default_format(data: bytes) -> str:
     return "\n".join(lines)
 
 
-def disassemble(input_str: str) -> tuple[str, str, bytes]:
+def disassemble(input_str: str) -> tuple[str, str, str, bytes]:
     parsed = parse(input_str)
-    print_ast(parsed)
-    hir = lower(parsed)
-    print_hir(hir)
+    hir, diagnostics = lower(parsed)
+    diagnostics_formatted = "\n".join([str(x) for x in diagnostics])
+    if hir is None:
+        return "", "", diagnostics_formatted, b""
+
     emitter = BytecodeEmitter()
     vl_program = emitter.emit(hir)
     as_bytes = VlSEDF.dumpb(vl_program)
@@ -34,7 +36,7 @@ def disassemble(input_str: str) -> tuple[str, str, bytes]:
     try:
         out_str = f"Constants:\n{default_format(vl_program['constants'])}\n\n"
         out_str += f"Instructions:\n{disassemble_vl_program(vl_program)}"
-        return header_dumped, out_str, as_bytes
+        return header_dumped, out_str, diagnostics_formatted, as_bytes
     except Exception as e:
         return (
             header_dumped,
@@ -42,5 +44,6 @@ def disassemble(input_str: str) -> tuple[str, str, bytes]:
                 f"Exception when disassembling: {e}\nRaw data:"
                 f"\n{default_format(vl_program['constants'] + vl_program['instructions'])}"
             ),
+            diagnostics_formatted,
             as_bytes,
         )

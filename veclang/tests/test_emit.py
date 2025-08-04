@@ -26,12 +26,12 @@ fn mandlebrot(
         }
         z = z * z + c;
     }
-    return [255, 255, 255];
+    return [255, 0, 0];
 }
 """
 )
 print_ast(parsed)
-hir = lower(parsed)
+hir, diagnostics = lower(parsed)
 print_hir(hir)
 emitter = BytecodeEmitter()
 bytecode = emitter.emit(hir)

@@ -15,7 +15,7 @@ parsed = parse(
 """
 )
 print_ast(parsed)
-hir = lower(parsed)
+hir, diagnostics = lower(parsed)
 print_hir(hir)
 emitter = BytecodeEmitter()
 bytecode = emitter.emit(hir)

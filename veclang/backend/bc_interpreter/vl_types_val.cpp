@@ -66,7 +66,8 @@ namespace vl_types
         {
             throw std::runtime_error("Division by zero");
         }
-        return int_to_rv(x / y);
+        float result = static_cast<float>(x) / static_cast<float>(y);
+        return float_to_rv(result);
     }
 
     RawValue int_mod(const RawValue &a, const RawValue &b)

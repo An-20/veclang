@@ -35,4 +35,4 @@ if(EMSCRIPTEN)
   target_link_options(veclang PRIVATE -sNO_DISABLE_EXCEPTION_CATCHING=1)
 endif()
 
-target_compile_options(veclang PRIVATE -Wall -O2 -g)
+target_compile_options(veclang PRIVATE -Wall -O3 -g)

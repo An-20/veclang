@@ -157,7 +157,7 @@ class VlInt(VlTypeABC):
                 "DIVIDE",
                 ["int"],
                 "real",
-                lambda x, y: x // y,
+                lambda x, y: x / y,
                 "OP_INT_DIV",
             ),
             VlConstOperation(

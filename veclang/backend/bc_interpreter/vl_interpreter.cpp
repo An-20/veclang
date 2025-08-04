@@ -147,33 +147,39 @@ namespace vl_interpreter
 
     void Interpreter::op_get_local_obj(const uint8_t *instruction)
     {
-        uint32_t offset = get_1_operand(instruction) + get_local_stack_offset();
+        auto [type_8b, offset_16b] = get_2_operands(instruction);
+        auto adj_offset = offset_16b + get_local_stack_offset();
         vl_types::RawObject object;
-        memcpy(&object.bits, local_stack.data() + offset, sizeof(vl_types::RawObject));
+        size_t type_size = vl_program::get_type_canonical_size(static_cast<vl_program::type_code>(type_8b));
+        memcpy(&object.bits, local_stack.data() + adj_offset, type_size);
         object_stack.push(object);
     }
 
     void Interpreter::op_set_local_obj(const uint8_t *instruction)
     {
-        uint32_t offset = get_1_operand(instruction) + get_local_stack_offset();
+        auto [type_8b, offset_16b] = get_2_operands(instruction);
+        auto adj_offset = offset_16b + get_local_stack_offset();
         vl_types::RawObject object = object_stack.top();
-        memcpy(local_stack.data() + offset, &object.bits, sizeof(vl_types::RawObject));
+        size_t type_size = vl_program::get_type_canonical_size(static_cast<vl_program::type_code>(type_8b));
+        memcpy(local_stack.data() + adj_offset, &object.bits, type_size);
         object_stack.pop();
     }
 
     void Interpreter::op_get_global_obj(const uint8_t *instruction)
     {
-        uint32_t offset = get_1_operand(instruction);
+        auto [type_8b, offset_16b] = get_2_operands(instruction);
         vl_types::RawObject object;
-        memcpy(&object.bits, global_stack.data() + offset, sizeof(vl_types::RawObject));
+        size_t type_size = vl_program::get_type_canonical_size(static_cast<vl_program::type_code>(type_8b));
+        memcpy(&object.bits, global_stack.data() + offset_16b, type_size);
         object_stack.push(object);
     }
 
     void Interpreter::op_set_global_obj(const uint8_t *instruction)
     {
-        uint32_t offset = get_1_operand(instruction);
+        auto [type_8b, offset_16b] = get_2_operands(instruction);
         vl_types::RawObject object = object_stack.top();
-        memcpy(global_stack.data() + offset, &object.bits, sizeof(vl_types::RawObject));
+        size_t type_size = vl_program::get_type_canonical_size(static_cast<vl_program::type_code>(type_8b));
+        memcpy(global_stack.data() + offset_16b, &object.bits, type_size);
         object_stack.pop();
     }
 

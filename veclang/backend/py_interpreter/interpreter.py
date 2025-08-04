@@ -531,20 +531,23 @@ def eval_vl(node: ASTNode, state: InterpreterState) -> VlTypeABC | None:
             state["stdout_buffer"].append(out)
             return
 
-        callee_val = eval_vl(node.callee, state)
-        if isinstance(callee_val, VlFunction):
-            arg_vals = []
-            for param_t, argument in zip(
-                callee_val.arg_types, node.arguments.arguments
-            ):
-                argument_val = eval_vl(argument, state)
-                actual_type = argument_val.get_type_name()
-                if param_t != actual_type:
-                    raise ValueError(
-                        f"Expected parameter to be of type {param_t}, not {actual_type}"
-                    )
-                arg_vals.append(argument_val)
-            return callee_val.fn(*arg_vals)
+        try:
+            callee_val = eval_vl(node.callee, state)
+            if isinstance(callee_val, VlFunction):
+                arg_vals = []
+                for param_t, argument in zip(
+                    callee_val.arg_types, node.arguments.arguments
+                ):
+                    argument_val = eval_vl(argument, state)
+                    actual_type = argument_val.get_type_name()
+                    if param_t != actual_type:
+                        raise ValueError(
+                            f"Expected parameter to be of type {param_t}, not {actual_type}"
+                        )
+                    arg_vals.append(argument_val)
+                return callee_val.fn(*arg_vals)
+        except:
+            pass
 
         if state["in_function"]:
             raise ValueError("Nested functions are not supported")
@@ -962,7 +965,7 @@ fn mandlebrot(
     const THRESHOLD: real = 10.0;
     let c: complex = x / res_x + (y / res_y) * 1i;
     let z: complex = 0;
-    for (_: int in (0:ITERATIONS)) {
+    for (_: int in 0:ITERATIONS) {
         if (z.re * z.re + z.im * z.im > THRESHOLD) {
             return [0, 0, 0];
         }
@@ -1024,7 +1027,7 @@ fn mandlebrot(
     const THRESHOLD: real = 100;
     let c: complex = x / res_x + (y / res_y) * 1i;
     let z: complex = 0;
-    for (_: int in (0:ITERATIONS)) {
+    for (_: int in 0:ITERATIONS) {
         if (z.re * z.re + z.im * z.im > THRESHOLD) {
             return [0, 0, 0];
         }

@@ -12,11 +12,11 @@ from veclang.midend.vl_core.vl_type import (
 
 
 def obj_to_bytes_32(values: list[float]) -> bytes:
-    return b"".join(struct.pack("!f", x) for x in values)
+    return b"".join(struct.pack("<f", x) for x in values)
 
 
 def obj_to_bytes_64(values: list[float]) -> bytes:
-    return b"".join(struct.pack("!f", x) for x in values)
+    return b"".join(struct.pack("<f", x) for x in values)
 
 
 class VlComplex(VlTypeABC):
@@ -32,7 +32,7 @@ class VlComplex(VlTypeABC):
         return obj_to_bytes_32([self.underlying.real, self.underlying.imag])
 
     def to_bytes_64(self) -> bytes:
-        return obj_to_bytes_32([self.underlying.real, self.underlying.imag])
+        return obj_to_bytes_64([self.underlying.real, self.underlying.imag])
 
     @staticmethod
     def get_info() -> tuple[VlTypeStr, VlTypeCode, VlTypeType, tuple[int, int]]:
@@ -118,14 +118,14 @@ class VlComplex(VlTypeABC):
                 "re",
                 ["complex"],
                 "real",
-                0x1000,
+                0x1200,
                 "Returns a `real` representing the real component of a `complex`.",
             ),
             VlMethod(
                 "im",
                 ["complex"],
                 "real",
-                0x1001,
+                0x1201,
                 "Returns a `real` representing the real component of a `complex`.",
             ),
         ]

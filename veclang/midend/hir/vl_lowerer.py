@@ -69,7 +69,13 @@ class Lowerer:
         self.functions: dict[str, VlFunctionTypeProfile] = {
             "print": VlFunctionTypeProfile(
                 "print", 0x0000, [VlFunctionParameterTypeProfile("arg", VlInt)], VlNull
-            )
+            ),
+            "printr": VlFunctionTypeProfile(
+                "printr",
+                0x0001,
+                [VlFunctionParameterTypeProfile("arg", VlReal)],
+                VlNull,
+            ),
         }
 
         self.ctx_function_name: str | None = None
@@ -115,9 +121,10 @@ class Lowerer:
                 return FunctionCallExprNode(
                     cast.fn_id,
                     [expr],
-                    False,
+                    expr.constexpr,
                     cls.lower_vl_type(cast.to_type),
                     expr.ast_position_info,
+                    is_type_cast=True,
                 )
         return None
 
@@ -174,6 +181,7 @@ class Lowerer:
                 False,
                 self.lower_vl_type(method.return_type),
                 expr.position_info,
+                is_property=True,
             )
         else:
             raise ValueError(
@@ -373,15 +381,38 @@ class Lowerer:
         self, decl: vl_ast.ConstantDeclNode | vl_ast.VariableDeclNode
     ) -> DataDeclNode:
         value_lowered = self.lower_expr(decl.value)
+        vl_type = self.lower_vl_type(decl._type.name)
+
         if isinstance(decl, vl_ast.VariableDeclNode):
-            self.ctx_scopes.init_variable(
-                decl.target.name, self.lower_vl_type(decl._type.name)
-            )
+            self.ctx_scopes.init_variable(decl.target.name, vl_type)
         else:
             # check that we are assigning a ConstantValue
-            if not isinstance(value_lowered, ConstantExprNode):
+            # major bodge: it is acceptable to lower a constant to a variable instead
+            # if it is the result of a type cast, as a temporary fix for assigning
+            # complex literals, etc, until compile time constant folding / type casts
+            # are implemented: TODO!
+            if isinstance(value_lowered, ConstantExprNode):
+                self.ctx_scopes.init_constant(decl.target.name, value_lowered.value)
+            elif isinstance(value_lowered, FunctionCallExprNode):
+                # FIXME!
+                if not value_lowered.is_type_cast:
+                    raise ValueError
+                self.ctx_scopes.init_variable(decl.target.name, vl_type)
+            else:
                 raise ValueError
-            self.ctx_scopes.init_constant(decl.target.name, value_lowered.value)
+
+        if not value_lowered.vl_type.to_vl_type_str() == vl_type.to_vl_type_str():
+            # Attempt a type widening cast
+            value_widened = self.try_widen_cast_expr(
+                value_lowered, vl_type.to_vl_type_str()
+            )
+            if value_widened:
+                value_lowered = value_widened
+            else:
+                raise ValueError(
+                    "value_lowered.vl_type == vl_type.to_vl_type_str(), could not widen cast"
+                )
+
         return DataDeclNode(
             isinstance(decl, vl_ast.ConstantDeclNode),
             decl.target.name,
@@ -421,23 +452,25 @@ class Lowerer:
         if not isinstance(target, RvalueIdentifierExprNode):
             raise ValueError("TODO")
 
-        value = self.lower_expr(stmt.value)
+        value_lowered = self.lower_expr(stmt.value)
         vl_type_or_val, is_variable = self.ctx_scopes.resolve(target.identifier)
         vl_type = vl_type_or_val if is_variable else vl_type_or_val.__class__
         if not is_variable:
             raise ValueError("Cant assign to a constant!")
 
-        if not value.vl_type.to_vl_type_str() == vl_type.to_vl_type_str():
+        if not value_lowered.vl_type.to_vl_type_str() == vl_type.to_vl_type_str():
             # Attempt a type widening cast
-            value_widened = self.try_widen_cast_expr(value, vl_type.to_vl_type_str())
+            value_widened = self.try_widen_cast_expr(
+                value_lowered, vl_type.to_vl_type_str()
+            )
             if value_widened:
-                value = value_widened
+                value_lowered = value_widened
             else:
                 raise ValueError(
-                    "value.vl_type == vl_type.to_vl_type_str(), could not widen cast"
+                    "value_lowered.vl_type == vl_type.to_vl_type_str(), could not widen cast"
                 )
 
-        return AssignmentStmtNode(target.identifier, value, stmt.position_info)
+        return AssignmentStmtNode(target.identifier, value_lowered, stmt.position_info)
 
     def lower_selection_stack_stmt(
         self, stmts: list[vl_ast.StmtNode]

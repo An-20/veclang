@@ -50,37 +50,49 @@ namespace vl_interpreter
             }
         }
 
-        vl_types::RawObject interpret_tl_fn(const vl_sedf::VlProgram &program, int32_t x, int32_t y, int32_t res_x, int32_t res_y)
+        std::vector<vl_types::VlVec3> generate_img(const vl_sedf::VlProgram &program)
         {
             constants = program.constants;
             instructions = program.instructions;
-            instruction_pointer = 0;
             uint32_t num_instructions = instructions.size() / 4;
-
             uint32_t local_stack_size = program.header.functions.at(0).stack_size;
 
             global_stack = std::vector<uint8_t>(program.header.globals_stack_size);
             local_stack = std::vector<uint8_t>(local_stack_size);
             call_stack = std::stack<StackFrame>();
-            call_stack.push(StackFrame(num_instructions, 0, local_stack_size));
             value_stack = std::stack<vl_types::RawValue>();
             object_stack = std::stack<vl_types::RawObject>();
 
-            value_stack.push(vl_types::int_to_rv(x));
-            value_stack.push(vl_types::int_to_rv(y));
-            value_stack.push(vl_types::int_to_rv(res_x));
-            value_stack.push(vl_types::int_to_rv(res_y));
+            const uint32_t WIDTH = 256;
+            const uint32_t HEIGHT = 256;
+            std::vector<vl_types::VlVec3> output;
+            output.reserve(HEIGHT * WIDTH);
 
-            while (instruction_pointer < num_instructions)
+            for (uint32_t y = 0; y < HEIGHT; y++)
             {
-                const uint8_t *instruction = &instructions[instruction_pointer * 4];
-                instruction_pointer += 1;
-                interpret_instruction(instruction);
-            }
+                for (uint32_t x = 0; x < WIDTH; x++)
+                {
+                    instruction_pointer = 0;
+                    call_stack.push(StackFrame(num_instructions, 0, local_stack_size));
 
-            vl_types::RawObject return_val = object_stack.top();
-            object_stack.pop();
-            return return_val;
+                    value_stack.push(vl_types::int_to_rv(x));
+                    value_stack.push(vl_types::int_to_rv(y));
+                    value_stack.push(vl_types::int_to_rv(WIDTH));
+                    value_stack.push(vl_types::int_to_rv(HEIGHT));
+
+                    while (instruction_pointer < num_instructions)
+                    {
+                        const uint8_t *instruction = &instructions[instruction_pointer * 4];
+                        instruction_pointer += 1;
+                        interpret_instruction(instruction);
+                    }
+
+                    output.push_back(vl_types::ro_to_vec3(object_stack.top()));
+                    object_stack.pop();
+                }
+                // std::cout << "done with row " << y << std::endl;
+            }
+            return output;
         }
 
     private:

@@ -333,8 +333,14 @@ class BytecodeEmitter:
         else:
             # sigh - you'd think we'd want to do this but uh
             # assert isinstance(node.value, ConstantExprNode)
-
-            self.fn_add_data(node.target, node.value.value, False)
+            if isinstance(node.value, FunctionCallExprNode):
+                # TODO: FIXME
+                self.emit_function_call_expr(node.value)
+                self.fn_add_data(node.target, node.vl_type, True)
+            elif isinstance(node.value, ConstantExprNode):
+                self.fn_add_data(node.target, node.value.value, False)
+            else:
+                raise ValueError
 
         # TODO: bodge?
         data_offset = self.scopes[-1].data[node.target][2]

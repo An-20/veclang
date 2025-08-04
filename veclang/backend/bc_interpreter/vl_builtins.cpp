@@ -45,7 +45,7 @@ namespace vl_builtins
     {
         // builtin for casting a real to a complex
         vl_types::RawValue value = delegate.get_val_argument();
-        int32_t value_float = vl_types::rv_to_float(value);
+        float value_float = vl_types::rv_to_float(value);
         vl_types::VlComplex complex;
         complex.real = value_float;
         complex.imag = 0.0f;

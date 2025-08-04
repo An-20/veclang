@@ -91,10 +91,16 @@ class FunctionCallExprNode(ExprNode):
         constexpr: bool,
         vl_type: VlType,
         ast_position_info: ASTPositionInfo,
+        is_type_cast: bool = False,
+        is_method: bool = False,
+        is_property: bool = False,
     ) -> None:
         super().__init__(constexpr, vl_type, ast_position_info)
         self.callee_fn_id = callee_fn_id
         self.arguments = arguments
+        self.is_type_cast = is_type_cast
+        self.is_method = is_method
+        self.is_property = is_property
 
 
 class BinaryOperationExprNode(ExprNode):

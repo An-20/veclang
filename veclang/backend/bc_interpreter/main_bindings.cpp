@@ -73,10 +73,10 @@ std::vector<uint8_t> buildBMP(const std::vector<vl_types::VlVec3> &pixels, int w
 
 using namespace emscripten;
 
-std::vector<uint8_t> generate_img(std::vector<uint8_t> program_data)
+std::vector<uint8_t> generate_img(std::vector<uint8_t> program_data, uint32_t dim)
 {
-    const uint32_t HEIGHT = 256;
-    const uint32_t WIDTH = 256;
+    const uint32_t HEIGHT = dim;
+    const uint32_t WIDTH = dim;
 
     vl_sedf::VlProgram program = vl_sedf::loadb(program_data);
     vl_interpreter::Interpreter interpreter;
@@ -85,33 +85,8 @@ std::vector<uint8_t> generate_img(std::vector<uint8_t> program_data)
     return bmp_data;
 }
 
-std::vector<int> returnVectorData()
-{
-    std::vector<int> v(10, 1);
-    return v;
-}
-
-std::vector<uint8_t> processBytes(const std::vector<uint8_t> &data)
-{
-    std::cout << "Got " << data.size() << " bytes: ";
-    for (auto byte : data)
-    {
-        std::cout << static_cast<int>(byte) << " ";
-    }
-    std::cout << std::endl;
-    std::vector<uint8_t> out;
-    for (auto byte : data)
-        out.push_back(byte + 1);
-    return out;
-}
-
 EMSCRIPTEN_BINDINGS(module)
 {
-    function("returnVectorData", &returnVectorData);
-    function("processBytes", &processBytes);
     function("generate_img", &generate_img);
-
-    // register bindings for std::vector<uint_8_t>
-    register_vector<int>("vector<int>");
     register_vector<uint8_t>("vector_uint8");
 }

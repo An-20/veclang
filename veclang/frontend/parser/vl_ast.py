@@ -47,6 +47,16 @@ VlOperatorType = (
     AugmentedAssignmentOperatorType | BinaryOperatorType | UnaryOperatorType
 )
 
+augmented_assignment_operator_translation: dict[
+    AugmentedAssignmentOperatorType, BinaryOperatorType
+] = {
+    "PLUS_ASSIGNMENT": "PLUS",
+    "MINUS_ASSIGNMENT": "MINUS",
+    "TIMES_ASSIGNMENT": "TIMES",
+    "DIVIDE_ASSIGNMENT": "DIVIDE",
+    "MODULUS_ASSIGNMENT": "MODULUS",
+}
+
 
 class ASTPositionInfo(typing.NamedTuple):
     """Position info of an AST node"""

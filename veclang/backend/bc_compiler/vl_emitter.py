@@ -27,6 +27,7 @@ from veclang.midend.hir.vl_hir import (
     ContinueStmtNode,
 )
 from veclang.midend.vl_core import VlType, VlTypeABC, VlInt, VlNull
+from veclang.midend.hir.vl_lowerer import GLOBAL_FN_NAME
 
 from veclang.backend.bc_compiler.vl_emitter_utils import (
     int_to_1_byte,
@@ -76,7 +77,9 @@ class BytecodeEmitter:
         self.constant_offsets: dict[bytes, int] = {}
 
         self.scopes: list[FunctionScope] = [
-            FunctionScope("vl::global", ASTPositionInfo(0, 0), {}, 0, 0, [], [], VlNull)
+            FunctionScope(
+                GLOBAL_FN_NAME, ASTPositionInfo(0, 0), {}, 0, 0, [], [], VlNull
+            )
         ]
 
         # some context attributes to keep track of state
@@ -96,7 +99,7 @@ class BytecodeEmitter:
         return_type: VlType,
     ) -> None:
         for scope in self.scopes:
-            if scope.fn_name != "vl::global":
+            if scope.fn_name != GLOBAL_FN_NAME:
                 raise ValueError("Cannot nest function declarations!")
         self.scopes.append(
             FunctionScope(
@@ -177,6 +180,17 @@ class BytecodeEmitter:
             :2
         ] + int_to_2_bytes(arg_16b)
 
+    def check_instructions(self):
+        """
+        Performs basic sanity checks on instructions:
+        - checks if any instructions have an offset of 0xFFFF
+        """
+        for instruction in self.instructions:
+            opcode = instruction[0]
+            if opcode in [0x20, 0x21, 0x22]:
+                if instruction[2] == 0xFF and instruction[3] == 0xFF:
+                    raise ValueError("IE: instruction with unset offset")
+
     def emit_stmt(self, node: StmtNode) -> None:
         if isinstance(node, DeclNode):
             self.emit_decl(node)
@@ -198,6 +212,8 @@ class BytecodeEmitter:
             self.emit_continue_stmt(node)
         elif isinstance(node, ExprStmtNode):
             self.emit_expr_stmt(node)
+        else:
+            raise ValueError(f"IE: Unknown stmt type {type(node)}")
 
     def emit_decl(self, node: DeclNode) -> None:
         if isinstance(node, FunctionDeclNode):
@@ -205,7 +221,7 @@ class BytecodeEmitter:
         elif isinstance(node, DataDeclNode):
             self.emit_data_decl(node)
         else:
-            raise ValueError("TODO: Unknown decl type")
+            raise ValueError(f"IE: Unknown decl type {type(node)}")
 
     def emit_expr(self, node: ExprNode) -> None:
         if isinstance(node, RvalueIdentifierExprNode):
@@ -219,11 +235,12 @@ class BytecodeEmitter:
         elif isinstance(node, ConstantExprNode):
             self.emit_constant_expr(node)
         else:
-            raise ValueError
+            raise ValueError(f"IE: Unknown expr type {type(node)}")
 
     def emit_rvalue_identifier_expr(self, node: RvalueIdentifierExprNode) -> None:
         identifier = node.identifier
         # it doesn't matter if we check globals or locals first
+        # because locals cant shadow globals
         # check globals
         for scope in reversed(self.scopes):
             if identifier not in scope.data:
@@ -242,7 +259,7 @@ class BytecodeEmitter:
 
             # now process if is variable
             vl_type = vl_type_or_val
-            if scope.fn_name == "vl::global":
+            if scope.fn_name == GLOBAL_FN_NAME:
                 instruction_prefix = "OP_GET_GLOBAL_"
             else:
                 instruction_prefix = "OP_GET_LOCAL_"
@@ -536,8 +553,8 @@ class BytecodeEmitter:
             )
 
     def emit_return_stmt(self, node: ReturnStmtNode):
-        if self.scopes[-1].fn_name == "vl::global":
-            raise ValueError("TODO: Can't return outside of function")
+        if self.scopes[-1].fn_name == GLOBAL_FN_NAME:
+            raise ValueError("IE: Already checked that return was inside function")
         self.emit_expr(node.value)
         self.add_instruction("OP_RETURN")
 
@@ -548,7 +565,7 @@ class BytecodeEmitter:
                 subscope.block_end_update_offsets.append(self.last_instruction_offset())
                 return
         else:
-            raise ValueError("Not in loop scope!")
+            raise ValueError("IE: Already checked in loop scope")
 
     def emit_continue_stmt(self, _node: ContinueStmtNode):
         for subscope in reversed(self.scopes[-1].sub_scopes):
@@ -558,7 +575,7 @@ class BytecodeEmitter:
                 )
                 return
         else:
-            raise ValueError("Not in loop scope!")
+            raise ValueError("IE: Already checked in loop scope")
 
     def emit_expr_stmt(self, node: ExprStmtNode):
         if isinstance(node.expr, FunctionCallExprNode):

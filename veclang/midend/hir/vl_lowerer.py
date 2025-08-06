@@ -4,7 +4,10 @@ import traceback
 import collections
 
 from veclang.frontend.parser import vl_ast
-from veclang.frontend.parser.vl_ast import ASTPositionInfo
+from veclang.frontend.parser.vl_ast import (
+    ASTPositionInfo,
+    augmented_assignment_operator_translation,
+)
 
 from veclang.midend.hir.vl_hir import (
     ExprNode,
@@ -23,6 +26,7 @@ from veclang.midend.hir.vl_hir import (
     SelectionBlock,
     SelectionStackStmt,
     RangedForStmtNode,
+    WhileStmtNode,
     ReturnStmtNode,
     BreakStmtNode,
     ContinueStmtNode,
@@ -58,6 +62,8 @@ from veclang.midend.hir.vl_lowerer_utils import (
     check_constant_case,
 )
 
+GLOBAL_FN_NAME = "vl_global!"
+
 
 class Lowerer:
 
@@ -78,7 +84,7 @@ class Lowerer:
 
         self.ctx_function_name: str | None = None
         self.scopes: list[Scope] = [
-            self.create_scope("vl::global", None, None, ASTPositionInfo(0, 0))
+            self.create_scope(GLOBAL_FN_NAME, None, None, None, ASTPositionInfo(0, 0))
         ]
 
         self.error: bool = False
@@ -100,29 +106,31 @@ class Lowerer:
 
     @staticmethod
     def create_scope(
-        scope_fn_name: str | None,
+        fn_name: str | None,
+        fn_return_type: VlType | None,
         loop_name: str | None,
         selection_name: str | None,
         ast_position_info: ASTPositionInfo,
     ) -> Scope:
-        return Scope(scope_fn_name, loop_name, selection_name, ast_position_info, {})
+        return Scope(
+            fn_name, fn_return_type, loop_name, selection_name, ast_position_info, {}
+        )
 
     def get_stack_trace_hr(self) -> str:
         def ast_position_info_to_hr(ast_position_info: ASTPositionInfo) -> str:
             return f"{ast_position_info.line_number}:{ast_position_info.line_character_number}"
 
         out_lines = []
-        fn_name = ""
         for scope in self.scopes:
             if scope.fn_name:
-                fn_name = fn_name
+                fn_name = scope.fn_name
                 line = f"Function '{fn_name}' at {ast_position_info_to_hr(scope.ast_position_info)}"
             elif scope.loop_name:
                 line = f"Loop '{scope.loop_name}' at {ast_position_info_to_hr(scope.ast_position_info)}"
             elif scope.selection_name:
                 line = f"Selection '{scope.selection_name}' at {ast_position_info_to_hr(scope.ast_position_info)}"
             else:
-                raise ValueError(f"IE: Unknown scope: {self}")
+                raise ValueError(f"IE: Unknown scope: {scope}")
             out_lines.append(line)
         return "\n".join(out_lines)
 
@@ -141,8 +149,12 @@ class Lowerer:
                     data.ast_position_info,
                 )
 
-    def scope_in_fn(self, fn_name: str, ast_position_info: ASTPositionInfo) -> None:
-        self.scopes.append(self.create_scope(fn_name, None, None, ast_position_info))
+    def scope_in_fn(
+        self, fn_name: str, fn_return_type: VlType, ast_position_info: ASTPositionInfo
+    ) -> None:
+        self.scopes.append(
+            self.create_scope(fn_name, fn_return_type, None, None, ast_position_info)
+        )
 
     def scope_out_fn(self) -> None:
         if len(self.scopes) == 1:
@@ -155,7 +167,9 @@ class Lowerer:
         self.scopes.pop()
 
     def scope_in_loop(self, loop_name: str, ast_position_info: ASTPositionInfo) -> None:
-        self.scopes.append(self.create_scope(None, loop_name, None, ast_position_info))
+        self.scopes.append(
+            self.create_scope(None, None, loop_name, None, ast_position_info)
+        )
 
     def scope_out_loop(self) -> None:
         if len(self.scopes) == 1:
@@ -169,7 +183,7 @@ class Lowerer:
         self, selection_name: str, ast_position_info: ASTPositionInfo
     ) -> None:
         self.scopes.append(
-            self.create_scope(None, None, selection_name, ast_position_info)
+            self.create_scope(None, None, None, selection_name, ast_position_info)
         )
 
     def scope_out_selection(self) -> None:
@@ -181,6 +195,26 @@ class Lowerer:
             )
         self.check_unused_identifiers()
         self.scopes.pop()
+
+    def check_in_loop_scope(self) -> bool:
+        """Returns a bool of whether the current scope is in a loop"""
+        for scope in reversed(self.scopes):
+            if scope.loop_name:
+                return True
+            if scope.fn_name:
+                raise ValueError(
+                    "IE: Illegal construction: function declaration inside loop"
+                )
+        return False
+
+    def check_in_fn_scope(self) -> VlType | None:
+        """Returns a VlType of the current function's return type, or None if not in a function"""
+        for scope in reversed(self.scopes):
+            if scope.fn_name and scope.fn_name != GLOBAL_FN_NAME:
+                if not scope.fn_return_type:
+                    raise ValueError("IE: Scope with fn_name without fn_return_type")
+                return scope.fn_return_type
+        return None
 
     def resolve(
         self, identifier: str, ast_position_info: ASTPositionInfo
@@ -254,6 +288,11 @@ class Lowerer:
     def lower(
         self, ast_node: vl_ast.ProgramNode
     ) -> tuple[ProgramNode | None, list[Diagnostic]]:
+        """
+        Lowers an AST to a HIR, returning a tuple of:
+        - a HIR ProgramNode or None
+        - a list[Diagnostic]
+        """
         self.error = False
         self.diagnostics = []
 
@@ -344,8 +383,11 @@ class Lowerer:
             is_constant_value = False
             casted_element = self.try_widen_cast_expr(element, "real")
             if casted_element is None:
-                # TODO: FIX error msg
-                raise ValueError("Could not cast array literal element to real")
+                self.add_diagnostic(
+                    "E100",
+                    f"Array elements must be castable to real, got type '{element.vl_type.to_vl_type_str()}'",
+                    element.ast_position_info,
+                )
             casted_elements.append(casted_element)
 
         # TODO: Emitting a constant to add to constant table instead of calling the function
@@ -365,7 +407,9 @@ class Lowerer:
     ) -> FunctionCallExprNode:
         target = self.lower_expr(expr.target)
         identifier = expr.name.name
-        # TODO: FIXME FOR METHODS
+        # TODO: FIXME FOR METHODS - would require introducing some
+        # compiler type to indicate this resolves to a function - or not?
+        # could just handle method resolving when handling fn calls
         for method in target.vl_type.get_properties():
             if identifier != method.name:
                 continue
@@ -385,7 +429,7 @@ class Lowerer:
 
     def lower_index_expr(self, expr: vl_ast.IndexExprNode) -> FunctionCallExprNode:
         """Call the underlying index fn"""
-        pass
+        # TODO
 
     def lower_function_call_expr(
         self, expr: vl_ast.FunctionCallExprNode
@@ -506,7 +550,6 @@ class Lowerer:
         operand = self.lower_expr(expr.operand)
         operator = expr.operator
 
-        # TODO: FIXME for type casting, etc.
         operation = [
             x
             for x in operand.vl_type.get_operations()
@@ -599,7 +642,11 @@ class Lowerer:
                 decl.position_info,
             )
 
-        self.scope_in_fn(decl.identifier.name, decl.position_info)
+        self.scope_in_fn(
+            decl.identifier.name,
+            self.lower_vl_type(decl.return_type.name),
+            decl.position_info,
+        )
         for parameter in decl.parameters.parameters:
             self.init_variable(
                 parameter.name.name,
@@ -611,7 +658,7 @@ class Lowerer:
 
         if not isinstance(decl.stmts.stmts[-1], vl_ast.ReturnStmtNode):
             self.add_diagnostic(
-                "E320",
+                "E321",
                 "No return statement at end of statement list in function",
                 decl.stmts.stmts[-1].position_info,
             )
@@ -735,6 +782,22 @@ class Lowerer:
 
         return AssignmentStmtNode(target.identifier, value_lowered, stmt.position_info)
 
+    def lower_augmented_assignment_stmt(
+        self, stmt: vl_ast.AugmentedAssignmentStmtNode
+    ) -> StmtNode:
+        return self.lower_assignment_stmt(
+            vl_ast.AssignmentStmtNode(
+                stmt.target,
+                vl_ast.BinaryOperationExprNode(
+                    stmt.target,
+                    stmt.value,
+                    augmented_assignment_operator_translation[stmt.operator],
+                    stmt.position_info,
+                ),
+                stmt.position_info,
+            )
+        )
+
     def lower_selection_stack_stmt(
         self, stmts: list[vl_ast.StmtNode]
     ) -> SelectionStackStmt:
@@ -803,7 +866,7 @@ class Lowerer:
         self.init_variable(
             identifier, self.lower_vl_type(vl_type_str), stmt.position_info
         )
-        stmts = self.lower_stmts(stmt.stmts)
+        stmts_lowered = self.lower_stmts(stmt.stmts)
         self.scope_out_loop()
 
         return RangedForStmtNode(
@@ -812,17 +875,99 @@ class Lowerer:
             self.lower_expr(range_node.start),
             self.lower_expr(range_node.end),
             self.lower_expr(range_node.step),
-            stmts,
+            stmts_lowered,
             stmt.position_info,
         )
 
+    def lower_while_stmt(self, stmt: vl_ast.WhileStmtNode) -> WhileStmtNode:
+        condition_lowered = self.lower_expr(stmt.condition)
+        if condition_lowered.vl_type.to_vl_type_str() != "bool":
+            self.add_diagnostic(
+                "E122",
+                f"while statement condition should be type bool, "
+                f"got type '{condition_lowered.vl_type.to_vl_type_str()}'",
+                stmt.position_info,
+            )
+
+        # lower stmts with updated loop context
+        self.scope_in_loop("while", stmt.position_info)
+        stmts_lowered = self.lower_stmts(stmt.stmts)
+        self.scope_out_loop()
+
+        return WhileStmtNode(
+            condition_lowered,
+            stmts_lowered,
+            stmt.position_info,
+        )
+
+    def lower_break_stmt(self, stmt: vl_ast.BreakStmtNode) -> BreakStmtNode:
+        if not self.check_in_loop_scope():
+            self.add_diagnostic(
+                "E310",
+                "Use of break statement outside of loop",
+                stmt.position_info,
+            )
+        return BreakStmtNode(stmt.position_info)
+
+    def lower_continue_stmt(self, stmt: vl_ast.ContinueStmtNode) -> ContinueStmtNode:
+        if not self.check_in_loop_scope():
+            self.add_diagnostic(
+                "E311",
+                "Use of break statement outside of loop",
+                stmt.position_info,
+            )
+        return ContinueStmtNode(stmt.position_info)
+
+    def lower_return_stmt(self, stmt: vl_ast.ReturnStmtNode) -> ReturnStmtNode:
+        ret_type_or_none = self.check_in_fn_scope()
+        if not ret_type_or_none:
+            self.add_diagnostic(
+                "E320",
+                "Use of return statement outside of function",
+                stmt.position_info,
+            )
+        expr_lowered = self.lower_expr(stmt.value)
+        if expr_lowered.vl_type != ret_type_or_none:
+            self.add_diagnostic(
+                "E112",
+                f"Expected return type of '{ret_type_or_none.to_vl_type_str()}', "
+                f"got type '{expr_lowered.vl_type.to_vl_type_str()}'",
+                stmt.position_info,
+            )
+        return ReturnStmtNode(self.lower_expr(stmt.value), stmt.position_info)
+
     def lower_expr_stmt(self, stmt: vl_ast.ExprStmtNode) -> ExprStmtNode:
+        if not isinstance(stmt.expr, vl_ast.FunctionCallExprNode):
+            self.add_diagnostic(
+                "W013", "Expression statement has no effect", stmt.position_info
+            )
         return ExprStmtNode(self.lower_expr(stmt.expr), stmt.position_info)
 
     def lower_stmts(self, stmts: vl_ast.StmtsNode) -> list["StmtNode"]:
         out_stmts = []
         selection_stmts = []
+
+        has_return = False
+        has_break = False
+        has_continue = False
+        emitted_unreachable_diagnostic = False
+
         for stmt in stmts.stmts:
+            for has_x, x_str, x_code in [
+                (has_return, "return", "W010"),
+                (has_break, "break", "W011"),
+                (has_continue, "continue", "W012"),
+            ]:
+                if has_x and not emitted_unreachable_diagnostic:
+                    x_code: DiagnosticCode
+                    self.add_diagnostic(
+                        x_code,
+                        f"Unreachable code after {x_str} statement",
+                        stmt.position_info,
+                    )
+                    # to suppress further unreachable code diagnostics
+                    emitted_unreachable_diagnostic = False
+
             # first, handle selection statements (because ordering matters)
             if isinstance(stmt, vl_ast.ElseifStmtNode):
                 selection_stmts.append(stmt)
@@ -856,37 +1001,34 @@ class Lowerer:
                 out_stmts.append(self.lower_assignment_stmt(stmt))
 
             elif isinstance(stmt, vl_ast.AugmentedAssignmentStmtNode):
-                # TODO: FIXME
-                pass
+                out_stmts.append(self.lower_augmented_assignment_stmt(stmt))
 
             elif isinstance(stmt, vl_ast.ForStmtNode):
                 out_stmts.append(self.lower_ranged_for_stmt(stmt))
 
             elif isinstance(stmt, vl_ast.WhileStmtNode):
-                # TODO: FIXME
-                pass
+                out_stmts.append(self.lower_while_stmt(stmt))
 
             elif isinstance(stmt, vl_ast.BreakStmtNode):
-                # TODO: check if in loop first
-                out_stmts.append(BreakStmtNode(stmt.position_info))
+                out_stmts.append(self.lower_break_stmt(stmt))
+                has_break = True
 
             elif isinstance(stmt, vl_ast.ContinueStmtNode):
-                # TODO: check if in loop first
-                out_stmts.append(ContinueStmtNode(stmt.position_info))
+                out_stmts.append(self.lower_continue_stmt(stmt))
+                has_continue = True
 
             elif isinstance(stmt, vl_ast.ReturnStmtNode):
-                # TODO: check if in fn first, and check ret type
-                out_stmts.append(
-                    ReturnStmtNode(self.lower_expr(stmt.value), stmt.position_info)
-                )
+                out_stmts.append(self.lower_return_stmt(stmt))
+                has_return = True
 
             elif isinstance(stmt, vl_ast.ExprStmtNode):
                 out_stmts.append(self.lower_expr_stmt(stmt))
 
             elif isinstance(stmt, vl_ast.CommentNode):
                 pass
+
             else:
-                raise ValueError(f"Unknown stmt type '{type(stmt)}'")
+                raise ValueError(f"IE: Unknown stmt type '{type(stmt)}'")
 
         # if there are still selection statements left over
         if selection_stmts:
@@ -899,7 +1041,7 @@ class Lowerer:
         elif isinstance(decl, (vl_ast.VariableDeclNode, vl_ast.ConstantDeclNode)):
             return self.lower_data_decl(decl)
         else:
-            raise ValueError(f"Unknown decl type '{type(decl)}'")
+            raise ValueError(f"IE: Unknown decl type '{type(decl)}'")
 
     def lower_expr(self, expr: vl_ast.ExprNode) -> "ExprNode":
         """Only to be called on rvalue exprs"""
@@ -920,7 +1062,7 @@ class Lowerer:
         elif isinstance(expr, vl_ast.ConstantExprNode):
             return self.lower_constant_expr(expr)
         else:
-            raise ValueError(f"Unknown expr type '{type(expr)}'")
+            raise ValueError(f"IE: Unknown expr type '{type(expr)}'")
 
 
 def lower(ast_node: vl_ast.ProgramNode) -> tuple[ProgramNode | None, list[Diagnostic]]:

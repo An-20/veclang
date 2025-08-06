@@ -1,9 +1,7 @@
 import json
 
 from veclang.frontend.parser.vl_parser import parse
-from veclang.frontend.parser.vl_ast_io import print_ast
 from veclang.midend.hir import lower
-from veclang.midend.hir.vl_hlr_io import print_hir
 from veclang.backend.bc_compiler.vl_emitter import BytecodeEmitter
 from veclang.backend.bc_compiler.vl_disassembler import disassemble_vl_program
 from veclang.backend.bc_common.py.vl_sedf import VlSEDF
@@ -21,8 +19,17 @@ def default_format(data: bytes) -> str:
     return "\n".join(lines)
 
 
-def disassemble(input_str: str) -> tuple[str, str, str, bytes]:
+def vl_compile(input_str: str) -> tuple[str, str, str, bytes]:
+    """
+    Compiles a program, returning a tuple of:
+    - str of dumped header JSON data
+    - str of disassembled constants and instructions
+    - str of diagnostics HR-formatted
+    - bytes of raw VlSEDF data
+    """
     parsed = parse(input_str)
+    if not parsed:
+        return "", "", "E000: Syntax error in program", b""
     hir, diagnostics = lower(parsed)
     diagnostics_formatted = "\n".join([str(x) for x in diagnostics])
     if hir is None:

@@ -17,6 +17,7 @@ class IdentifierData:
 @dataclasses.dataclass
 class Scope:
     fn_name: str | None
+    fn_return_type: VlType
     loop_name: str | None
     selection_name: str | None
     ast_position_info: ASTPositionInfo
@@ -26,6 +27,7 @@ class Scope:
 
 
 DiagnosticCode = typing.Literal[
+    "E000",
     "E100",
     "E101",
     "E102",
@@ -36,8 +38,6 @@ DiagnosticCode = typing.Literal[
     "E120",
     "E121",
     "E122",
-    "E123",
-    "E124",
     "E200",
     "E201",
     "E202",
@@ -54,6 +54,7 @@ DiagnosticCode = typing.Literal[
     "W010",
     "W011",
     "W012",
+    "W013",
     "X000",
     "X001",
     "X002",

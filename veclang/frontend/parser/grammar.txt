@@ -85,6 +85,7 @@ decl : function_decl
      | variable_decl
      | constant_decl
      | constexpr_decl
+     | using_decl
 
 stmt : decl
      | assignment_stmt

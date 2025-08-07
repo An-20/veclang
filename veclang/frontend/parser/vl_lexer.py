@@ -77,6 +77,7 @@ RESERVED_KEYWORDS = [
     "using",
     "let",
     "const",
+    "constexpr",
     "in",
     "fn",
     "if",

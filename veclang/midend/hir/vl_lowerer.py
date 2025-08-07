@@ -149,16 +149,21 @@ class Lowerer:
                     f"Unused identifier '{identifier}' - prefix with '_' to suppress",
                     data.ast_position_info,
                 )
+            elif (
+                data.ref_write_count == 0
+                and identifier[0] != "_"
+                and data.vl_qualifier == "var"
+            ):
+                self.add_diagnostic(
+                    "W002",
+                    f"Variable '{identifier}' is never written to after initialisation "
+                    f"- prefix with '_' to suppress",
+                    data.ast_position_info,
+                )
             elif data.ref_read_count != 0 and identifier[0] == "_":
                 self.add_diagnostic(
                     "X003",
                     f"Identifier '{identifier}' - only unused identifiers should be prefixed with '_'",
-                    data.ast_position_info,
-                )
-            elif data.ref_write_count == 0 and data.vl_qualifier == "var":
-                self.add_diagnostic(
-                    "W002",
-                    f"Variable '{identifier}' is never written to after initialisation",
                     data.ast_position_info,
                 )
 
@@ -284,6 +289,7 @@ class Lowerer:
         vl_type: VlType,
         vl_value: VlTypeABC | None,
         ast_position_info: ASTPositionInfo,
+        is_parameter: bool = False,
     ):
         if vl_qualifier not in VlQualifierValues:
             raise ValueError(f"IE: Unknown VlQualifier {vl_qualifier}")
@@ -294,11 +300,13 @@ class Lowerer:
                 ast_position_info,
             )
         if (
-            vl_qualifier == "const" or vl_qualifier == "constexpr"
-        ) and not check_constant_case(identifier):
+            (vl_qualifier == "const" or vl_qualifier == "constexpr")
+            and not check_constant_case(identifier)
+            and not is_parameter
+        ):
             self.add_diagnostic(
                 "X001",
-                f"Variable identifier '{identifier}' should be lowercase snake_case",
+                f"Constant identifier '{identifier}' should be uppercase SNAKE_CASE",
                 ast_position_info,
             )
         self._check_if_identifier_declared(identifier, ast_position_info)
@@ -307,7 +315,7 @@ class Lowerer:
         if vl_qualifier == "constexpr" and vl_value is None:
             raise ValueError("IE: constexpr data must have a vl_value")
         scope.data[identifier] = IdentifierData(
-            ast_position_info, vl_qualifier, vl_type, vl_value, 0, 0
+            ast_position_info, vl_qualifier, vl_type, vl_value, 0, 0, is_parameter
         )
 
     def init_variable(
@@ -326,6 +334,11 @@ class Lowerer:
         self._init_data(
             identifier, "constexpr", type(vl_val), vl_val, ast_position_info
         )
+
+    def init_parameter(
+        self, identifier: str, vl_type: VlType, ast_position_info: ASTPositionInfo
+    ) -> None:
+        self._init_data(identifier, "const", vl_type, None, ast_position_info, True)
 
     # Lowering
     # ====================
@@ -547,7 +560,7 @@ class Lowerer:
             return None
         if not isinstance(operation, VlConstexprOperation):
             return None
-        return operation.eval_fn(left.constexpr_value, right.constexpr_value)
+        return operation.evaluate(left.constexpr_value, right.constexpr_value)
 
     def lower_binary_operation_expr(
         self, expr: vl_ast.BinaryOperationExprNode
@@ -741,7 +754,7 @@ class Lowerer:
             decl.position_info,
         )
         for parameter in decl.parameters.parameters:
-            self.init_variable(
+            self.init_parameter(
                 parameter.name.name,
                 self.lower_vl_type(parameter.type.name),
                 parameter.position_info,
@@ -877,9 +890,14 @@ class Lowerer:
         vl_type = identifier_data.vl_type
         vl_qualifier = identifier_data.vl_qualifier
         if vl_qualifier != "var":
+            if identifier_data.is_parameter:
+                hr_qualifier = vl_qualifier_to_hr(vl_qualifier).capitalize()
+            else:
+                hr_qualifier = "const parameter"
             self.add_diagnostic(
                 "E102",
-                f"Assignment to {vl_qualifier_to_hr(vl_qualifier).capitalize()} '{target.identifier}' after initialization",
+                f"Assignment to {hr_qualifier} '{target.identifier}' "
+                f"after initialization",
                 stmt.position_info,
             )
 

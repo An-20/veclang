@@ -75,6 +75,7 @@ block : LEFT_CURLY_BRACKET stmts RIGHT_CURLY_BRACKET
 decl : function_decl
      | variable_decl
      | constant_decl
+     | constexpr_decl
      | using_decl
 
 stmt : decl

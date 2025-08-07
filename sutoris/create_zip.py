@@ -24,7 +24,7 @@ def zip_only_py_files(source_folder: str, zip_filename: str, exclude_dirs=None):
             dirs[:] = [d for d in dirs if d not in exclude_dirs]
 
             for file in files:
-                if file.endswith(".py"):
+                if file.endswith(".py"):  # and not file.startswith("test_"):
                     full_path = os.path.join(root, file)
                     rel_path = os.path.relpath(full_path, start=source_folder)
                     zipf.write(full_path, arcname=rel_path)

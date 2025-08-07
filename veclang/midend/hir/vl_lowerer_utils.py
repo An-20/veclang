@@ -37,6 +37,8 @@ class IdentifierData:
     ref_read_count: int
     ref_write_count: int
 
+    is_parameter: bool
+
 
 @dataclasses.dataclass
 class Scope:
@@ -159,6 +161,9 @@ def format_operator(operator: VlOperatorType) -> str:
 
 def check_constant_case(input_str: str) -> bool:
     """Checks if a string uses constant case"""
+    # allow single char
+    if len(input_str) == 1:
+        return True
     allowed_characters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ" "0123456789" "_"
     return all([char in allowed_characters for char in input_str])
 

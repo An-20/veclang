@@ -27,18 +27,12 @@ from veclang.midend.hir.vl_hir import (
     ContinueStmtNode,
 )
 from veclang.midend.vl_core import VlType, VlTypeABC, VlInt, VlNull
-from veclang.midend.hir.vl_lowerer import GLOBAL_FN_NAME
+from veclang.midend.hir.vl_lowerer import GLOBAL_FN_NAME, VlQualifier, VlQualifierValues
 
 from veclang.backend.bc_compiler.vl_emitter_utils import (
     int_to_1_byte,
     int_to_2_bytes,
 )
-
-
-@dataclasses.dataclass
-class VariableProfile:
-    variable_offset: int
-    vl_type: VlType
 
 
 @dataclasses.dataclass
@@ -53,12 +47,27 @@ class FunctionSubScope:
 
 
 @dataclasses.dataclass
+class IdentifierData:
+    """
+    We don't store constexprs because they've already been constant-folded.
+    """
+
+    vl_qualifier: VlQualifier
+    vl_type: VlType
+    data_offset: int
+
+
+@dataclasses.dataclass
 class FunctionScope:
+    """
+    Scope for a single function. Note how data can be tracked at a function level
+    because unbound locals have already been checked at the HIR lowering stage.
+    """
+
     fn_name: str | None
     ast_position_info: ASTPositionInfo
 
-    # Tuple of (type_or_value, is_variable, data_offset)
-    data: dict[str, tuple[VlType | VlTypeABC, bool, int | None]]
+    data: dict[str, IdentifierData]
     data_offset_counter: int
     instruction_offset: int
     sub_scopes: list[FunctionSubScope]
@@ -70,8 +79,6 @@ class FunctionScope:
 class BytecodeEmitter:
 
     def __init__(self):
-        # TODO: add some function that checks the integrity of instructions
-        # because by default we will set instruction pointers to 0xFFFF
         self.instructions: list[bytes] = []
         self.constants: bytearray = bytearray()
         self.constant_offsets: dict[bytes, int] = {}
@@ -140,13 +147,15 @@ class BytecodeEmitter:
         return type(vl_type_or_val)
 
     def fn_add_data(
-        self, identifier: str, type_or_value: VlType | VlTypeABC, is_variable: bool
+        self, qualifier: VlQualifier, identifier: str, vl_type: VlType
     ) -> int:
         scope = self.scopes[-1]
         data_offset = scope.data_offset_counter
-        self.scopes[-1].data[identifier] = (type_or_value, is_variable, data_offset)
+        self.scopes[-1].data[identifier] = IdentifierData(
+            qualifier, vl_type, data_offset
+        )
         # TODO: FIXME FOR 32 / 64
-        scope.data_offset_counter += type_or_value.get_info()[3][0]
+        scope.data_offset_counter += vl_type.get_info()[3][0]
         return data_offset
 
     def last_instruction_offset(self) -> int:
@@ -241,24 +250,13 @@ class BytecodeEmitter:
         identifier = node.identifier
         # it doesn't matter if we check globals or locals first
         # because locals cant shadow globals
-        # check globals
         for scope in reversed(self.scopes):
             if identifier not in scope.data:
                 continue
-            vl_type_or_val, is_variable, data_offset = scope.data[identifier]
-            if not is_variable:
-                self.emit_constant_expr(
-                    ConstantExprNode(
-                        vl_type_or_val,
-                        True,
-                        type(vl_type_or_val),
-                        node.ast_position_info,
-                    )
-                )
-                return
+            identifier_data = scope.data[identifier]
+            data_offset = identifier_data.data_offset
+            vl_type = identifier_data.vl_type
 
-            # now process if is variable
-            vl_type = vl_type_or_val
             if scope.fn_name == GLOBAL_FN_NAME:
                 instruction_prefix = "OP_GET_GLOBAL_"
             else:
@@ -321,20 +319,24 @@ class BytecodeEmitter:
         return_type = node.return_type
         self.scope_in_fn(fn_identifier, node.ast_position_info, arg_types, return_type)
         for parameter in node.parameters:
-            self.fn_add_data(parameter.identifier, parameter.vl_type, True)
+            self.fn_add_data("const", parameter.identifier, parameter.vl_type)
 
         # arguments are evaluated in left-to-right order, so pop them off in reverse
         for parameter in reversed(node.parameters):
             if parameter.vl_type.is_val():
                 self.add_instruction(
                     "OP_SET_LOCAL_VAL",
-                    int_to_2_bytes(self.scopes[-1].data[parameter.identifier][2]),
+                    int_to_2_bytes(
+                        self.scopes[-1].data[parameter.identifier].data_offset
+                    ),
                 )
             else:
                 self.add_instruction(
                     "OP_SET_LOCAL_OBJ",
                     int_to_1_byte(parameter.vl_type.to_vl_type_code()),
-                    int_to_2_bytes(self.scopes[-1].data[parameter.identifier][2]),
+                    int_to_2_bytes(
+                        self.scopes[-1].data[parameter.identifier].data_offset
+                    ),
                 )
 
         # emit each statement
@@ -343,24 +345,14 @@ class BytecodeEmitter:
         self.scope_out_fn()
 
     def emit_data_decl(self, node: DataDeclNode):
-        is_variable = not node.constant
         self.emit_expr(node.value)
-        if is_variable:
-            self.fn_add_data(node.target, node.vl_type, True)
+        if node.constant:
+            vl_qualifier: VlQualifier = "const"
         else:
-            # sigh - you'd think we'd want to do this but uh
-            # assert isinstance(node.value, ConstantExprNode)
-            if isinstance(node.value, FunctionCallExprNode):
-                # TODO: FIXME
-                self.emit_function_call_expr(node.value)
-                self.fn_add_data(node.target, node.vl_type, True)
-            elif isinstance(node.value, ConstantExprNode):
-                self.fn_add_data(node.target, node.value.value, False)
-            else:
-                raise ValueError
+            vl_qualifier: VlQualifier = "var"
+        self.fn_add_data(vl_qualifier, node.target, node.vl_type)
 
-        # TODO: bodge?
-        data_offset = self.scopes[-1].data[node.target][2]
+        data_offset = self.scopes[-1].data[node.target].data_offset
         if len(self.scopes) == 1:
             instruction_pre = "OP_SET_GLOBAL_"
         else:
@@ -383,13 +375,13 @@ class BytecodeEmitter:
         else:
             instruction_pre = "OP_SET_LOCAL_"
 
-        data_offset = self.scopes[-1].data[node.target][2]
-        if self.scopes[-1].data[node.target][0].is_val():
+        data_offset = self.scopes[-1].data[node.target].data_offset
+        if self.scopes[-1].data[node.target].vl_type.is_val():
             instruction = instruction_pre + "VAL"
             self.add_instruction(instruction, int_to_2_bytes(data_offset))
         else:
             instruction = instruction_pre + "OBJ"
-            vl_type_code = self.scopes[-1].data[node.target][0].to_vl_type_code()
+            vl_type_code = self.scopes[-1].data[node.target].vl_type.to_vl_type_code()
             self.add_instruction(
                 instruction,
                 int_to_1_byte(vl_type_code),
@@ -457,7 +449,7 @@ class BytecodeEmitter:
     def emit_ranged_for_stmt(self, node: RangedForStmtNode):
         block_end_updates = []
 
-        self.fn_add_data(node.loop_var_identifier, node.loop_var_type, True)
+        self.fn_add_data("var", node.loop_var_identifier, node.loop_var_type)
         self.emit_expr(node.loop_var_start)
         if self.is_global_scope():
             # fortunately this is the only construct outside of initialisation that means
@@ -470,7 +462,7 @@ class BytecodeEmitter:
 
         self.add_instruction(
             set_val_instruction,
-            int_to_2_bytes(self.scopes[-1].data[node.loop_var_identifier][2]),
+            int_to_2_bytes(self.scopes[-1].data[node.loop_var_identifier].data_offset),
         )
         loop_start_offset = self.next_instruction_offset()
 
@@ -480,7 +472,7 @@ class BytecodeEmitter:
         self.emit_expr(node.loop_var_end)
         self.add_instruction(
             get_val_instruction,
-            int_to_2_bytes(self.scopes[-1].data[node.loop_var_identifier][2]),
+            int_to_2_bytes(self.scopes[-1].data[node.loop_var_identifier].data_offset),
         )
         self.add_instruction("OP_INT_LESS")
         self.add_instruction("OP_JMP_IF_FALSE", int_to_2_bytes(0xFFFF))
@@ -503,15 +495,15 @@ class BytecodeEmitter:
                 BinaryOperationExprNode(
                     RvalueIdentifierExprNode(
                         node.loop_var_identifier,
-                        False,
                         node.loop_var_type,
+                        None,
                         node.ast_position_info,
                     ),
                     node.loop_var_step,
                     "PLUS",
                     VlInt.get_operations()[6],
-                    False,
                     node.loop_var_type,
+                    None,
                     node.ast_position_info,
                 ),
                 node.ast_position_info,

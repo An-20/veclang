@@ -5,7 +5,7 @@ from veclang.midend.vl_core.vl_type import (
     VlTypeCode,
     VlTypeType,
     VlOperation,
-    VlConstOperation,
+    VlConstexprOperation,
     VlMethod,
     VlCast,
 )
@@ -26,7 +26,8 @@ class VlComplex(VlTypeABC):
             raise ValueError(
                 f"Underlying value of VlComplex must be a Python complex, not '{type(underlying)}'"
             )
-        self.underlying: complex = underlying
+        self.underlying: complex
+        super().__init__(underlying)
 
     def to_bytes_32(self) -> bytes:
         return obj_to_bytes_32([self.underlying.real, self.underlying.imag])
@@ -41,7 +42,7 @@ class VlComplex(VlTypeABC):
     @staticmethod
     def get_operations() -> list[VlOperation]:
         return [
-            VlConstOperation(
+            VlConstexprOperation(
                 "BINARY",
                 "EQUAL_TO",
                 ["complex"],
@@ -49,7 +50,7 @@ class VlComplex(VlTypeABC):
                 lambda x, y: x == y,
                 "OP_COMPLEX_EQUAL",
             ),
-            VlConstOperation(
+            VlConstexprOperation(
                 "BINARY",
                 "NOT_EQUAL_TO",
                 ["complex"],
@@ -57,7 +58,7 @@ class VlComplex(VlTypeABC):
                 lambda x, y: x != y,
                 "OP_COMPLEX_NOT_EQUAL",
             ),
-            VlConstOperation(
+            VlConstexprOperation(
                 "BINARY",
                 "PLUS",
                 ["complex"],
@@ -65,7 +66,7 @@ class VlComplex(VlTypeABC):
                 lambda x, y: x + y,
                 "OP_COMPLEX_ADD",
             ),
-            VlConstOperation(
+            VlConstexprOperation(
                 "BINARY",
                 "MINUS",
                 ["complex"],
@@ -73,7 +74,7 @@ class VlComplex(VlTypeABC):
                 lambda x, y: x - y,
                 "OP_COMPLEX_SUB",
             ),
-            VlConstOperation(
+            VlConstexprOperation(
                 "BINARY",
                 "TIMES",
                 ["complex"],
@@ -81,7 +82,7 @@ class VlComplex(VlTypeABC):
                 lambda x, y: x * y,
                 "OP_COMPLEX_MUL",
             ),
-            VlConstOperation(
+            VlConstexprOperation(
                 "BINARY",
                 "DIVIDE",
                 ["complex"],
@@ -89,7 +90,7 @@ class VlComplex(VlTypeABC):
                 lambda x, y: x / y,
                 "OP_COMPLEX_DIV",
             ),
-            VlConstOperation(
+            VlConstexprOperation(
                 "BINARY",
                 "EXPONENTIATION",
                 ["complex"],
@@ -97,7 +98,7 @@ class VlComplex(VlTypeABC):
                 lambda x, y: x**y,
                 "OP_COMPLEX_EXP",
             ),
-            VlConstOperation(
+            VlConstexprOperation(
                 "UNARY",
                 "UNARY_MINUS",
                 ["complex"],
@@ -253,11 +254,23 @@ class VlVec2(VlTypeABC):
 
 class VlVec3(VlTypeABC):
 
+    def __init__(self, underlying: list[float]) -> None:
+        if (
+            not isinstance(underlying, list)
+            or not (all(isinstance(x, float) for x in underlying))
+            or len(underlying) != 3
+        ):
+            raise ValueError(
+                f"Underlying value of VlVec3 must be a Python list float of length 3, not '{underlying}'"
+            )
+        self.underlying: list[float]
+        super().__init__(underlying)
+
     def to_bytes_32(self) -> bytes:
-        pass  # TODO: FIXME
+        return obj_to_bytes_32(self.underlying)
 
     def to_bytes_64(self) -> bytes:
-        pass  # TODO: FIXME
+        return obj_to_bytes_64(self.underlying)
 
     @staticmethod
     def get_info() -> tuple[VlTypeStr, VlTypeCode, VlTypeType, tuple[int, int]]:

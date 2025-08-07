@@ -16,7 +16,7 @@ file(GLOB_RECURSE ALL_SOURCES
 set(SOURCES "")
 foreach(FILE IN LISTS ALL_SOURCES)
     get_filename_component(FILENAME ${FILE} NAME)
-    if(NOT FILENAME MATCHES "^test_" AND NOT FILENAME MATCHES "^main")
+    if(NOT FILENAME MATCHES "^test_" AND NOT FILENAME MATCHES "^main" AND NOT FILENAME MATCHES "bindings")
         list(APPEND SOURCES ${FILE})
     endif()
 endforeach()

@@ -58,6 +58,7 @@ SEMICOLON: ";"
 USING: "using"
 LET: "let"
 CONST: "const"
+CONSTEXPR: "constexpr"
 IN: "in"
     
 FN: "fn"

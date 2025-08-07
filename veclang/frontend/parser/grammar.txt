@@ -51,6 +51,7 @@ SEMICOLON: ";"
 USING: "using"
 LET: "let"
 CONST: "const"
+CONSTEXPR: "constexpr"
 IN: "in"
 
 FN: "fn"
@@ -83,6 +84,7 @@ block : LEFT_CURLY_BRACKET stmts RIGHT_CURLY_BRACKET
 decl : function_decl
      | variable_decl
      | constant_decl
+     | constexpr_decl
 
 stmt : decl
      | assignment_stmt
@@ -119,7 +121,7 @@ function_decl : attribute_tags FN identifier LEFT_PARENTHESIS function_decl_para
 
 variable_decl : LET identifier COLON type ASSIGNMENT expr SEMICOLON
 constant_decl : CONST identifier COLON type ASSIGNMENT expr SEMICOLON
-
+constexpr_decl : CONSTEXPR identifier COLON type ASSIGNMENT expr SEMICOLON
 
 using_decl_identifiers : using_decl_identifiers COMMA identifier
                        | identifier

@@ -13,6 +13,7 @@
 #include <vector>
 #include <fstream>
 #include <string>
+#include <chrono>
 #include <cstdint>
 #include <algorithm>
 
@@ -89,7 +90,12 @@ void writeBMPToFile(const std::string &filename, const std::vector<vl_types::VlV
 
 int main()
 {
-    vl_sedf::VlProgram program = vl_sedf::load("C:\\Users\\xiada\\Documents\\veclang\\veclang\\tests\\out2.sedf");
+    using std::chrono::duration;
+    using std::chrono::duration_cast;
+    using std::chrono::high_resolution_clock;
+    using std::chrono::milliseconds;
+
+    vl_sedf::VlProgram program = vl_sedf::load("C:\\Users\\xiada\\Documents\\veclang\\veclang\\tests\\outmandle.sedf");
     std::cout << "Loaded VL SEDF program with magic: " << program.header.magic << "\n";
     std::cout << "Version: " << program.header.version << "\n";
     std::cout << "Functions:\n";
@@ -120,7 +126,22 @@ int main()
     const uint32_t WIDTH = 256;
 
     vl_interpreter::Interpreter interpreter;
-    interpreter.interpret(program);
+    // interpreter.interpret(program);
+
+    auto t1 = high_resolution_clock::now();
+    std::vector<vl_types::VlVec3> data = interpreter.generate_img(program, HEIGHT, WIDTH);
+    auto t2 = high_resolution_clock::now();
+
+    /* Getting number of milliseconds as an integer. */
+    auto ms_int = duration_cast<milliseconds>(t2 - t1);
+
+    /* Getting number of milliseconds as a double. */
+    duration<double, std::milli> ms_double = t2 - t1;
+
+    std::cout << ms_int.count() << "ms\n";
+    std::cout << ms_double.count() << "ms\n";
+
+    writeBMPToFile("out.bmp", data, HEIGHT, WIDTH);
 
     return 0;
 }

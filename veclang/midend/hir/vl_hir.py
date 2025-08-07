@@ -34,14 +34,14 @@ class ExprNode(HIRNode, abc.ABC):
     """A HIR node for an expression"""
 
     def __init__(
-        self, constexpr: bool, vl_type: VlType, ast_position_info: ASTPositionInfo
+        self,
+        vl_type: VlType,
+        constexpr_value: VlTypeABC | None,
+        ast_position_info: ASTPositionInfo,
     ) -> None:
         super().__init__(ast_position_info)
-        self.constexpr: bool = constexpr
         self.vl_type: VlType = vl_type
-
-    def update_constexpr(self, *children):
-        self.constexpr = all(child.constexpr for child in children)
+        self.constexpr_value: VlTypeABC | None = constexpr_value
 
 
 class StmtNode(HIRNode, abc.ABC):
@@ -73,11 +73,11 @@ class RvalueIdentifierExprNode(ExprNode):
     def __init__(
         self,
         identifier: str,
-        constexpr: bool,
         vl_type: VlType,
+        constexpr_value: VlTypeABC | None,
         ast_position_info: ASTPositionInfo,
     ) -> None:
-        super().__init__(constexpr, vl_type, ast_position_info)
+        super().__init__(vl_type, constexpr_value, ast_position_info)
         self.identifier = identifier
 
 
@@ -88,14 +88,14 @@ class FunctionCallExprNode(ExprNode):
         self,
         callee_fn_id: int,
         arguments: list[ExprNode],
-        constexpr: bool,
         vl_type: VlType,
+        constexpr_value: VlTypeABC | None,
         ast_position_info: ASTPositionInfo,
         is_type_cast: bool = False,
         is_method: bool = False,
         is_property: bool = False,
     ) -> None:
-        super().__init__(constexpr, vl_type, ast_position_info)
+        super().__init__(vl_type, constexpr_value, ast_position_info)
         self.callee_fn_id = callee_fn_id
         self.arguments = arguments
         self.is_type_cast = is_type_cast
@@ -112,11 +112,11 @@ class BinaryOperationExprNode(ExprNode):
         right: ExprNode,
         operator: BinaryOperatorType,
         operation: VlOperation,
-        constexpr: bool,
         vl_type: VlType,
+        constexpr_value: VlTypeABC | None,
         ast_position_info: ASTPositionInfo,
     ) -> None:
-        super().__init__(constexpr, vl_type, ast_position_info)
+        super().__init__(vl_type, constexpr_value, ast_position_info)
         self.left = left
         self.right = right
         self.operator = operator
@@ -131,11 +131,11 @@ class UnaryOperatorExprNode(ExprNode):
         operand: ExprNode,
         operator: UnaryOperatorType,
         operation: VlOperation,
-        constexpr: bool,
         vl_type: VlType,
+        constexpr_value: VlTypeABC | None,
         ast_position_info: ASTPositionInfo,
     ) -> None:
-        super().__init__(constexpr, vl_type, ast_position_info)
+        super().__init__(vl_type, constexpr_value, ast_position_info)
         self.operand = operand
         self.operator = operator
         self.operation = operation
@@ -148,13 +148,12 @@ class ConstantExprNode(ExprNode):
 
     def __init__(
         self,
-        constant_value: VlTypeABC,
-        constexpr: bool,
         vl_type: VlType,
+        constexpr_value: VlTypeABC,
         ast_position_info: ASTPositionInfo,
     ) -> None:
-        super().__init__(constexpr, vl_type, ast_position_info)
-        self.value: VlTypeABC = constant_value
+        super().__init__(vl_type, constexpr_value, ast_position_info)
+        self.value: VlTypeABC = constexpr_value
 
 
 # Stmts
@@ -180,7 +179,11 @@ class FunctionDeclNode(DeclNode):
 
 
 class DataDeclNode(DeclNode):
-    """A HIR node for variable / constant declaration"""
+    """
+    A HIR node for variable / constant declaration.
+    Note this node has no way of supporting a constexpr declaration because
+    those are effectively all constant folded at the HIR lowering stage.
+    """
 
     def __init__(
         self,

@@ -37,6 +37,9 @@ from veclang.midend.vl_core import (
     VlTypeABC,
     VlTypeStr,
     VlTypeStrs,
+    VlOperation,
+    VlConstexprOperation,
+    VlConstexprCast,
     VlFunctionTypeProfile,
     VlFunctionParameterTypeProfile,
     VlNull,
@@ -54,9 +57,13 @@ from veclang.midend.vl_core import (
 
 from veclang.midend.hir.vl_lowerer_utils import (
     Scope,
+    VlQualifier,
+    VlQualifierValues,
+    vl_qualifier_to_hr,
     IdentifierData,
     Diagnostic,
     DiagnosticCode,
+    FatalCompileError,
     format_operator,
     check_snake_case,
     check_constant_case,
@@ -136,16 +143,22 @@ class Lowerer:
 
     def check_unused_identifiers(self):
         for identifier, data in self.scopes[-1].data.items():
-            if data.ref_count == 0 and identifier[0] != "_":
+            if data.ref_read_count == 0 and identifier[0] != "_":
                 self.add_diagnostic(
                     "W001",
                     f"Unused identifier '{identifier}' - prefix with '_' to suppress",
                     data.ast_position_info,
                 )
-            elif data.ref_count != 0 and identifier[0] == "_":
+            elif data.ref_read_count != 0 and identifier[0] == "_":
                 self.add_diagnostic(
                     "X003",
                     f"Identifier '{identifier}' - only unused identifiers should be prefixed with '_'",
+                    data.ast_position_info,
+                )
+            elif data.ref_write_count == 0 and data.vl_qualifier == "var":
+                self.add_diagnostic(
+                    "W002",
+                    f"Variable '{identifier}' is never written to after initialisation",
                     data.ast_position_info,
                 )
 
@@ -216,71 +229,103 @@ class Lowerer:
                 return scope.fn_return_type
         return None
 
-    def resolve(
-        self, identifier: str, ast_position_info: ASTPositionInfo
+    def _resolve(
+        self,
+        identifier: str,
+        increment_read_ref: bool,
+        increment_write_ref: bool,
+        ast_position_info: ASTPositionInfo,
     ) -> IdentifierData:
-        """
-        Resolves a variable / constant, returning a IdentifierData
-        :return:
-        """
+        # FIXME: fix for lvalue resolution to prevent modifying globals
         for scope in reversed(self.scopes):
             if identifier in scope.data:
-                scope.data[identifier].ref_count += 1
+                scope.data[identifier].ref_read_count += 1 if increment_read_ref else 0
+                scope.data[identifier].ref_write_count += (
+                    1 if increment_write_ref else 0
+                )
                 return scope.data[identifier]
-        # FIXME
         self.add_diagnostic(
             "E200", f"Unresolved identifier '{identifier}'", ast_position_info
         )
-        raise
+        raise FatalCompileError
 
-    def check_if_identifier_declared(
+    def resolve_lvalue_identifier(
         self, identifier: str, ast_position_info: ASTPositionInfo
     ):
-        for parent_scope in reversed(self.scopes[:-1]):
+        return self._resolve(identifier, False, True, ast_position_info)
+
+    def resolve_rvalue_identifier(
+        self, identifier: str, ast_position_info: ASTPositionInfo
+    ):
+        return self._resolve(identifier, True, False, ast_position_info)
+
+    def _check_if_identifier_declared(
+        self, identifier: str, ast_position_info: ASTPositionInfo
+    ) -> None:
+        for scope_idx, parent_scope in enumerate(reversed(self.scopes)):
             if identifier in parent_scope.data:
                 identifier_data = parent_scope.data[identifier]
+
+                if scope_idx == 0:
+                    scope_hr = "this scope"
+                else:
+                    scope_hr = f"parent scope with ASTPositionInfo {parent_scope.ast_position_info}"
                 self.add_diagnostic(
                     "E201",
-                    f"{'Variable' if identifier_data.is_variable else 'Constant'} '{identifier}' "
-                    f"already declared in parent scope with ASTPositionInfo {parent_scope.ast_position_info}",
+                    f"{vl_qualifier_to_hr(identifier_data.vl_qualifier).capitalize()} '{identifier}' "
+                    f"already declared in {scope_hr}",
                     ast_position_info,
                 )
 
-        scope = self.scopes[-1]
-        if identifier in scope.data:
-            identifier_data = scope.data[identifier]
-            self.add_diagnostic(
-                "E201",
-                f"{'Variable' if identifier_data.is_variable else 'Constant'} '{identifier}' "
-                f"already declared in this scope",
-                ast_position_info,
-            )
-
-    def init_variable(
-        self, identifier: str, vl_type: VlType, ast_position_info: ASTPositionInfo
+    def _init_data(
+        self,
+        identifier: str,
+        vl_qualifier: VlQualifier,
+        vl_type: VlType,
+        vl_value: VlTypeABC | None,
+        ast_position_info: ASTPositionInfo,
     ):
-        if not check_snake_case(identifier):
+        if vl_qualifier not in VlQualifierValues:
+            raise ValueError(f"IE: Unknown VlQualifier {vl_qualifier}")
+        if vl_qualifier == "var" and not check_snake_case(identifier):
             self.add_diagnostic(
                 "X001",
                 f"Variable identifier '{identifier}' should be lowercase snake_case",
                 ast_position_info,
             )
-        self.check_if_identifier_declared(identifier, ast_position_info)
-        scope = self.scopes[-1]
-        scope.data[identifier] = IdentifierData(ast_position_info, vl_type, True, 0)
-
-    def init_constant(
-        self, identifier: str, vl_val: VlTypeABC, ast_position_info: ASTPositionInfo
-    ):
-        if not check_constant_case(identifier):
+        if (
+            vl_qualifier == "const" or vl_qualifier == "constexpr"
+        ) and not check_constant_case(identifier):
             self.add_diagnostic(
-                "X000",
-                f"Constant identifier '{identifier}' should be uppercase CONSTANT_CASE",
+                "X001",
+                f"Variable identifier '{identifier}' should be lowercase snake_case",
                 ast_position_info,
             )
-        self.check_if_identifier_declared(identifier, ast_position_info)
+        self._check_if_identifier_declared(identifier, ast_position_info)
         scope = self.scopes[-1]
-        scope.data[identifier] = IdentifierData(ast_position_info, vl_val, False, 0)
+
+        if vl_qualifier == "constexpr" and vl_value is None:
+            raise ValueError("IE: constexpr data must have a vl_value")
+        scope.data[identifier] = IdentifierData(
+            ast_position_info, vl_qualifier, vl_type, vl_value, 0, 0
+        )
+
+    def init_variable(
+        self, identifier: str, vl_type: VlType, ast_position_info: ASTPositionInfo
+    ) -> None:
+        self._init_data(identifier, "var", vl_type, None, ast_position_info)
+
+    def init_constant(
+        self, identifier: str, vl_type: VlType, ast_position_info: ASTPositionInfo
+    ) -> None:
+        self._init_data(identifier, "const", vl_type, None, ast_position_info)
+
+    def init_constexpr(
+        self, identifier: str, vl_val: VlTypeABC, ast_position_info: ASTPositionInfo
+    ) -> None:
+        self._init_data(
+            identifier, "constexpr", type(vl_val), vl_val, ast_position_info
+        )
 
     # Lowering
     # ====================
@@ -300,11 +345,18 @@ class Lowerer:
         try:
             stmts_lowered = self.lower_stmts(ast_node.stmts)
         except Exception as e:
-            self.add_diagnostic(
-                "E900",
-                f"Internal error: {e}; {traceback.format_exc()}",
-                ast_node.position_info,
-            )
+            if isinstance(e, FatalCompileError):
+                self.add_diagnostic(
+                    "E900",
+                    "The previous error was fatal and compilation has terminated.",
+                    ast_node.position_info,
+                )
+            else:
+                self.add_diagnostic(
+                    "E900",
+                    f"Internal error: {e}; {traceback.format_exc()}",
+                    ast_node.position_info,
+                )
 
         self.diagnostics = sorted(
             self.diagnostics, key=lambda x: (x.line_no, x.char_no)
@@ -335,14 +387,18 @@ class Lowerer:
     def lower_identifier_expr(
         self, expr: vl_ast.IdentifierNode
     ) -> RvalueIdentifierExprNode:
-        # Not to be called when the identifier identifies a function
+        """Only to be called for rvalue identifiers referring to a piece of data (var, const, constexpr)"""
         identifier = expr.name
-        identifier_data = self.resolve(identifier, expr.position_info)
-        vl_type_or_val = identifier_data.type_or_value
-        is_variable = identifier_data.is_variable
-        vl_type = vl_type_or_val if is_variable else vl_type_or_val.__class__
-        # TODO: FIXME FOR CONSTEXPR
-        return RvalueIdentifierExprNode(identifier, False, vl_type, expr.position_info)
+        identifier_data = self.resolve_rvalue_identifier(identifier, expr.position_info)
+        if identifier_data.vl_qualifier == "constexpr" and not identifier_data.vl_value:
+            raise ValueError("IE: Constexpr without vl_value")
+
+        return RvalueIdentifierExprNode(
+            identifier,
+            identifier_data.vl_type,
+            identifier_data.vl_value,
+            expr.position_info,
+        )
 
     @classmethod
     def try_widen_cast_expr(
@@ -351,19 +407,23 @@ class Lowerer:
         """Attempts a widening cast to cast expr into desired_type"""
         for cast in expr.vl_type.get_casts():
             if cast.to_type == desired_type:
+                # attempt constexpr cast
+                if isinstance(cast, VlConstexprCast) and expr.constexpr_value:
+                    constexpr_value = cast.evaluate(expr.constexpr_value)
+                else:
+                    constexpr_value = None
+
                 return FunctionCallExprNode(
                     cast.fn_id,
                     [expr],
-                    expr.constexpr,
                     cls.lower_vl_type(cast.to_type),
+                    constexpr_value,
                     expr.ast_position_info,
                     is_type_cast=True,
                 )
         return None
 
-    def lower_array_literal_expr(
-        self, expr: vl_ast.ArrayLiteralExprNode
-    ) -> FunctionCallExprNode:
+    def lower_array_literal_expr(self, expr: vl_ast.ArrayLiteralExprNode) -> ExprNode:
         # TODO: Support matrices
         if len(expr.elements.exprs) in [2, 3, 4]:
             vl_type_str = f"vec{len(expr.elements.exprs)}"
@@ -372,15 +432,13 @@ class Lowerer:
                 f"Unsupported array literal with length {len(expr.elements.exprs)}"
             )
 
-        is_constant_value = True
         elements = [self.lower_expr(x) for x in expr.elements.exprs]
         casted_elements = []
         for element in elements:
             if element.vl_type.to_vl_type_str() == "real":
-                is_constant_value = is_constant_value and element.constexpr
                 casted_elements.append(element)
                 continue
-            is_constant_value = False
+
             casted_element = self.try_widen_cast_expr(element, "real")
             if casted_element is None:
                 self.add_diagnostic(
@@ -390,6 +448,15 @@ class Lowerer:
                 )
             casted_elements.append(casted_element)
 
+        is_constexpr = all([element.constexpr_value for element in casted_elements])
+        if is_constexpr:
+            vl_type = {"vec2": VlVec2, "vec3": VlVec3, "vec4": VlVec4}[vl_type_str]
+            constexpr_value = vl_type(
+                [element.constexpr_value.underlying for element in casted_elements]
+            )
+        else:
+            constexpr_value = None
+
         # TODO: Emitting a constant to add to constant table instead of calling the function
         constructor_fn_id = {"vec2": 0x1300, "vec3": 0x1301, "vec4": 0x1302}[
             vl_type_str
@@ -397,8 +464,8 @@ class Lowerer:
         return FunctionCallExprNode(
             constructor_fn_id,
             casted_elements,
-            False,
             self.lower_vl_type(vl_type_str),
+            constexpr_value,
             expr.position_info,
         )
 
@@ -416,8 +483,8 @@ class Lowerer:
             return FunctionCallExprNode(
                 method.fn_id,
                 [target],
-                False,
                 self.lower_vl_type(method.return_type),
+                None,  # no such thing as static member access
                 expr.position_info,
                 is_property=True,
             )
@@ -467,10 +534,20 @@ class Lowerer:
         return FunctionCallExprNode(
             function_profile.fn_id,
             arguments,
-            False,
             function_profile.return_type,
+            None,  # no such thing as constexpr function call apart from casts
             expr.position_info,
         )
+
+    @staticmethod
+    def _try_eval_constexpr_binary_operation_expr(
+        left: ExprNode, right: ExprNode, operation: VlOperation
+    ) -> VlTypeABC | None:
+        if not left.constexpr_value or not right.constexpr_value:
+            return None
+        if not isinstance(operation, VlConstexprOperation):
+            return None
+        return operation.eval_fn(left.constexpr_value, right.constexpr_value)
 
     def lower_binary_operation_expr(
         self, expr: vl_ast.BinaryOperationExprNode
@@ -494,13 +571,16 @@ class Lowerer:
             )
         if operation:
             operation = operation[0]
+            constexpr_value = self._try_eval_constexpr_binary_operation_expr(
+                left, right, operation
+            )
             return BinaryOperationExprNode(
                 left,
                 right,
                 expr.operator,
                 operation,
-                False,
                 self.lower_vl_type(operation.result_type),
+                constexpr_value,
                 expr.position_info,
             )
 
@@ -509,32 +589,40 @@ class Lowerer:
             if operation.op_arity != "BINARY" or operation.op_type != operator:
                 continue
             right_widened = self.try_widen_cast_expr(right, operation.operand_types[0])
-            if right_widened:
-                return BinaryOperationExprNode(
-                    left,
-                    right_widened,
-                    expr.operator,
-                    operation,
-                    False,
-                    self.lower_vl_type(operation.result_type),
-                    expr.position_info,
-                )
+            if not right_widened:
+                continue
+            constexpr_value = self._try_eval_constexpr_binary_operation_expr(
+                left, right_widened, operation
+            )
+            return BinaryOperationExprNode(
+                left,
+                right_widened,
+                expr.operator,
+                operation,
+                self.lower_vl_type(operation.result_type),
+                constexpr_value,
+                expr.position_info,
+            )
 
         # Next, try coercing left
         for operation in right.vl_type.get_operations():
             if operation.op_arity != "BINARY" or operation.op_type != operator:
                 continue
             left_widened = self.try_widen_cast_expr(left, operation.operand_types[0])
-            if left_widened:
-                return BinaryOperationExprNode(
-                    left_widened,
-                    right,
-                    expr.operator,
-                    operation,
-                    False,
-                    self.lower_vl_type(operation.result_type),
-                    expr.position_info,
-                )
+            if not left_widened:
+                continue
+            constexpr_value = self._try_eval_constexpr_binary_operation_expr(
+                left_widened, right, operation
+            )
+            return BinaryOperationExprNode(
+                left_widened,
+                right,
+                expr.operator,
+                operation,
+                self.lower_vl_type(operation.result_type),
+                constexpr_value,
+                expr.position_info,
+            )
 
         self.add_diagnostic(
             "E103",
@@ -568,12 +656,18 @@ class Lowerer:
             )
         operation = operation[0]
 
+        # try constexpr eval
+        if operand.constexpr_value and isinstance(operation, VlConstexprOperation):
+            constexpr_value = operation.evaluate(operand.constexpr_value)
+        else:
+            constexpr_value = None
+
         return UnaryOperatorExprNode(
             operand,
             expr.operator,
             operation,
-            False,
             self.lower_vl_type(operation.result_type),
+            constexpr_value,
             expr.position_info,
         )
 
@@ -592,9 +686,8 @@ class Lowerer:
             )
 
         return ConstantExprNode(
-            value,
-            True,
             self.lower_vl_type(expr.value.type),
+            value,
             expr.position_info,
         )
 
@@ -673,32 +766,15 @@ class Lowerer:
         )
 
     def lower_data_decl(
-        self, decl: vl_ast.ConstantDeclNode | vl_ast.VariableDeclNode
-    ) -> DataDeclNode:
-        value_lowered = self.lower_expr(decl.value)
+        self,
+        decl: (
+            vl_ast.ConstantDeclNode | vl_ast.VariableDeclNode | vl_ast.ConstexprDeclNode
+        ),
+    ) -> DataDeclNode | None:
+        identifier = decl.target.name
         vl_type = self.lower_vl_type(decl._type.name)
-
-        if isinstance(decl, vl_ast.VariableDeclNode):
-            self.init_variable(decl.target.name, vl_type, decl.position_info)
-        else:
-            # check that we are assigning a ConstantValue
-            # major bodge: it is acceptable to lower a constant to a variable instead
-            # if it is the result of a type cast, as a temporary fix for assigning
-            # complex literals, etc, until compile time constant folding / type casts
-            # are implemented: TODO!
-            if isinstance(value_lowered, ConstantExprNode):
-                self.init_constant(
-                    decl.target.name, value_lowered.value, decl.position_info
-                )
-            elif isinstance(value_lowered, FunctionCallExprNode):
-                # FIXME!
-                if not value_lowered.is_type_cast:
-                    raise ValueError
-                self.init_variable(decl.target.name, vl_type, decl.position_info)
-            else:
-                raise ValueError
-
-        if not value_lowered.vl_type.to_vl_type_str() == vl_type.to_vl_type_str():
+        value_lowered = self.lower_expr(decl.value)
+        if value_lowered.vl_type != vl_type:
             # Attempt a type widening cast
             value_widened = self.try_widen_cast_expr(
                 value_lowered, vl_type.to_vl_type_str()
@@ -708,10 +784,50 @@ class Lowerer:
             else:
                 self.add_diagnostic(
                     "E100",
-                    f"Data '{decl.target.name}' is type {vl_type.to_vl_type_str()}, got "
+                    f"Data '{identifier}' is type {vl_type.to_vl_type_str()}, got "
                     f"{value_lowered.vl_type.to_vl_type_str()}",
                     decl.position_info,
                 )
+
+        if isinstance(decl, vl_ast.VariableDeclNode):
+            vl_qualifier = "var"
+            self.init_variable(identifier, vl_type, decl.position_info)
+
+        elif isinstance(decl, vl_ast.ConstantDeclNode):
+            if value_lowered.constexpr_value:
+                vl_qualifier = "constexpr"
+                self.add_diagnostic(
+                    "X100",
+                    f"Constant '{identifier}' could be declared as constexpr",
+                    decl.position_info,
+                )
+                self.init_constexpr(
+                    identifier, value_lowered.constexpr_value, decl.position_info
+                )
+            else:
+                vl_qualifier = "const"
+                self.init_constant(identifier, vl_type, decl.position_info)
+
+        elif isinstance(decl, vl_ast.ConstexprDeclNode):
+            if value_lowered.constexpr_value:
+                vl_qualifier = "constexpr"
+                self.init_constexpr(
+                    decl.target.name, value_lowered.constexpr_value, decl.position_info
+                )
+            else:
+                self.add_diagnostic(
+                    "E101",
+                    f"Assignment of non-constexpr expression to constexpr '{identifier}'",
+                    decl.position_info,
+                )
+                raise FatalCompileError
+
+        else:
+            raise ValueError(f"IE: Unknown data decl type {type(decl)}")
+
+        if vl_qualifier == "constexpr":
+            # we have nothing to do with a constexpr
+            return None
 
         return DataDeclNode(
             isinstance(decl, vl_ast.ConstantDeclNode),
@@ -749,23 +865,25 @@ class Lowerer:
     def lower_assignment_stmt(self, stmt: vl_ast.AssignmentStmtNode) -> StmtNode:
         target = self.lower_expr(stmt.target)
         # TODO: add special handling for indexing and member access (lvalues)
+        # probably need to add a LvalueIdentifierExprNode with separate lowering pathway
         if not isinstance(target, RvalueIdentifierExprNode):
-            raise ValueError("TODO")
+            raise ValueError("IE: TODO; can't handle assignment to non lvalues")
 
         value_lowered = self.lower_expr(stmt.value)
 
-        identifier_data = self.resolve(target.identifier, stmt.position_info)
-        vl_type_or_val = identifier_data.type_or_value
-        is_variable = identifier_data.is_variable
-        vl_type = vl_type_or_val if is_variable else vl_type_or_val.__class__
-        if not is_variable:
+        identifier_data = self.resolve_lvalue_identifier(
+            target.identifier, stmt.position_info
+        )
+        vl_type = identifier_data.vl_type
+        vl_qualifier = identifier_data.vl_qualifier
+        if vl_qualifier != "var":
             self.add_diagnostic(
                 "E102",
-                f"Assignment to constant '{target.identifier}' after initialization",
+                f"Assignment to {vl_qualifier_to_hr(vl_qualifier).capitalize()} '{target.identifier}' after initialization",
                 stmt.position_info,
             )
 
-        if not value_lowered.vl_type.to_vl_type_str() == vl_type.to_vl_type_str():
+        if not value_lowered.vl_type == vl_type:
             # Attempt a type widening cast
             value_widened = self.try_widen_cast_expr(
                 value_lowered, vl_type.to_vl_type_str()
@@ -842,7 +960,9 @@ class Lowerer:
         if has_else:
             else_stmt = stmts[-1]
             if not isinstance(else_stmt, vl_ast.ElseStmtNode):
-                raise ValueError("UNREACHABLE")
+                raise ValueError(
+                    "IE: Unreachable, already checked else_stmt was a ElseStmtNode"
+                )
             self.scope_in_selection("else", else_stmt.position_info)
             else_stmts = self.lower_stmts(else_stmt.stmts)
             self.scope_out_selection()
@@ -943,8 +1063,8 @@ class Lowerer:
             )
         return ExprStmtNode(self.lower_expr(stmt.expr), stmt.position_info)
 
-    def lower_stmts(self, stmts: vl_ast.StmtsNode) -> list["StmtNode"]:
-        out_stmts = []
+    def lower_stmts(self, stmts: vl_ast.StmtsNode) -> list[StmtNode]:
+        out_stmts: list[StmtNode] = []
         selection_stmts = []
 
         has_return = False
@@ -995,7 +1115,9 @@ class Lowerer:
 
             # handle other statements now
             if isinstance(stmt, vl_ast.DeclNode):
-                out_stmts.append(self.lower_decl(stmt))
+                decl_lowered = self.lower_decl(stmt)
+                if decl_lowered:
+                    out_stmts.append(decl_lowered)
 
             elif isinstance(stmt, vl_ast.AssignmentStmtNode):
                 out_stmts.append(self.lower_assignment_stmt(stmt))
@@ -1035,34 +1157,50 @@ class Lowerer:
             out_stmts.append(self.lower_selection_stack_stmt(selection_stmts))
         return out_stmts
 
-    def lower_decl(self, decl: vl_ast.DeclNode) -> "DeclNode":
+    def lower_decl(self, decl: vl_ast.DeclNode) -> DeclNode | None:
         if isinstance(decl, vl_ast.FunctionDeclNode):
             return self.lower_function_decl(decl)
-        elif isinstance(decl, (vl_ast.VariableDeclNode, vl_ast.ConstantDeclNode)):
+        elif isinstance(
+            decl,
+            (
+                vl_ast.VariableDeclNode,
+                vl_ast.ConstantDeclNode,
+                vl_ast.ConstexprDeclNode,
+            ),
+        ):
             return self.lower_data_decl(decl)
         else:
             raise ValueError(f"IE: Unknown decl type '{type(decl)}'")
 
-    def lower_expr(self, expr: vl_ast.ExprNode) -> "ExprNode":
+    def lower_expr(self, expr: vl_ast.ExprNode) -> ExprNode:
         """Only to be called on rvalue exprs"""
         if isinstance(expr, vl_ast.IdentifierNode):
-            return self.lower_identifier_expr(expr)
+            expr_lowered = self.lower_identifier_expr(expr)
         elif isinstance(expr, vl_ast.ArrayLiteralExprNode):
-            return self.lower_array_literal_expr(expr)
+            expr_lowered = self.lower_array_literal_expr(expr)
         elif isinstance(expr, vl_ast.MemberAccessExprNode):
-            return self.lower_member_access_expr(expr)
+            expr_lowered = self.lower_member_access_expr(expr)
         elif isinstance(expr, vl_ast.IndexExprNode):
-            return self.lower_index_expr(expr)
+            expr_lowered = self.lower_index_expr(expr)
         elif isinstance(expr, vl_ast.FunctionCallExprNode):
-            return self.lower_function_call_expr(expr)
+            expr_lowered = self.lower_function_call_expr(expr)
         elif isinstance(expr, vl_ast.BinaryOperationExprNode):
-            return self.lower_binary_operation_expr(expr)
+            expr_lowered = self.lower_binary_operation_expr(expr)
         elif isinstance(expr, vl_ast.UnaryOperatorExprNode):
-            return self.lower_unary_operation_expr(expr)
+            expr_lowered = self.lower_unary_operation_expr(expr)
         elif isinstance(expr, vl_ast.ConstantExprNode):
-            return self.lower_constant_expr(expr)
+            expr_lowered = self.lower_constant_expr(expr)
         else:
             raise ValueError(f"IE: Unknown expr type '{type(expr)}'")
+
+        # apply constant folding
+        if expr_lowered.constexpr_value:
+            return ConstantExprNode(
+                expr_lowered.vl_type,
+                expr_lowered.constexpr_value,
+                expr_lowered.ast_position_info,
+            )
+        return expr_lowered
 
 
 def lower(ast_node: vl_ast.ProgramNode) -> tuple[ProgramNode | None, list[Diagnostic]]:

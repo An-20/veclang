@@ -40,6 +40,7 @@ from veclang.frontend.parser.vl_ast import (
     FunctionDeclNode,
     VariableDeclNode,
     ConstantDeclNode,
+    ConstexprDeclNode,
     UsingDeclIdentifiersNode,
     UsingDeclNode,
     AssignmentStmtNode,
@@ -111,6 +112,7 @@ function_decl : attribute_tags FN identifier LEFT_PARENTHESIS function_decl_para
 
 variable_decl : LET identifier COLON type ASSIGNMENT expr SEMICOLON
 constant_decl : CONST identifier COLON type ASSIGNMENT expr SEMICOLON
+constexpr_decl : CONSTEXPR identifier COLON type ASSIGNMENT expr SEMICOLON
 
 
 using_decl_identifiers : using_decl_identifiers COMMA identifier
@@ -341,6 +343,10 @@ def p_variable_decl(p):
 
 def p_constant_decl(p):
     p[0] = ConstantDeclNode(p[2], p[4], p[6], get_ast_pos_info(p))
+
+
+def p_constexpr_decl(p):
+    p[0] = ConstexprDeclNode(p[2], p[4], p[6], get_ast_pos_info(p))
 
 
 def p_using_decl_identifiers(p):
@@ -686,6 +692,7 @@ PARSER_FUNCTION_SPEC = {
     "function_decl": p_function_decl,
     "variable_decl": p_variable_decl,
     "constant_decl": p_constant_decl,
+    "constexpr_decl": p_constexpr_decl,
     "using_decl_identifiers": p_using_decl_identifiers,
     "using_decl": p_using_decl,
     "assignment_stmt": p_assignment_stmt,

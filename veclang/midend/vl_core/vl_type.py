@@ -91,7 +91,11 @@ class VlOperation(abc.ABC):
         self.extra_opcode_hr: str | None = extra_opcode_hr
 
 
-class VlConstOperation(VlOperation):
+class VlConstexprOperation(VlOperation):
+    """
+    A VlConstexprOperation has an eval_fn that gets passed the underlying Python objects as a arguments,
+    but must return a VlTypeABC.
+    """
 
     def __init__(
         self,
@@ -108,7 +112,7 @@ class VlConstOperation(VlOperation):
         )
         self.eval_fn: typing.Callable = eval_fn
 
-    def evaluate(self, *args):
+    def evaluate(self, *args: "VlTypeABC") -> "VlTypeABC":
         if self.op_arity == "UNARY" and len(args) != 0:
             raise ValueError("Unary operation must take exactly 1 operand.")
         elif self.op_arity == "BINARY" and len(args) != 1:
@@ -117,7 +121,7 @@ class VlConstOperation(VlOperation):
             raise ValueError("Ternary operation must take exactly 3 operands.")
         elif self.op_arity not in ["UNARY", "BINARY", "TERNARY"]:
             raise ValueError(f"Unknown operation arity: '{self.op_type}'.")
-        return self.eval_fn(args)
+        return self.eval_fn(*[arg.underlying for arg in args])
 
 
 class VlCast:
@@ -127,7 +131,26 @@ class VlCast:
         self.fn_id: int = fn_id
 
 
+class VlConstexprCast(VlCast):
+    """
+    A VlConstexprCast has an eval_fn that gets passed the underlying Python object as an argument,
+    but must return a VlTypeABC.
+    """
+
+    def __init__(
+        self, to_type: VlTypeStr, fn_id: int, eval_fn: typing.Callable
+    ) -> None:
+        super().__init__(to_type, fn_id)
+        self.eval_fn = eval_fn
+
+    def evaluate(self, arg: "VlTypeABC") -> "VlTypeABC":
+        return self.eval_fn(arg.underlying)
+
+
 class VlTypeABC(abc.ABC):
+
+    def __init__(self, underlying: typing.Any) -> None:
+        self.underlying = underlying
 
     @staticmethod
     @abc.abstractmethod

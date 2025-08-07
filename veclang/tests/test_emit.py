@@ -26,7 +26,7 @@ fn mandlebrot(
         }
         z = z * z + c;
     }
-    return [255, 0, 0];
+    return [0, 0, 255];
 }
 """
 )

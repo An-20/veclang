@@ -5,10 +5,12 @@ from veclang.midend.vl_core.vl_type import (
     VlTypeCode,
     VlTypeType,
     VlOperation,
-    VlConstOperation,
+    VlConstexprOperation,
     VlMethod,
     VlCast,
+    VlConstexprCast,
 )
+from veclang.midend.vl_core.vl_obj_types import VlComplex
 
 
 class VlNull(VlTypeABC):
@@ -18,13 +20,18 @@ class VlNull(VlTypeABC):
             raise ValueError(
                 f"Underlying value of VlNull must be a Python None, not '{type(underlying)}'"
             )
-        self.underlying: None = None
+        self.underlying: None
+        super().__init__(None)
 
     def to_bytes_32(self) -> bytes:
-        raise ValueError("UNIMPLEMENTED")
+        raise ValueError(
+            "IE: to_bytes_32 unimplemented for VlNull, should never be called"
+        )
 
     def to_bytes_64(self) -> bytes:
-        raise ValueError("UNIMPLEMENTED")
+        raise ValueError(
+            "IE: to_bytes_64 unimplemented for VlNull, should never be called"
+        )
 
     @staticmethod
     def get_info() -> tuple[VlTypeStr, VlTypeCode, VlTypeType, tuple[int, int]]:
@@ -54,15 +61,17 @@ class VlInt(VlTypeABC):
             raise ValueError(
                 f"Underlying value of VlInt must be a Python int, not '{type(underlying)}'"
             )
-        self.underlying: int = underlying
+        self.underlying: int
+        super().__init__(underlying)
 
     def to_bytes_32(self) -> bytes:
         if 0 <= self.underlying <= 0xFFFF:
+            # TODO: Use struct.pack
             return self.underlying.to_bytes().rjust(2, bytes(1))
         elif self.underlying <= 0xFFFFFFFF:
             return self.underlying.to_bytes().rjust(4, bytes(1))
         else:
-            raise ValueError(f"Value too large: {self.underlying}")
+            raise ValueError(f"IE: Int value too large: {self.underlying}")
 
     def to_bytes_64(self) -> bytes:
         if 0 <= self.underlying <= 0xFFFF:
@@ -70,7 +79,7 @@ class VlInt(VlTypeABC):
         elif self.underlying <= 0xFFFFFFFF_FFFFFFFF:
             return self.underlying.to_bytes().rjust(8, bytes(1))
         else:
-            raise ValueError(f"Value too large: {self.underlying}")
+            raise ValueError(f"IE: Int value too large: {self.underlying}")
 
     @staticmethod
     def get_info() -> tuple[VlTypeStr, VlTypeCode, VlTypeType, tuple[int, int]]:
@@ -79,157 +88,162 @@ class VlInt(VlTypeABC):
     @staticmethod
     def get_operations() -> list[VlOperation]:
         return [
-            VlConstOperation(
+            VlConstexprOperation(
                 "BINARY",
                 "EQUAL_TO",
                 ["int"],
                 "bool",
-                lambda x, y: x == y,
+                lambda x, y: VlBool(x == y),
                 "OP_INT_EQUAL",
                 extra_opcode_hr="OP_INT_JMP_IF_EQUAL",
             ),
-            VlConstOperation(
+            VlConstexprOperation(
                 "BINARY",
                 "NOT_EQUAL_TO",
                 ["int"],
                 "bool",
-                lambda x, y: x != y,
+                lambda x, y: VlBool(x != y),
                 "OP_INT_NOT_EQUAL",
                 extra_opcode_hr="OP_INT_JMP_IF_NOT_EQUAL",
             ),
-            VlConstOperation(
+            VlConstexprOperation(
                 "BINARY",
                 "GREATER_THAN",
                 ["int"],
                 "bool",
-                lambda x, y: x > y,
+                lambda x, y: VlBool(x > y),
                 "OP_INT_GREATER",
                 extra_opcode_hr="OP_INT_JMP_IF_GREATER",
             ),
-            VlConstOperation(
+            VlConstexprOperation(
                 "BINARY",
                 "GREATER_THAN_OR_EQUAL",
                 ["int"],
                 "bool",
-                lambda x, y: x >= y,
+                lambda x, y: VlBool(x >= y),
                 "OP_INT_GREATER_OR_EQUAL",
                 extra_opcode_hr="OP_INT_JMP_IF_GREATER_OR_EQUAL",
             ),
-            VlConstOperation(
+            VlConstexprOperation(
                 "BINARY",
                 "LESS_THAN",
                 ["int"],
                 "bool",
-                lambda x, y: x < y,
+                lambda x, y: VlBool(x < y),
                 "OP_INT_LESS",
                 extra_opcode_hr="OP_INT_JMP_IF_LESS",
             ),
-            VlConstOperation(
+            VlConstexprOperation(
                 "BINARY",
                 "LESS_THAN_OR_EQUAL",
                 ["int"],
                 "bool",
-                lambda x, y: x <= y,
+                lambda x, y: VlBool(x <= y),
                 "OP_INT_LESS_OR_EQUAL",
                 extra_opcode_hr="OP_INT_JMP_IF_LESS_OR_EQUAL",
             ),
-            VlConstOperation(
-                "BINARY", "PLUS", ["int"], "int", lambda x, y: x + y, "OP_INT_ADD"
+            VlConstexprOperation(
+                "BINARY",
+                "PLUS",
+                ["int"],
+                "int",
+                lambda x, y: VlInt(x + y),
+                "OP_INT_ADD",
             ),
-            VlConstOperation(
+            VlConstexprOperation(
                 "BINARY",
                 "MINUS",
                 ["int"],
                 "int",
-                lambda x, y: x - y,
+                lambda x, y: VlInt(x - y),
                 "OP_INT_SUB",
             ),
-            VlConstOperation(
+            VlConstexprOperation(
                 "BINARY",
                 "TIMES",
                 ["int"],
                 "int",
-                lambda x, y: x * y,
+                lambda x, y: VlInt(x * y),
                 "OP_INT_MUL",
             ),
-            VlConstOperation(
+            VlConstexprOperation(
                 "BINARY",
                 "DIVIDE",
                 ["int"],
                 "real",
-                lambda x, y: x / y,
+                lambda x, y: VlReal(x / y),
                 "OP_INT_DIV",
             ),
-            VlConstOperation(
+            VlConstexprOperation(
                 "BINARY",
                 "MODULUS",
                 ["int"],
                 "int",
-                lambda x, y: x % y,
+                lambda x, y: VlInt(x % y),
                 "OP_INT_MOD",
             ),
-            VlConstOperation(
+            VlConstexprOperation(
                 "BINARY",
                 "EXPONENTIATION",
                 ["int"],
                 "int",
-                lambda x, y: x**y,
+                lambda x, y: VlInt(x**y),
                 "OP_INT_EXP",
             ),
-            VlConstOperation(
+            VlConstexprOperation(
                 "UNARY",
                 "UNARY_MINUS",
                 [],
                 "int",
-                lambda x: -x,
+                lambda x: VlInt(-x),
                 "OP_INT_NEG",
             ),
-            VlConstOperation(
+            VlConstexprOperation(
                 "BINARY",
                 "BITWISE_AND",
                 ["int"],
                 "int",
-                lambda x, y: x & y,
+                lambda x, y: VlInt(x & y),
                 "OP_INT_AND",
             ),
-            VlConstOperation(
+            VlConstexprOperation(
                 "BINARY",
                 "BITWISE_OR",
                 ["int"],
                 "int",
-                lambda x, y: x | y,
+                lambda x, y: VlInt(x | y),
                 "OP_INT_OR",
             ),
-            VlConstOperation(
+            VlConstexprOperation(
                 "BINARY",
                 "BITWISE_XOR",
                 ["int"],
                 "int",
-                lambda x, y: x ^ y,
+                lambda x, y: VlInt(x ^ y),
                 "OP_INT_XOR",
             ),
-            VlConstOperation(
+            VlConstexprOperation(
                 "UNARY",
                 "BITWISE_NOT",
                 ["int"],
                 "int",
-                lambda x: (1 << 64) - 1 - x,
+                lambda x: VlInt((1 << 64) - 1 - x),
                 "OP_INT_NOT",
             ),
-            VlConstOperation(
+            VlConstexprOperation(
                 "BINARY",
                 "BITWISE_LEFT_SHIFT",
                 ["int"],
                 "int",
-                lambda x, y: x << y,
+                lambda x, y: VlInt(x << y),
                 "OP_INT_LEFT_SHIFT",
             ),
-            VlConstOperation(
+            VlConstexprOperation(
                 "BINARY",
                 "BITWISE_RIGHT_SHIFT",
                 ["int"],
                 "int",
-                lambda x, y: x >> y,
+                lambda x, y: VlInt(x >> y),
                 "OP_INT_RIGHT_SHIFT",
             ),
         ]
@@ -244,7 +258,10 @@ class VlInt(VlTypeABC):
 
     @staticmethod
     def get_casts() -> list[VlCast]:
-        return [VlCast("real", 0x1000), VlCast("complex", 0x1001)]
+        return [
+            VlConstexprCast("real", 0x1000, lambda x: VlReal(float(x))),
+            VlConstexprCast("complex", 0x1001, lambda x: VlComplex(complex(x))),
+        ]
 
 
 class VlBool(VlTypeABC):
@@ -254,9 +271,11 @@ class VlBool(VlTypeABC):
             raise ValueError(
                 f"Underlying value of VlBool must be a Python bool, not '{type(underlying)}'"
             )
-        self.underlying: bool = underlying
+        self.underlying: bool
+        super().__init__(underlying)
 
     def to_bytes_32(self) -> bytes:
+        # TODO: use struct
         if 0 <= self.underlying <= 0xFFFF:
             return self.underlying.to_bytes().rjust(2, bytes(1))
         elif self.underlying <= 0xFFFFFFFF:
@@ -279,44 +298,44 @@ class VlBool(VlTypeABC):
     @staticmethod
     def get_operations() -> list[VlOperation]:
         return [
-            VlConstOperation(
+            VlConstexprOperation(
                 "BINARY",
                 "EQUAL_TO",
                 ["bool"],
                 "bool",
-                lambda x, y: x == y,
+                lambda x, y: VlBool(x == y),
                 "OP_INT_EQUAL",
             ),
-            VlConstOperation(
+            VlConstexprOperation(
                 "BINARY",
                 "NOT_EQUAL_TO",
                 ["bool"],
                 "bool",
-                lambda x, y: x != y,
+                lambda x, y: VlBool(x != y),
                 "OP_INT_NOT_EQUAL",
             ),
-            VlConstOperation(
+            VlConstexprOperation(
                 "BINARY",
                 "BOOLEAN_AND",
                 ["bool"],
                 "bool",
-                lambda x, y: x and y,
+                lambda x, y: VlBool(x and y),
                 "OP_BOOLEAN_AND",
             ),
-            VlConstOperation(
+            VlConstexprOperation(
                 "BINARY",
                 "BOOLEAN_OR",
                 ["bool"],
                 "bool",
-                lambda x, y: x or y,
+                lambda x, y: VlBool(x or y),
                 "OP_BOOLEAN_OR",
             ),
-            VlConstOperation(
+            VlConstexprOperation(
                 "UNARY",
                 "BOOLEAN_NOT",
                 [],
                 "bool",
-                lambda x: not x,
+                lambda x: VlBool(not x),
                 "OP_BOOLEAN_NOT",
             ),
         ]
@@ -341,7 +360,8 @@ class VlReal(VlTypeABC):
             raise ValueError(
                 f"Underlying value of VlReal must be a Python float, not '{type(underlying)}'"
             )
-        self.underlying: float = underlying
+        self.underlying: float
+        super().__init__(underlying)
 
     def to_bytes_32(self) -> bytes:
         return bytes(struct.pack("<f", self.underlying))
@@ -356,114 +376,114 @@ class VlReal(VlTypeABC):
     @staticmethod
     def get_operations() -> list[VlOperation]:
         return [
-            VlConstOperation(
+            VlConstexprOperation(
                 "BINARY",
                 "EQUAL_TO",
                 ["real"],
                 "bool",
-                lambda x, y: x == y,
+                lambda x, y: VlBool(x == y),
                 "OP_REAL_EQUAL",
                 extra_opcode_hr="OP_REAL_JMP_IF_EQUAL",
             ),
-            VlConstOperation(
+            VlConstexprOperation(
                 "BINARY",
                 "NOT_EQUAL_TO",
                 ["real"],
                 "bool",
-                lambda x, y: x != y,
+                lambda x, y: VlBool(x != y),
                 "OP_REAL_NOT_EQUAL",
                 extra_opcode_hr="OP_REAL_JMP_IF_NOT_EQUAL",
             ),
-            VlConstOperation(
+            VlConstexprOperation(
                 "BINARY",
                 "GREATER_THAN",
                 ["real"],
                 "bool",
-                lambda x, y: x > y,
+                lambda x, y: VlBool(x > y),
                 "OP_REAL_GREATER",
                 extra_opcode_hr="OP_REAL_JMP_IF_GREATER",
             ),
-            VlConstOperation(
+            VlConstexprOperation(
                 "BINARY",
                 "GREATER_THAN_OR_EQUAL",
                 ["real"],
                 "bool",
-                lambda x, y: x >= y,
+                lambda x, y: VlBool(x >= y),
                 "OP_REAL_GREATER_OR_EQUAL",
                 extra_opcode_hr="OP_REAL_JMP_IF_GREATER_OR_EQUAL",
             ),
-            VlConstOperation(
+            VlConstexprOperation(
                 "BINARY",
                 "LESS_THAN",
                 ["real"],
                 "bool",
-                lambda x, y: x < y,
+                lambda x, y: VlBool(x < y),
                 "OP_REAL_LESS",
                 extra_opcode_hr="OP_REAL_JMP_IF_LESS",
             ),
-            VlConstOperation(
+            VlConstexprOperation(
                 "BINARY",
                 "LESS_THAN_OR_EQUAL",
                 ["real"],
                 "bool",
-                lambda x, y: x <= y,
+                lambda x, y: VlBool(x <= y),
                 "OP_REAL_LESS_OR_EQUAL",
                 extra_opcode_hr="OP_REAL_JMP_IF_LESS_OR_EQUAL",
             ),
-            VlConstOperation(
+            VlConstexprOperation(
                 "BINARY",
                 "PLUS",
                 ["real"],
                 "real",
-                lambda x, y: x + y,
+                lambda x, y: VlReal(x + y),
                 "OP_REAL_ADD",
             ),
-            VlConstOperation(
+            VlConstexprOperation(
                 "BINARY",
                 "MINUS",
                 ["real"],
                 "real",
-                lambda x, y: x - y,
+                lambda x, y: VlReal(x - y),
                 "OP_REAL_SUB",
             ),
-            VlConstOperation(
+            VlConstexprOperation(
                 "BINARY",
                 "TIMES",
                 ["real"],
                 "real",
-                lambda x, y: x * y,
+                lambda x, y: VlReal(x * y),
                 "OP_REAL_MUL",
             ),
-            VlConstOperation(
+            VlConstexprOperation(
                 "BINARY",
                 "DIVIDE",
                 ["real"],
                 "real",
-                lambda x, y: x // y,
+                lambda x, y: VlReal(x / y),
                 "OP_REAL_DIV",
             ),
-            VlConstOperation(
+            VlConstexprOperation(
                 "BINARY",
                 "MODULUS",
                 ["real"],
                 "real",
-                lambda x, y: x % y,
+                lambda x, y: VlReal(x % y),
                 "OP_REAL_MOD",
             ),
-            VlConstOperation(
+            VlConstexprOperation(
                 "BINARY",
                 "EXPONENTIATION",
                 ["real"],
                 "real",
-                lambda x, y: x**y,
+                lambda x, y: VlReal(x**y),
                 "OP_REAL_EXP",
             ),
-            VlConstOperation(
+            VlConstexprOperation(
                 "UNARY",
                 "UNARY_MINUS",
                 [],
                 "real",
-                lambda x: -x,
+                lambda x: VlReal(-x),
                 "OP_REAL_NEG",
             ),
         ]
@@ -478,4 +498,4 @@ class VlReal(VlTypeABC):
 
     @staticmethod
     def get_casts() -> list[VlCast]:
-        return [VlCast("complex", 0x1100)]
+        return [VlConstexprCast("complex", 0x1100, lambda x: VlComplex(complex(x)))]

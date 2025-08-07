@@ -947,6 +947,13 @@ class ConstantDeclNode(DataDeclNode):
         return "ConstantDeclNode"
 
 
+class ConstexprDeclNode(DataDeclNode):
+
+    @staticmethod
+    def get_node_type_str() -> str:
+        return "ConstantDeclNode"
+
+
 class UsingDeclIdentifiersNode(ASTNode):
     """An AST node for using declaration list of identifiers"""
 

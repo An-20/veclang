@@ -6,12 +6,36 @@ from veclang.frontend.parser.vl_ast import ASTPositionInfo, VlOperatorType
 from veclang.midend.vl_core import VlType, VlTypeABC
 
 
+VlQualifier = typing.Literal[
+    "constexpr",
+    "const",
+    "var",
+]
+VlQualifierValues: list[VlQualifier] = [
+    "constexpr",
+    "const",
+    "var",
+]
+
+
+def vl_qualifier_to_hr(qualifier: VlQualifier) -> str:
+    if qualifier not in VlQualifierValues:
+        raise ValueError(f"IE: Unknown VlQualifier '{qualifier}'")
+    return {
+        "constexpr": "constexpr",
+        "const": "constant",
+        "var": "variable",
+    }[qualifier]
+
+
 @dataclasses.dataclass
 class IdentifierData:
     ast_position_info: ASTPositionInfo
-    type_or_value: VlType | VlTypeABC
-    is_variable: bool
-    ref_count: int
+    vl_qualifier: VlQualifier
+    vl_type: VlType
+    vl_value: VlTypeABC
+    ref_read_count: int
+    ref_write_count: int
 
 
 @dataclasses.dataclass
@@ -51,6 +75,7 @@ DiagnosticCode = typing.Literal[
     "E331",
     "E900",
     "W001",
+    "W002",
     "W010",
     "W011",
     "W012",
@@ -59,6 +84,7 @@ DiagnosticCode = typing.Literal[
     "X001",
     "X002",
     "X003",
+    "X100",
 ]
 
 
@@ -91,6 +117,10 @@ class Diagnostic:
             f"{diagnostic_type.capitalize()} {self.code} at {self.line_no}:{self.char_no}:"
             f" '{self.message}'"
         )
+
+
+class FatalCompileError(RuntimeError):
+    pass
 
 
 def format_operator(operator: VlOperatorType) -> str:

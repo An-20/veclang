@@ -96,6 +96,7 @@ RESERVED_KEYWORDS = [
     "uint",
     "long",
     "ulong",
+    "bool",
     "real",
     "complex",
     "vec2",
@@ -205,19 +206,3 @@ LEXER_FUNCTION_SPEC = {
 
 
 lexer = lex.lex(LEXER_TOKEN_SPEC_STR, LEXER_FUNCTION_SPEC, debug=DEBUG)
-
-
-if __name__ == "__main__":
-    lexer.line_no = 0
-    lexer_tokens = []
-    # Give the lexer some input
-    lexer.input("0.7 + 32i -0x2113afe1 a::b")
-
-    # Tokenize
-    while True:
-        tok = lexer.token()
-        if not tok:
-            break  # No more input
-        lexer_tokens.append(tok)
-
-    print(lexer_tokens)

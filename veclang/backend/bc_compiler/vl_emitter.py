@@ -1,5 +1,3 @@
-import dataclasses
-
 import veclang.backend.bc_common.py as bc
 from veclang.backend.bc_compiler.vl_instruction import OpcodeHRMap
 
@@ -27,53 +25,15 @@ from veclang.midend.hir.vl_hir import (
     ContinueStmtNode,
 )
 from veclang.midend.vl_core import VlType, VlTypeABC, VlInt, VlNull
-from veclang.midend.hir.vl_lowerer import GLOBAL_FN_NAME, VlQualifier, VlQualifierValues
+from veclang.midend.hir.vl_lowerer import GLOBAL_FN_NAME, VlQualifier
 
 from veclang.backend.bc_compiler.vl_emitter_utils import (
+    FunctionScope,
+    FunctionSubScope,
+    IdentifierData,
     int_to_1_byte,
     int_to_2_bytes,
 )
-
-
-@dataclasses.dataclass
-class FunctionSubScope:
-    loop_name: str | None
-    selection_name: str | None
-    ast_position_info: ASTPositionInfo
-
-    instruction_offset: int
-    block_end_update_offsets: list[int]
-    stack_end_update_offsets: list[int]
-
-
-@dataclasses.dataclass
-class IdentifierData:
-    """
-    We don't store constexprs because they've already been constant-folded.
-    """
-
-    vl_qualifier: VlQualifier
-    vl_type: VlType
-    data_offset: int
-
-
-@dataclasses.dataclass
-class FunctionScope:
-    """
-    Scope for a single function. Note how data can be tracked at a function level
-    because unbound locals have already been checked at the HIR lowering stage.
-    """
-
-    fn_name: str | None
-    ast_position_info: ASTPositionInfo
-
-    data: dict[str, IdentifierData]
-    data_offset_counter: int
-    instruction_offset: int
-    sub_scopes: list[FunctionSubScope]
-
-    arg_types: list[VlType]
-    return_type: VlType
 
 
 class BytecodeEmitter:
@@ -156,6 +116,12 @@ class BytecodeEmitter:
         )
         # TODO: FIXME FOR 32 / 64
         scope.data_offset_counter += vl_type.get_info()[3][0]
+
+        if scope.data_offset_counter > 65536:
+            raise ValueError(
+                "IE: a Veclang function can have a maximum stack frame size of 65536 bytes"
+            )
+
         return data_offset
 
     def last_instruction_offset(self) -> int:
@@ -180,11 +146,17 @@ class BytecodeEmitter:
         constant_offset = len(self.constants)
         self.constants.extend(constant_as_bytes)
         self.constant_offsets[constant_as_bytes] = constant_offset
+
+        if len(self.constants) > 65536:
+            raise ValueError(
+                "IE: a Veclang program can have a maximum constant table size of 65536 bytes"
+            )
         return constant_offset
 
     def modify_instruction_16b(self, instruction_offset: int, arg_16b: int):
-        # TODO: loads more checking
         current_instruction = self.instructions[instruction_offset]
+        if current_instruction[0] not in [0x20, 0x21, 0x22]:
+            raise ValueError("IE: modification of arg_16b for a non-JMP instruction")
         self.instructions[instruction_offset] = current_instruction[
             :2
         ] + int_to_2_bytes(arg_16b)
@@ -453,7 +425,7 @@ class BytecodeEmitter:
         self.emit_expr(node.loop_var_start)
         if self.is_global_scope():
             # fortunately this is the only construct outside of initialisation that means
-            # we have to find a place for a new variable (I think?)
+            # we have to find a place for a new variable
             set_val_instruction = "OP_SET_GLOBAL_VAL"
             get_val_instruction = "OP_GET_GLOBAL_VAL"
         else:

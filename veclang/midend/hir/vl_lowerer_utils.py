@@ -37,6 +37,7 @@ class IdentifierData:
     ref_read_count: int
     ref_write_count: int
 
+    is_loop_var: bool
     is_parameter: bool
 
 

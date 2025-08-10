@@ -153,6 +153,7 @@ class Lowerer:
                 data.ref_write_count == 0
                 and identifier[0] != "_"
                 and data.vl_qualifier == "var"
+                and not data.is_loop_var
             ):
                 self.add_diagnostic(
                     "W002",
@@ -289,6 +290,7 @@ class Lowerer:
         vl_type: VlType,
         vl_value: VlTypeABC | None,
         ast_position_info: ASTPositionInfo,
+        is_loop_var: bool = False,
         is_parameter: bool = False,
     ):
         if vl_qualifier not in VlQualifierValues:
@@ -315,7 +317,14 @@ class Lowerer:
         if vl_qualifier == "constexpr" and vl_value is None:
             raise ValueError("IE: constexpr data must have a vl_value")
         scope.data[identifier] = IdentifierData(
-            ast_position_info, vl_qualifier, vl_type, vl_value, 0, 0, is_parameter
+            ast_position_info,
+            vl_qualifier,
+            vl_type,
+            vl_value,
+            0,
+            0,
+            is_loop_var,
+            is_parameter,
         )
 
     def init_variable(
@@ -338,7 +347,16 @@ class Lowerer:
     def init_parameter(
         self, identifier: str, vl_type: VlType, ast_position_info: ASTPositionInfo
     ) -> None:
-        self._init_data(identifier, "const", vl_type, None, ast_position_info, True)
+        self._init_data(
+            identifier, "const", vl_type, None, ast_position_info, is_parameter=True
+        )
+
+    def init_loop_var(
+        self, identifier: str, vl_type: VlType, ast_position_info: ASTPositionInfo
+    ) -> None:
+        self._init_data(
+            identifier, "var", vl_type, None, ast_position_info, is_loop_var=True
+        )
 
     # Lowering
     # ====================
@@ -995,13 +1013,15 @@ class Lowerer:
         vl_type_str = stmt.init_stmt.init_type.name
         range_node = stmt.init_stmt.value
         if not isinstance(range_node, vl_ast.RangeLiteralExprNode):
-            raise ValueError("TODO")
+            raise ValueError(
+                "IE: For loops only work when iterating through a range literal"
+            )
         if vl_type_str != "int":
-            raise ValueError("TODO")
+            raise ValueError("IE: For loops only work for integer indices FIXME!")
 
         # lower stmts with updated loop context
         self.scope_in_loop("for", stmt.position_info)
-        self.init_variable(
+        self.init_loop_var(
             identifier, self.lower_vl_type(vl_type_str), stmt.position_info
         )
         stmts_lowered = self.lower_stmts(stmt.stmts)

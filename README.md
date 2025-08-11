@@ -311,3 +311,5 @@ When the AST is lowered to a HIR, type casts, methods, and property calls are al
 `0x1302`: Construct a vec4 from 4 reals
 
 #### 0x1400 - 0x14FF: mat methods and properties
+
+`python setup.py build_ext --inplace`

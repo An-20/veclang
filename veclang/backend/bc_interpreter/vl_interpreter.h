@@ -6,6 +6,8 @@
 #include <sstream>
 #include <stdexcept>
 #include <iostream>
+#include <utility>
+
 #include "vl_types_val.h"
 #include "vl_types_obj.h"
 #include "vl_program.h"
@@ -50,6 +52,60 @@ namespace vl_interpreter
                 instruction_pointer += 1;
                 interpret_instruction(instruction);
             }
+        }
+
+        std::pair<vl_types::RawValue, vl_types::RawObject> interpret_fn(
+            const vl_sedf::VlProgram &program,
+            std::vector<vl_types::RawValue> value_params,
+            std::vector<vl_types::RawObject> object_params,
+            bool returns_val)
+        {
+            constants = program.constants;
+            instructions = program.instructions;
+            uint32_t num_instructions = instructions.size() / 4;
+            uint32_t local_stack_size = program.header.functions.size() ? program.header.functions.at(0).stack_size : 0;
+
+            global_stack = std::vector<uint8_t>(program.header.globals_stack_size);
+            local_stack = std::vector<uint8_t>(local_stack_size);
+            call_stack = std::stack<StackFrame>();
+            value_stack = std::stack<vl_types::RawValue>();
+            object_stack = std::stack<vl_types::RawObject>();
+
+            uint32_t total = 0;
+            instruction_pointer = 0;
+            call_stack.push(StackFrame(num_instructions, 0, local_stack_size));
+
+            for (vl_types::RawValue v : value_params)
+            {
+                value_stack.push(v);
+            }
+            for (vl_types::RawObject o : object_params)
+            {
+                object_stack.push(o);
+            }
+
+            while (instruction_pointer < num_instructions)
+            {
+                const uint8_t *instruction = &instructions[instruction_pointer * 4];
+                instruction_pointer += 1;
+                total++;
+                interpret_instruction(instruction);
+            }
+
+            vl_types::RawValue value;
+            vl_types::RawObject object;
+            if (returns_val)
+            {
+                value = value_stack.top();
+                value_stack.pop();
+            }
+            else
+            {
+                object = object_stack.top();
+                object_stack.pop();
+            }
+            std::cout << total << std::endl;
+            return std::make_pair(value, object);
         }
 
         std::vector<vl_types::VlVec3> generate_img(

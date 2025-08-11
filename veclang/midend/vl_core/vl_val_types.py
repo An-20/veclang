@@ -259,8 +259,8 @@ class VlInt(VlTypeABC):
     @staticmethod
     def get_casts() -> list[VlCast]:
         return [
-            VlConstexprCast("real", 0x1000, lambda x: VlReal(float(x))),
-            VlConstexprCast("complex", 0x1001, lambda x: VlComplex(complex(x))),
+            VlConstexprCast("real", 0x1000, True, lambda x: VlReal(float(x))),
+            VlConstexprCast("complex", 0x1001, True, lambda x: VlComplex(complex(x))),
         ]
 
 
@@ -498,4 +498,6 @@ class VlReal(VlTypeABC):
 
     @staticmethod
     def get_casts() -> list[VlCast]:
-        return [VlConstexprCast("complex", 0x1100, lambda x: VlComplex(complex(x)))]
+        return [
+            VlConstexprCast("complex", 0x1100, True, lambda x: VlComplex(complex(x)))
+        ]

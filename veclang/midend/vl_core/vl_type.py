@@ -113,11 +113,11 @@ class VlConstexprOperation(VlOperation):
         self.eval_fn: typing.Callable = eval_fn
 
     def evaluate(self, *args: "VlTypeABC") -> "VlTypeABC":
-        if self.op_arity == "UNARY" and len(args) != 0:
+        if self.op_arity == "UNARY" and len(args) != 1:
             raise ValueError("Unary operation must take exactly 1 operand.")
-        elif self.op_arity == "BINARY" and len(args) != 1:
+        elif self.op_arity == "BINARY" and len(args) != 2:
             raise ValueError("Binary operation must take exactly 2 operands.")
-        elif self.op_arity == "TERNARY" and len(args) != 2:
+        elif self.op_arity == "TERNARY" and len(args) != 3:
             raise ValueError("Ternary operation must take exactly 3 operands.")
         elif self.op_arity not in ["UNARY", "BINARY", "TERNARY"]:
             raise ValueError(f"Unknown operation arity: '{self.op_type}'.")
@@ -126,9 +126,10 @@ class VlConstexprOperation(VlOperation):
 
 class VlCast:
 
-    def __init__(self, to_type: VlTypeStr, fn_id: int) -> None:
+    def __init__(self, to_type: VlTypeStr, fn_id: int, is_widening: bool) -> None:
         self.to_type: VlTypeStr = to_type
         self.fn_id: int = fn_id
+        self.is_widening: bool = is_widening
 
 
 class VlConstexprCast(VlCast):
@@ -138,9 +139,13 @@ class VlConstexprCast(VlCast):
     """
 
     def __init__(
-        self, to_type: VlTypeStr, fn_id: int, eval_fn: typing.Callable
+        self,
+        to_type: VlTypeStr,
+        fn_id: int,
+        is_widening: bool,
+        eval_fn: typing.Callable,
     ) -> None:
-        super().__init__(to_type, fn_id)
+        super().__init__(to_type, fn_id, is_widening)
         self.eval_fn = eval_fn
 
     def evaluate(self, arg: "VlTypeABC") -> "VlTypeABC":

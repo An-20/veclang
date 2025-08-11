@@ -12,6 +12,9 @@ file(GLOB_RECURSE ALL_SOURCES
     veclang/utils/*.cpp
 )
 
+# set(PYBIND11_FINDPYTHON ON)
+# find_package(pybind11 REQUIRED)
+
 # Filter out those starting with "test_"
 set(SOURCES "")
 foreach(FILE IN LISTS ALL_SOURCES)
@@ -21,9 +24,9 @@ foreach(FILE IN LISTS ALL_SOURCES)
     endif()
 endforeach()
 
-if (NOT EMSCRIPTEN)
-    list(APPEND SOURCES "veclang/backend/bc_interpreter/main.cpp")
-endif()
+# if (NOT EMSCRIPTEN)
+#     list(APPEND SOURCES "veclang/backend/bc_interpreter/main.cpp")
+# endif()
 
 # Add include directories (recursive headers)
 include_directories(veclang/utils)
@@ -33,12 +36,17 @@ if (EMSCRIPTEN)
     list(APPEND SOURCES "veclang/backend/bc_interpreter/main_bindings.cpp")
 endif()
 
-add_executable(veclang ${SOURCES})
+add_executable(veclang veclang/backend/bc_interpreter/main.cpp ${SOURCES})
 target_compile_options(veclang PRIVATE -Wall -O3 -g)
-
 if (EMSCRIPTEN)
     target_link_options(veclang PRIVATE --bind -lembind)
 endif()
+
+# set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+# pybind11_add_module(_bc_interpreter_core ${SOURCES})
+# set_target_properties(_bc_interpreter_core PROPERTIES
+#     LIBRARY_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/veclang/backend/bc_interpreter"
+# )
 
 # if(EMSCRIPTEN)
 #   add_executable(veclang_wasm veclang/backend/bc_interpreter/bindings.cpp ${SOURCES})

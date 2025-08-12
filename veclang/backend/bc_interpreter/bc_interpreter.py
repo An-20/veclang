@@ -19,4 +19,5 @@ class ProgramOutput:
 def interpret_fn(program: VlProgram, args: list[typing.Any]) -> ProgramOutput:
     program_as_bytes = VlSEDF.dumpb(program)
     out = _bc_interpreter_core.interpret_fn(program_as_bytes, args, 0)
-    return out
+    assert len(out) == 2
+    return ProgramOutput(out[0], out[1])

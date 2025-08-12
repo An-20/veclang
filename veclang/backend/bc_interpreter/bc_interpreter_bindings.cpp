@@ -16,12 +16,8 @@ namespace py = pybind11;
 
 py::list interpret_fn(py::bytes program_bytes, py::list arguments, py::int_ return_type_code)
 {
-    std::cout << "hjere!" << std::endl;
     std::string program_bytes_str = program_bytes.cast<std::string>();
-    std::cout << "hjere2!" << std::endl;
-
     vl_sedf::VlProgram program = vl_sedf::loadb(std::vector<uint8_t>(program_bytes_str.begin(), program_bytes_str.end()));
-    std::cout << "hjere3!" << std::endl;
 
     std::vector<vl_types::RawValue> value_params;
     std::vector<vl_types::RawObject> object_params;
@@ -29,32 +25,25 @@ py::list interpret_fn(py::bytes program_bytes, py::list arguments, py::int_ retu
     for (size_t i = 0; i < arguments.size(); ++i)
     {
         py::handle obj = arguments[i];
-        std::cout << "hjere4!" << std::endl;
 
         if (py::isinstance<py::bool_>(obj))
         {
             bool val = obj.cast<bool>();
-            std::cout << "arg " << i << " was bool with value "
-                      << std::boolalpha << val << "\n";
             value_params.push_back(vl_types::bool_to_rv(val));
         }
         else if (py::isinstance<py::int_>(obj))
         {
             long val = obj.cast<long>();
-            std::cout << "arg " << i << " was int with value " << val << "\n";
             value_params.push_back(vl_types::int_to_rv(val));
         }
         else if (py::isinstance<py::float_>(obj))
         {
             double val = obj.cast<double>();
-            std::cout << "arg " << i << " was float with value " << val << "\n";
             value_params.push_back(vl_types::float_to_rv(val));
         }
         else if (PyComplex_Check(obj.ptr()))
         {
             std::complex<double> val = obj.cast<std::complex<double>>();
-            std::cout << "arg " << i << " was complex with value ("
-                      << val.real() << " + " << val.imag() << "i)\n";
             vl_types::VlComplex vl_val;
             vl_val.real = val.real();
             vl_val.imag = val.imag();
@@ -65,8 +54,6 @@ py::list interpret_fn(py::bytes program_bytes, py::list arguments, py::int_ retu
             std::cout << "arg " << i << " was unknown type\n";
         }
     }
-    std::cout << "hjere5!" << std::endl;
-
     bool returns_val = return_type_code.cast<uint8_t>() <= 2;
 
     std::stringstream buffer;
@@ -77,6 +64,7 @@ py::list interpret_fn(py::bytes program_bytes, py::list arguments, py::int_ retu
 
     py::list ret;
     std::string text = buffer.str();
+    std::cout.rdbuf(old);
     ret.append(text);
 
     switch (return_type_code.cast<uint8_t>())

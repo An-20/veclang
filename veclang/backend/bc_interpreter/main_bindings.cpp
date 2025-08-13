@@ -25,9 +25,9 @@ void writeIntLE(std::vector<uint8_t> &buffer, size_t offset, uint32_t value)
 }
 
 // Clamp a float value to [0, 255] and cast to uint8
-uint8_t clamp255(float v)
+uint8_t clamp255(double v)
 {
-    return static_cast<uint8_t>(std::max(0.0f, std::min(255.0f, v)));
+    return static_cast<uint8_t>(std::max(0.0, std::min(255.0, v)));
 }
 
 // Build BMP data in memory

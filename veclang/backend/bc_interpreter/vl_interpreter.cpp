@@ -50,7 +50,7 @@ namespace vl_interpreter
             return;
         }
         vl_types::RawValue value;
-        std::memcpy(&value.bits, constants.data() + offset_16b, 4); // todo: fix for variable runtime precision
+        std::memcpy(&value.bits, constants.data() + offset_16b, 8); // todo: fix for variable runtime precision
         value_stack.push(value);
     }
 

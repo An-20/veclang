@@ -17,7 +17,7 @@ namespace vl_builtins
     {
         // builtin for printing a real
         vl_types::RawValue value = delegate.get_val_argument();
-        std::cout << vl_types::rv_to_float(value) << "\n";
+        std::cout << vl_types::rv_to_double(value) << "\n";
         delegate.return_val(value);
     }
 
@@ -25,18 +25,18 @@ namespace vl_builtins
     {
         // builtin for casting an int to a real
         vl_types::RawValue value = delegate.get_val_argument();
-        int32_t value_int = vl_types::rv_to_int(value);
-        float value_float = (float)value_int;
-        delegate.return_val(vl_types::float_to_rv(value_float));
+        int64_t value_int = vl_types::rv_to_int(value);
+        double value_double = (double)value_int;
+        delegate.return_val(vl_types::double_to_rv(value_double));
     }
 
     void bi_0x1001(BuiltinsDelegate &delegate)
     {
         // builtin for casting an int to a complex
         vl_types::RawValue value = delegate.get_val_argument();
-        int32_t value_int = vl_types::rv_to_int(value);
+        int64_t value_int = vl_types::rv_to_int(value);
         vl_types::VlComplex complex;
-        complex.real = (float)value_int;
+        complex.real = (double)value_int;
         complex.imag = 0.0f;
         delegate.return_obj(vl_types::complex_to_ro(complex));
     }
@@ -45,9 +45,9 @@ namespace vl_builtins
     {
         // builtin for casting a real to a complex
         vl_types::RawValue value = delegate.get_val_argument();
-        float value_float = vl_types::rv_to_float(value);
+        double value_double = vl_types::rv_to_double(value);
         vl_types::VlComplex complex;
-        complex.real = value_float;
+        complex.real = value_double;
         complex.imag = 0.0f;
         delegate.return_obj(vl_types::complex_to_ro(complex));
     }
@@ -57,8 +57,8 @@ namespace vl_builtins
         // builtin for getting the real component of a complex
         vl_types::RawObject object = delegate.get_obj_argument();
         vl_types::VlComplex complex = vl_types::ro_to_complex(object);
-        float real_component = complex.real;
-        delegate.return_val(vl_types::float_to_rv(real_component));
+        double real_component = complex.real;
+        delegate.return_val(vl_types::double_to_rv(real_component));
     }
 
     void bi_0x1201(BuiltinsDelegate &delegate)
@@ -66,15 +66,15 @@ namespace vl_builtins
         // builtin for getting the imaginary component of a complex
         vl_types::RawObject object = delegate.get_obj_argument();
         vl_types::VlComplex complex = vl_types::ro_to_complex(object);
-        float imag_component = complex.imag;
-        delegate.return_val(vl_types::float_to_rv(imag_component));
+        double imag_component = complex.imag;
+        delegate.return_val(vl_types::double_to_rv(imag_component));
     }
 
     void bi_0x1300(BuiltinsDelegate &delegate)
     {
         // builtin for constructing a vec2 from 2 reals
-        float y = vl_types::rv_to_float(delegate.get_val_argument());
-        float x = vl_types::rv_to_float(delegate.get_val_argument());
+        double y = vl_types::rv_to_double(delegate.get_val_argument());
+        double x = vl_types::rv_to_double(delegate.get_val_argument());
         vl_types::VlVec2 vec;
         vec.x = x;
         vec.y = y;
@@ -84,9 +84,9 @@ namespace vl_builtins
     void bi_0x1301(BuiltinsDelegate &delegate)
     {
         // builtin for constructing a vec3 from 3 reals
-        float z = vl_types::rv_to_float(delegate.get_val_argument());
-        float y = vl_types::rv_to_float(delegate.get_val_argument());
-        float x = vl_types::rv_to_float(delegate.get_val_argument());
+        double z = vl_types::rv_to_double(delegate.get_val_argument());
+        double y = vl_types::rv_to_double(delegate.get_val_argument());
+        double x = vl_types::rv_to_double(delegate.get_val_argument());
         vl_types::VlVec3 vec;
         vec.x = x;
         vec.y = y;
@@ -97,10 +97,10 @@ namespace vl_builtins
     void bi_0x1302(BuiltinsDelegate &delegate)
     {
         // builtin for constructing a vec4 from 4 reals
-        float z = vl_types::rv_to_float(delegate.get_val_argument());
-        float y = vl_types::rv_to_float(delegate.get_val_argument());
-        float x = vl_types::rv_to_float(delegate.get_val_argument());
-        float w = vl_types::rv_to_float(delegate.get_val_argument());
+        double z = vl_types::rv_to_double(delegate.get_val_argument());
+        double y = vl_types::rv_to_double(delegate.get_val_argument());
+        double x = vl_types::rv_to_double(delegate.get_val_argument());
+        double w = vl_types::rv_to_double(delegate.get_val_argument());
         vl_types::VlVec4 vec;
         vec.w = w;
         vec.x = x;

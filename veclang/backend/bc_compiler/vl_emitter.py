@@ -34,6 +34,7 @@ from veclang.backend.bc_compiler.vl_emitter_utils import (
     int_to_1_byte,
     int_to_2_bytes,
 )
+from veclang.compiler_common import LANGUAGE_VERSION_INT
 
 
 class BytecodeEmitter:
@@ -115,7 +116,7 @@ class BytecodeEmitter:
             qualifier, vl_type, data_offset
         )
         # TODO: FIXME FOR 32 / 64
-        scope.data_offset_counter += vl_type.get_info()[3][0]
+        scope.data_offset_counter += vl_type.get_info()[3][1]
 
         if scope.data_offset_counter > 65536:
             raise ValueError(
@@ -264,7 +265,7 @@ class BytecodeEmitter:
         self.add_instruction(node.operation.opcode_hr)
 
     def emit_constant_expr(self, node: ConstantExprNode) -> None:
-        as_bytes = node.value.to_bytes_32()
+        as_bytes = node.value.to_bytes_64()
         if node.value.to_vl_type_str() in {"int", "bool"} and len(as_bytes) <= 2:
             # direct loading
             self.add_instruction("OP_CONSTANT_VAL_DIRECT", as_bytes.rjust(2, bytes(1)))
@@ -570,7 +571,7 @@ class BytecodeEmitter:
             )
         header: bc.VlHeader = {
             "magic": "VECL",
-            "version": 0x0001_0000,
+            "version": LANGUAGE_VERSION_INT,
             "flags": {},
             "functions": functions,
             "globals_stack_size": self.scopes[0].data_offset_counter,

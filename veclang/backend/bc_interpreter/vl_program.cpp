@@ -15,25 +15,25 @@ namespace vl_program
         switch (type)
         {
         case VL_INT:
-            return 4;
+            return 8;
         case VL_BOOL:
             return 1;
         case VL_REAL:
-            return 4;
+            return 8;
         case VL_COMPLEX:
-            return 8;
+            return 16;
         case VL_VEC2:
-            return 8;
+            return 16;
         case VL_VEC3:
-            return 12;
+            return 24;
         case VL_VEC4:
-            return 16;
+            return 32;
         case VL_MAT2:
-            return 16;
+            return 32;
         case VL_MAT3:
-            return 36;
-        case VL_MAT4:
             return 64;
+        case VL_MAT4:
+            return 128;
         default:
             throw std::runtime_error("Unknown type code");
         }

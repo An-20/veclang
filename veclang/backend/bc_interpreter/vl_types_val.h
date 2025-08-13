@@ -10,7 +10,7 @@ namespace vl_types
 {
     struct RawValue
     {
-        uint32_t bits;
+        uint64_t bits;
     };
 
     inline RawValue null()
@@ -20,10 +20,10 @@ namespace vl_types
         return value;
     }
 
-    inline RawValue int_to_rv(int32_t value)
+    inline RawValue int_to_rv(int64_t value)
     {
         RawValue rv;
-        rv.bits = static_cast<uint32_t>(value);
+        rv.bits = static_cast<uint64_t>(value);
         return rv;
     }
 
@@ -34,16 +34,16 @@ namespace vl_types
         return rv;
     }
 
-    inline RawValue float_to_rv(float value)
+    inline RawValue double_to_rv(double value)
     {
         RawValue rv;
-        std::memcpy(&rv.bits, &value, sizeof(float));
+        std::memcpy(&rv.bits, &value, sizeof(double));
         return rv;
     }
 
-    inline int32_t rv_to_int(const RawValue &rv)
+    inline int64_t rv_to_int(const RawValue &rv)
     {
-        return static_cast<int32_t>(rv.bits);
+        return static_cast<int64_t>(rv.bits);
     }
 
     inline bool rv_to_bool(const RawValue &rv)
@@ -51,10 +51,10 @@ namespace vl_types
         return rv.bits != 0;
     }
 
-    inline float rv_to_float(const RawValue &rv)
+    inline double rv_to_double(const RawValue &rv)
     {
-        float value;
-        std::memcpy(&value, &rv.bits, sizeof(float));
+        double value;
+        std::memcpy(&value, &rv.bits, sizeof(double));
         return value;
     }
 

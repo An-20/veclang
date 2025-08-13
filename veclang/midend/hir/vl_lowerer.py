@@ -57,16 +57,19 @@ from veclang.midend.vl_core import (
 
 from veclang.midend.hir.vl_lowerer_utils import (
     Scope,
+    IdentifierData,
     VlQualifier,
     VlQualifierValues,
     vl_qualifier_to_hr,
-    IdentifierData,
-    Diagnostic,
-    DiagnosticCode,
-    FatalCompileError,
     format_operator,
     check_snake_case,
     check_constant_case,
+)
+
+from veclang.compiler_common import (
+    Diagnostic,
+    DiagnosticCode,
+    FatalCompileError,
 )
 
 GLOBAL_FN_NAME = "vl_global!"
@@ -103,7 +106,13 @@ class Lowerer:
         if code.startswith("E"):
             self.error = True
         self.diagnostics.append(
-            Diagnostic(ast_position_info, code, self.get_stack_trace_hr(), message)
+            Diagnostic(
+                ast_position_info.line_number,
+                ast_position_info.line_character_number,
+                code,
+                self.get_stack_trace_hr(),
+                message,
+            )
         )
 
     # Scope tracking

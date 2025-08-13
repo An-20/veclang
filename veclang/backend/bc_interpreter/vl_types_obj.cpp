@@ -49,7 +49,7 @@ namespace vl_types
         VlComplex x = ro_to_complex(a);
         VlComplex y = ro_to_complex(b);
         VlComplex result;
-        float denom = y.real * y.real + y.imag * y.imag;
+        double denom = y.real * y.real + y.imag * y.imag;
         if (denom == 0.0f)
             throw std::runtime_error("Division by zero in complex division");
         result.real = (x.real * y.real + x.imag * y.imag) / denom;
@@ -60,11 +60,11 @@ namespace vl_types
     RawObject complex_pow(const RawObject &a, const RawObject &b)
     {
         VlComplex x = ro_to_complex(a);
-        std::complex<float> w(x.real, x.imag);
+        std::complex<double> w(x.real, x.imag);
         VlComplex y = ro_to_complex(b);
-        std::complex<float> z(y.real, y.imag);
+        std::complex<double> z(y.real, y.imag);
 
-        std::complex<float> powed = std::pow(w, z);
+        std::complex<double> powed = std::pow(w, z);
 
         VlComplex result;
         result.real = powed.real();

@@ -1,41 +1,32 @@
-## Pipeline
+# Veclang Language
+**Veclang** is an interpreted scripting language designed for high-performance numerical calculations. Veclang was originally developed for Aureus, but VKSL LAB shows how Veclang can be used as a scripting language in other contexts, e.g. for image generation.
 
-There are three stages to the Veclang compilation pipeline:
+Veclang code is compiled to Veclang bytecode by the compiler. Veclang bytecode is then run by the Veclang interpreter. There are different interpreters for different platforms:
+- **Veclang for x86**, or `bc_interpreter` is the 'standard' Veclang interpreter implementation in C++, for running on desktop x86 platforms.
+- **Veclang for Web** is a variant of `bc_interpreter` compiled to WebAssembly using Emscripten (and is the interpreter used in VKSL LAB).
+- **Veclang for CUDA**, or `cu_interpreter` is a interpreter designed for running Veclang code simultaneously across many GPU cores. It has very little code in common with `bc_interpreter`, and is still in development.
 
-- The **frontend**, where a Veclang program is lexed and parsed into an **abstract syntax tree** (AST).
-- The **midend**, where the AST is lowered into a **high-level intermediate representation** (HIR). Additional checks are run at this stage, including code linting, analysis, and compiler plugins.
-- The **backend**, where the HIR is compiled into a Veclang bytecode, which can then be interpreted.
+## Variables, constants, and constexpr
+There are three type qualifiers in Veclang:
+- `var`: a variable value
+- `const`: a constant value that can not have its value modified after initialisation
+- `constexpr`: a constant value that can be evaluated at compile time.
+Collectively, `var`s, `const`s, and `constexpr`s are referred to throughout Veclang documentation as 'data'.
 
-###### Frontend
+**Variables** (`var`) are defined with the `let` keyword, which defines a new variable in the current local or global scope. Variables can only be accessed (read or written to) in the same local scope as their definition; i.e. global variables cannot be read or written to inside a function.
 
-The Veclang compiler frontend uses a custom version of PLY (Python Lex-Yacc) to parse a Veclang program based on the Veclang grammar. The frontend parses the input into an AST.
+**Constants** (`const`) are defined with the `const` keyword, which creates a new constant in the current local or global scope. Constants cannot be written to after initialisation. When compiling with the `--strict` flag, reading global constants from within a function will raise an error (as constants can't necessarily be evaluated at compile time, only constexprs).
 
-###### Midend
+**Constexprs** (`constexpr`) are defined with the `constexpr` keyword, which creates a new constant in the current local or global scope. Constexprs are evaluated at compile-time using constant folding and placed into the bytecode's constant table (or direct loaded). Where a `const` data is actually `constexpr`, the compiler will automatically promote the `const` to a `constexpr`, allowing for constant folding, and also emit a weak warning.
 
-The midend first lowers the AST to a tree-based HIR by recursively 'collapsing' parts of the AST. At the lowering stage, information on types, functions, imports, and identifiers is fully resolved. Then, the compiler performs pre-compilation checks with the linter. Compiler plugins run at the midend layer. A plugin is a stateful piece of code that is allowed to recursively process the HIR.
+## Types
+A Veclang program is capable of running with 32-bit or 64-bit integers and floating-point numbers. The **runtime precision** can thus be 32 or 64 bits (this feature is a carryover from Veclang v1).
 
-###### Backend
+All types in Veclang are values or objects.
+- A **value** is an `int`, `real`, `bool`, or `null`. A value takes up 4 or 8 bytes, depending on runtime precision.
+- An **object** is a `complex`, `matN`, or `vecN`, where $n \in \{2,3,4\}$. An object takes up 64 or 128 bytes, depending on runtime precision, when stored on the intermediate-value stack. An object only takes up as much memory as necessary when stored in stack memory, with no padding.
 
-The backend compiles the HIR to bytecode, a linear instruction-based representation of a Veclang program that is run by the Veclang Interpreter.
-
-# Veclang Interpreter
-
-## Values and Objects
-
-A Veclang program is capable of running with 32-bit or 64-bit integers and floating-point numbers. The **runtime precision** can thus be 32 or 64 bits.
-
-A **value** is an `int`, `real`, `bool`, or `null`. A value takes up 4 or 8 bytes, depending on runtime precision.
-An **object** is a `complex`, `matN`, or `vecN`, where $n \in \{2,3,4\}$. An object takes up 64 or 128 bytes, depending on runtime precision, when stored on the intermediate-value stack. An object only takes up as much memory as necessary when stored in the main stack memory, with no padding.
-
-There are two intermediate-value stacks:
-
-- The **value stack**, which has fixed offsets of either 4 or 8 bytes.
-- The **object stack**, which has fixed offsets of either 64 or 128 bytes.
-
-All values and objects stored in variables are in the stack memory.
-
-All Veclang types have an associated **type code**, which are used in some object instructions for dynamic dispatch:
-
+All Veclang types have an associated **type code**, which are used in some object instructions for dynamic dispatch (especially as the vector and matrix instructions are shared across all `vecN` and `matN`s):
 - VlInt=0x00
 - VlBool=0x01
 - VlReal=0x02
@@ -45,241 +36,65 @@ All Veclang types have an associated **type code**, which are used in some objec
 - VlVec4=0x06
 - VlMat2=0x07
 - VlMat3=0x08
-- VlMat4=0x09
-
-The **canonical size** of a Veclang type is the number of bytes needed to represent it in its bytecode form.
-
-## Lvalues and rvalues
-
-In Veclang, all **expressions** can be treated as `rvalues`, which can be on the right-hand side of an assignment statement. However, only bare identifiers and some member access / index operations can be treated as `lvalues`, which are expressions on the left-hand side of an assignment statement that can actually be assigned to.
-
-# Execution
-
-Each stack frame can have a maximum of 65,536 bytes allocated for local stack variables (values and objects).
-
-# Opcodes
-
-## Overvew
-
-There are three main types of instructions, classified by how they take operands:
-
-- 0 operand instructions e.g. `OP_POP`.
-- 1 operand instructions e.g. `OP_CONSTANT_VAL_TABLE`, that take 1 16-bit operand.
-- 2 operand instructions e.g. `OP_VECTOR_ADD`, that take 1 8-bit operand and 1 16-bit operand.
-  Each instruction consisting of opcode and operand(s) is stored as 4 bytes.
-
-## 0x00 - 0x2F - Basic variable and constant manipulations
-
-#### Constant loading
-
-##### `0x00: OP_CONSTANT_VAL_DIRECT`
-
-`OP_CONSTANT_VAL_DIRECT value_16b`
-Loads a constant value directly, by directly pushing the operand `value` onto the value stack. This instruction only works for `int`s and `bool`s, interpreting `value` as the last 2 bytes of an otherwise zeroed 4 or 8 byte value.
-
-##### `0x01: OP_CONSTANT_OBJ_DIRECT`
-
-`OP_CONSTANT_OBJ_DIRECT type_8b value_16b`
-Reserved instruction.
-Constant objects are too large to store in `value`.
-
-##### `0x02: OP_CONSTANT_VAL_TABLE`
-
-`OP_CONSTANT_VAL_TABLE offset_16b`
-Loads a constant value from the constant table at the given offset, by pushing the value at `offset` onto the value stack.
-
-##### `0x03: OP_CONSTANT_OBJ_TABLE`
-
-`OP_CONSTANT_OBJ_TABLE type_8b offset_16b`
-Loads a constant object from the constant table at the given offset, by pushing the object at `offset` onto the object stack.
-
-#### Stack manipulation
-
-##### `0x04: OP_POP_VAL`
-
-`OP_POP_VAL`
-Pops a value off the top of the value stack.
-
-##### `0x05: OP_POP_OBJ`
-
-`OP_POP_OBJ`
-Pops a value off the top of the object stack.
-
-#### Function calls
-
-##### `0x06: OP_CALL_BUILTIN`
-
-`OP_CALL_BUILTIN builtin_id_16b`
-Calls a builtin function. All arguments in Veclang must be evaluated in left-to-right order, therfore this operation will pop arguments off the value and object stacks in
-
-##### `0x07: OP_CALL`
-
-`OP_CALL_BUILTIN function_id_16b`
-Calls a function. Unimplemented.
-
-##### `0x08: OP_RETURN`
-
-`OP_RETURN`
-Returns from a function. Before this instruction is executed, the return value should be at the top of the object or value stacks.
-
-#### Getting and setting values
-
-##### `0x10: OP_GET_LOCAL_VAL`
-
-`OP_GET_LOCAL_VAL offset_16b`
-Gets the local value variable at `offset` and pushes the value onto the value stack.
-
-##### `0x11: OP_SET_LOCAL_VAL`
-
-`OP_SET_LOCAL_VAL offset_16b`
-Pops a value off the top of the value stack and sets the local variable at `offset` to that value.
-
-##### `0x12: OP_GET_GLOBAL_VAL`
-
-`OP_GET_GLOBAL_VAL offset_16b`
-Gets the global value variable at `offset` and pushes the value onto the value stack.
-
-##### `0x13: OP_SET_GLOBAL_VAL`
-
-`OP_SET_GLOBAL_VAL offset_16b`
-Pops a value off the top of the value stack and sets the global variable at `offset` to that value.
-
-##### `0x14: OP_GET_LOCAL_OBJ`
-
-`OP_GET_LOCAL_OBJ type_8b offset_16b`
-Gets the local object variable at `offset` with type `type` and pushes the object onto the object stack.
-
-##### `0x15: OP_SET_LOCAL_OBJ`
-
-`OP_SET_LOCAL_OBJ type_8b offset_16b`
-Pops a value off the top of the object stack and sets the local variable at `offset` with type `type` to that object.
-
-##### `0x16: OP_GET_GLOBAL_OBJ`
-
-`OP_GET_GLOBAL_OBJ type_8b offset_16b`
-Gets the global object variable at `offset` with type `type` and pushes the object onto the object stack.
-
-##### `0x17: OP_SET_GLOBAL_OBJ`
-
-`OP_SET_GLOBAL_OBJ type_8b offset_16b`
-Pops a value off the top of the object stack and sets the global variable at `offset` with type `type` to that object.
-
-#### Jumps
-
-##### `0x20: OP_JMP`
-
-`OP_JMP offset_16b`
-Unconditionally jumps to the instruction at `offset`.
-
-##### `0x21: OP_JMP_IF_TRUE`
-
-`OP_JMP_IF_TRUE offset_16b`
-Pops the top value off the value stack, and jumps to the instruction at `offset` if the value is non-zero.
-
-##### `0x22: OP_JMP_IF_FALSE`
-
-`OP_JMP_IF_FALSE offset_16b`
-Pops the top value off the value stack, and jumps to the instruction at `offset` if the value is zero.
-
-### 0x80 - 0x9F - Integer and Boolean Operations
-
-​
-
-```
-enum VlOpcode : uint8 {
-    OP_CONSTANT_VAL_DIRECT=0x00,
-    OP_CONSTANT_OBJ_DIRECT=0x01,
-    OP_CONSTANT_VAL_TABLE=0x02,
-    OP_CONSTANT_OBJ_TABLE=0x03,
-    OP_POP_VAL=0x04,
-    OP_POP_OBJ=0x05,
-    OP_CALL_BUILTIN=0x06,
-    OP_CALL=0x07,
-    OP_RETURN=0x08,
-
-    OP_GET_LOCAL_VAL=0x10,
-    OP_SET_LOCAL_VAL=0x11,
-    OP_GET_GLOBAL_VAL=0x12,
-    OP_SET_GLOBAL_VAL=0x13,
-    OP_GET_LOCAL_OBJ=0x14,
-    OP_SET_LOCAL_OBJ=0x15,
-    OP_GET_GLOBAL_OBJ=0x16,
-    OP_SET_GLOBAL_OBJ=0x17,
-
-    OP_JMP=0x20,
-    OP_JMP_IF_TRUE=0x20,
-    OP_JMP_IF_FALSE=0x21,
-
-    OP_INT_EQUAL=0x80,
-    OP_INT_NOT_EQUAL=0x81,
-    OP_INT_GREATER=0x82,
-    OP_INT_GREATER_OR_EQUAL=0x83,
-    OP_INT_LESS=0x84,
-    OP_INT_LESS_OR_EQUAL=0x85,
-    OP_INT_ADD=0x86,
-    OP_INT_SUB=0x87,
-    OP_INT_MUL=0x88,
-    OP_INT_DIV=0x89,
-    OP_INT_MOD=0x8A,
-    OP_INT_EXP=0x8B,
-    OP_INT_NEG=0x8C,
-    OP_INT_AND=0x8D,
-    OP_INT_OR=0x8E,
-    OP_INT_XOR=0x8F,
-
-    OP_INT_NOT=0x90,
-    OP_INT_LEFT_SHIFT=0x91,
-    OP_INT_RIGHT_SHIFT=0x92,
-    OP_BOOLEAN_AND=0x9C,
-    OP_BOOLEAN_OR=0x9D,
-    OP_BOOLEAN_NOT=0x9E,
-
-    OP_REAL_EQUAL=0xA0,
-    OP_REAL_NOT_EQUAL=0xA1,
-    OP_REAL_GREATER=0xA2,
-    OP_REAL_GREATER_OR_EQUAL=0xA3,
-    OP_REAL_LESS=0xA4,
-    OP_REAL_LESS_OR_EQUAL=0xA5,
-    OP_REAL_ADD=0xA6,
-    OP_REAL_SUB=0xA7,
-    OP_REAL_MUL=0xA8,
-    OP_REAL_DIV=0xA9,
-    OP_REAL_MOD=0xAA,
-    OP_REAL_EXP=0xAB,
-    OP_REAL_NEG=0xAC,
-
-    OP_COMPLEX_EQUAL=0xB0,
-    OP_COMPLEX_NOT_EQUAL=0xB1,
-    OP_COMPLEX_ADD=0xB2,
-    OP_COMPLEX_SUB=0xB3,
-    OP_COMPLEX_MUL=0xB4,
-    OP_COMPLEX_DIV=0xB5,
-    OP_COMPLEX_EXP=0xB6,
-    OP_COMPLEX_NEG=0xB7,
-
-    OP_VECTOR_ADD=0xC0,
-    OP_VECTOR_SUB=0xC1,
-    OP_VECTOR_MUL=0xC2,
-    OP_VECTOR_DIV=0xC3,
-    OP_VECTOR_NEG=0xC4,
-    OP_VECTOR_SCL=0xC5,
-    OP_VECTOR_DOT=0xC6,
-    OP_VECTOR_CRS=0xC7,
-    OP_MATRIX_ADD=0xC8,
-    OP_MATRIX_SUB=0xC9,
-    OP_MATRIX_MUL=0xCA,
-    OP_MATRIX_NEG=0xCB,
-    OP_MATRIX_SCL=0xCC,
-    OP_MATRIX_TRA=0xCD,
-    OP_MATRIX_DET=0xCE,
-    OP_MATRIX_INV=0xCF,
-}
-```
-
-## Builtin Function ID Codes
-
+- VlMat4=0x09 
+
+The **canonical size** of a Veclang type is the least number of bytes needed to represent it (like a struct with zero padding). When data is stored in a constant table or in stack memory, it is always arranged contiguously.
+
+#### Casts
+Veclang has type casts with the `cast<IntoType>(val)` syntax. A type cast can either be a narrowing or widening conversion:
+- A **narrowing** conversion causes data loss, e.g. a `real` to an `int`, and must always be performed explicitly.
+- A **widening** conversion does not cause data loss (apart from potential floating-point imprecisions), e.g. a `real` to a `complex`. 
+
+The compiler will attempt widening type casts when there are mismatched types in data initialisation, assignment, binary operations, or function arguments. In a binary operation `a OP b` where no suitable operator is found for the two types, the compiler will first try widening the type of `b`, then try widening the type of `a`.
+
+#### Stacks
+Veclang is a stack-based interpreted language, with operands and function parameters being pushed onto and popped off intermediate value stacks. There are two intermediate-value stacks:
+- The **value stack**, which has elements of either 4 or 8 bytes.
+- The **object stack**, which has elements of either 64 or 128 bytes.
+
+**Stack memory** stores all variables used in a Veclang program. In stack memory, objects and values are stored contiguously, in order of definition in each stack frame, and in stack frames. There are two stacks:
+- The **global stack**, which stores all global variables
+- The **local stack**, which stores all local variables, organised in stack frames
+
+The reason for this separation is so that globals can be easily added when using Veclang in a REPL or similar.
+
+
+## Veclang Grammar
+Veclang has the tradition separation between expressions and statements:
+- An **expression** evaluates to a value, including operations, function calls, type casts, etc. An expression is a **constexpr** expression if it can be evaluated at compile time; compound expressions are **constexpr** if all their children are also constexpr.
+- A **statement** forms part of the program structure and does not evaluate to a value, including selection, loops, and declarations. Declarations are treated in Veclang as a subclass of statements that only belong in certain places.
+
+#### Hoisting
+Veclang only has two ways to pass data into a function:
+- Through parameters
+- Through global `constexpr`s. Global variables and constants cannot be accessed from within functions (for parallelisability).
+
+When a Veclang program is compiled to bytecode, function bytecode is placed at the beginning of the bytecode. The exact order is:
+- A JMP instruction to the end of all the function bytecode.
+- For each function, the bytecode is emitted with all function bytecode placed contiguously.
+- After all the function bytecode, the global bytecode.
+
+#### Lvalues and rvalues
+In Veclang, all **expressions** can be treated as `rvalues`, which can be on the right-hand side of an assignment statement. However, only specific expressions can be treated as `lvalues`, which are expressions on the left-hand side of an assignment statement that can actually be assigned to:
+- Bare identifiers that identify a piece of data (not a function)
+- Member access expressions, e.g. `vector.x`
+- Index expressions, e.g. `matrix[2, 3]`
+
+## Functions
+Each Veclang function's **stack frame** can have a maximum of 65,536 bytes allocated for local stack variables (values and objects), as a result of the `offset` operand for instructions being 16 bytes. Similarly, a Veclang program can have a maximum of 65,536 bytes used for values in the constant table (across all global and local constexpr values). All Veclang functions must return some data.
+
+When a Veclang function is called:
+- The arguments are evaluated and pushed onto their respective stacks in the same order as the function declaration.
+- The details of the function are retrieved and a stack frame is constructed with the correct locals size and return instruction pointer.
+- The instruction pointer is set to the start of the function's instructions, transferring program flow to the function.
+- The function's instructions begin by popping off the function's arguments, in reverse order of the function declaration's parameters.
+- The function continues executing.
+- The function pushes the return value to the top of the object or value stacks and calls `OP_RETURN`.
+- The instruction pointer is set to the return instruction pointer value, and the top stack frame is popped.
+- The result of the value is now at the top of the object or value stacks. If the function was called as a bare function (a `ExprStmt`), e.g. `print(42);`, then `OP_POP_VAL` or `OP_POP_OBJ` will be emitted by the compiler to ensure the return value is dealt with.
+
+#### Builtin Functions
 Various elements of Veclang functionality are implemented by calling **builtin functions** (functions implemented in the interpreter's native language), either explicitly or implicitly:
-
 - Builtin functions, e.g. `print`, `math::sin`
 - Type casts, e.g. casting an `int` to a `real`, either explicit or implicit
 - Type methods, e.g. constructing a `vec2` from 2 `real`s
@@ -287,29 +102,321 @@ Various elements of Veclang functionality are implemented by calling **builtin f
 
 When the AST is lowered to a HIR, type casts, methods, and property calls are all converted into function call HIR nodes to simplify the compilation process.
 
+
+# Veclang Implementation
+## Veclang Compiler
+There are three stages to the Veclang compilation pipeline:
+- The **frontend**, where a Veclang program is lexed and parsed into an **abstract syntax tree** (AST).
+- The **midend**, where the AST is lowered into a **high-level intermediate representation** (HIR). Additional checks are run at this stage, including code linting, analysis, and compiler plugins.
+- The **backend**, where the HIR is compiled into a Veclang bytecode, which can then be interpreted.
+
+#### Compiler frontend
+The Veclang compiler frontend uses a custom version of PLY (Python Lex-Yacc) to parse a Veclang program based on the Veclang grammar. The frontend lexes the input into a stream of tokens, which is parsed into an **AST** (abstract syntax tree), where every language feature has a different AST node class.
+
+#### Compiler midend
+The midend first lowers the AST to a tree-based **HIR** by recursively 'collapsing' parts of the AST. At the lowering stage, information on types, functions, imports, and identifiers is fully resolved, and stored in the produced HIR nodes.
+
+Almost all non-syntax errors are typically emitted when the AST is lowered to a HIR. the **lowerer** performs type checking and general linting, producing **diagnostics** of three categories:
+- **Errors**, which result in the program not lowering to a HIR, and thus not compiling
+- **Warnings**, which do not prevent the program from being lowered
+- **Weak warnings**, which are code-style issues that do not affect the program's functionality in any way.
+
+#### Compiler backend
+The backend compiles the HIR to bytecode, a linear instruction-based representation of a Veclang program that is run by the Veclang Interpreter.
+
+## Bytecode
+### Overview
+There are three main types of instructions, classified by how they take operands:
+- 0 operand instructions e.g. `OP_POP_VAL`.
+- 1 operand instructions e.g. `OP_CONSTANT_VAL_TABLE`, that take 1 16-bit operand.
+- 2 operand instructions e.g. `OP_VECTOR_ADD`, that take 1 8-bit operand and 1 16-bit operand.
+Each instruction consisting of opcode and operand(s) is stored as 4 bytes.
+
+### Instruction reference
+#### 0x00 - 0x2F - Basic variable and constant manipulations
+#### Constant loading
+##### `0x00: OP_CONSTANT_VAL_DIRECT`
+`OP_CONSTANT_VAL_DIRECT value_16b`
+Loads a constant value directly, by directly pushing the operand `value` onto the value stack. This instruction only works for `int`s and `bool`s, interpreting `value` as the last 2 bytes of an otherwise zeroed 4 or 8 byte value.
+
+##### `0x01: OP_CONSTANT_OBJ_DIRECT`
+`OP_CONSTANT_OBJ_DIRECT type_8b value_16b`
+Reserved instruction.
+Constant objects are too large to store in `value`.
+
+##### `0x02: OP_CONSTANT_VAL_TABLE`
+`OP_CONSTANT_VAL_TABLE offset_16b`
+Loads a constant value from the constant table at the given offset, by pushing the value at `offset` onto the value stack.
+
+##### `0x03: OP_CONSTANT_OBJ_TABLE`
+`OP_CONSTANT_OBJ_TABLE type_8b offset_16b`
+Loads a constant object from the constant table at the given offset, by pushing the object at `offset` onto the object stack.
+
+#### Stack manipulation
+##### `0x04: OP_POP_VAL`
+`OP_POP_VAL`
+Pops a value off the top of the value stack.
+
+##### `0x05: OP_POP_OBJ`
+`OP_POP_OBJ`
+Pops a value off the top of the object stack.
+
+#### Function calls
+##### `0x06: OP_CALL_BUILTIN`
+`OP_CALL_BUILTIN builtin_id_16b`
+Calls a builtin function. All arguments in Veclang must be evaluated in left-to-right order, therfore this operation will pop arguments off the value and object stacks in 
+
+##### `0x07: OP_CALL`
+`OP_CALL_BUILTIN function_id_16b`
+Calls a function. Unimplemented.
+
+##### `0x08: OP_RETURN`
+`OP_RETURN`
+Returns from a function. Before this instruction is executed, the return value should be at the top of the object or value stacks.
+
+#### Getting and setting values
+##### `0x10: OP_GET_LOCAL_VAL`
+`OP_GET_LOCAL_VAL offset_16b`
+Gets the local value variable at `offset` and pushes the value onto the value stack.
+
+##### `0x11: OP_SET_LOCAL_VAL`
+`OP_SET_LOCAL_VAL offset_16b`
+Pops a value off the top of the value stack and sets the local variable at `offset` to that value.
+
+##### `0x12: OP_GET_GLOBAL_VAL`
+`OP_GET_GLOBAL_VAL offset_16b`
+Gets the global value variable at `offset` and pushes the value onto the value stack.
+
+##### `0x13: OP_SET_GLOBAL_VAL`
+`OP_SET_GLOBAL_VAL offset_16b`
+Pops a value off the top of the value stack and sets the global variable at `offset` to that value.
+
+##### `0x14: OP_GET_LOCAL_OBJ`
+`OP_GET_LOCAL_OBJ type_8b offset_16b`
+Gets the local object variable at `offset` with type `type` and pushes the object onto the object stack.
+
+##### `0x15: OP_SET_LOCAL_OBJ`
+`OP_SET_LOCAL_OBJ type_8b offset_16b`
+Pops a value off the top of the object stack and sets the local variable at `offset` with type `type` to that object.
+
+##### `0x16: OP_GET_GLOBAL_OBJ`
+`OP_GET_GLOBAL_OBJ type_8b offset_16b`
+Gets the global object variable at `offset` with type `type` and pushes the object onto the object stack.
+
+##### `0x17: OP_SET_GLOBAL_OBJ`
+`OP_SET_GLOBAL_OBJ type_8b offset_16b`
+Pops a value off the top of the object stack and sets the global variable at `offset` with type `type` to that object.
+
+#### Jumps
+##### `0x20: OP_JMP`
+`OP_JMP offset_16b`
+Unconditionally jumps to the instruction at `offset`.
+
+##### `0x21: OP_JMP_IF_TRUE`
+`OP_JMP_IF_TRUE offset_16b`
+Pops the top value off the value stack, and jumps to the instruction at `offset` if the value is non-zero.
+
+##### `0x22: OP_JMP_IF_FALSE`
+`OP_JMP_IF_FALSE offset_16b`
+Pops the top value off the value stack, and jumps to the instruction at `offset` if the value is zero.
+
+### 0x80 - 0x9F - Integer and Boolean Operations
+
+### Full Opcode Reference
+```
+enum VlOpcode : uint8 {  
+    OP_CONSTANT_VAL_DIRECT=0x00,  
+    OP_CONSTANT_OBJ_DIRECT=0x01,  
+    OP_CONSTANT_VAL_TABLE=0x02,  
+    OP_CONSTANT_OBJ_TABLE=0x03,  
+    OP_POP_VAL=0x04,  
+    OP_POP_OBJ=0x05,  
+    OP_CALL_BUILTIN=0x06,  
+    OP_CALL=0x07,  
+    OP_RETURN=0x08,  
+  
+    OP_GET_LOCAL_VAL=0x10,  
+    OP_SET_LOCAL_VAL=0x11,  
+    OP_GET_GLOBAL_VAL=0x12,  
+    OP_SET_GLOBAL_VAL=0x13,  
+    OP_GET_LOCAL_OBJ=0x14,  
+    OP_SET_LOCAL_OBJ=0x15,  
+    OP_GET_GLOBAL_OBJ=0x16,  
+    OP_SET_GLOBAL_OBJ=0x17,  
+  
+    OP_JMP=0x20,  
+    OP_JMP_IF_TRUE=0x20,  
+    OP_JMP_IF_FALSE=0x21,  
+  
+    OP_INT_EQUAL=0x80,  
+    OP_INT_NOT_EQUAL=0x81,  
+    OP_INT_GREATER=0x82,  
+    OP_INT_GREATER_OR_EQUAL=0x83,  
+    OP_INT_LESS=0x84,  
+    OP_INT_LESS_OR_EQUAL=0x85,  
+    OP_INT_ADD=0x86,  
+    OP_INT_SUB=0x87,  
+    OP_INT_MUL=0x88,  
+    OP_INT_DIV=0x89,  
+    OP_INT_MOD=0x8A,  
+    OP_INT_POW=0x8B,  
+    OP_INT_NEG=0x8C,  
+    OP_INT_AND=0x8D,  
+    OP_INT_OR=0x8E,  
+    OP_INT_XOR=0x8F,  
+  
+    OP_INT_NOT=0x90,  
+    OP_INT_LEFT_SHIFT=0x91,  
+    OP_INT_RIGHT_SHIFT=0x92,  
+    OP_BOOLEAN_AND=0x9C,  
+    OP_BOOLEAN_OR=0x9D,  
+    OP_BOOLEAN_NOT=0x9E,  
+  
+    OP_REAL_EQUAL=0xA0,  
+    OP_REAL_NOT_EQUAL=0xA1,  
+    OP_REAL_GREATER=0xA2,  
+    OP_REAL_GREATER_OR_EQUAL=0xA3,  
+    OP_REAL_LESS=0xA4,  
+    OP_REAL_LESS_OR_EQUAL=0xA5,  
+    OP_REAL_ADD=0xA6,  
+    OP_REAL_SUB=0xA7,  
+    OP_REAL_MUL=0xA8,  
+    OP_REAL_DIV=0xA9,  
+    OP_REAL_MOD=0xAA,  
+    OP_REAL_POW=0xAB,  
+    OP_REAL_NEG=0xAC,  
+  
+    OP_COMPLEX_EQUAL=0xB0,  
+    OP_COMPLEX_NOT_EQUAL=0xB1,  
+    OP_COMPLEX_ADD=0xB2,  
+    OP_COMPLEX_SUB=0xB3,  
+    OP_COMPLEX_MUL=0xB4,  
+    OP_COMPLEX_DIV=0xB5,  
+    OP_COMPLEX_POW=0xB6,  
+    OP_COMPLEX_NEG=0xB7,  
+  
+    OP_VECTOR_ADD=0xC0,  
+    OP_VECTOR_SUB=0xC1,  
+    OP_VECTOR_MUL=0xC2,  
+    OP_VECTOR_DIV=0xC3,  
+    OP_VECTOR_NEG=0xC4,  
+    OP_VECTOR_SCL=0xC5,  
+    OP_VECTOR_DOT=0xC6,  
+    OP_VECTOR_CRS=0xC7,  
+    OP_MATRIX_ADD=0xC8,  
+    OP_MATRIX_SUB=0xC9,  
+    OP_MATRIX_MUL=0xCA,  
+    OP_MATRIX_NEG=0xCB,  
+    OP_MATRIX_SCL=0xCC
+}
+```
+
+## Builtin Function Reference
 `0x0000 - 0x0FFF` is used for builtin functions
 `0x1000 - 0x1FFF` is used for builtin type methods and properties.
 
+#### 0x0000 - 0x0FFF: builtin functions
+###### 0x0000 - 0x00FF: Basic builtins
+`0x0000`: Prints an integer
+`0x0001`: Prints a float
 #### 0x1000 - 0x10FF: int methods and properties
-
 `0x1000`: Cast an int to a real
 `0x1001`: Cast an int to a complex
-
 #### 0x1100 - 0x11FF: real methods and properties
-
 `0x1100`: Cast a real to a complex
-
 #### 0x1200 - 0x12FF: complex methods and properties
-
-`0x1200`: Get the real part of a complex, returning a real.
-`0x1200`: Get the real part of a complex, returning a real.
-
+`0x1200`: Get the real component of a complex, returning a real.
+`0x1201`: Get the imaginary component of a complex, returning a real.
 #### 0x1300 - 0x13FF: vec methods and properties
-
 `0x1300`: Construct a vec2 from 2 reals
 `0x1301`: Construct a vec3 from 3 reals
 `0x1302`: Construct a vec4 from 4 reals
-
 #### 0x1400 - 0x14FF: mat methods and properties
 
+
+## Error Reference
+#### E0xx errors - Core program errors
+
+#### E1xx errors - Type errors
+###### E100
+E100: Data `<>` is type `<>`, got type `<>`
+###### E101
+E102: Assignment of non-constexpr expression to constexpr `<>`
+###### E102
+E102: Assignment to constant `<>`after initialization
+###### E103
+E103: Operator `<>` not supported between instances of `<>` and `<>`
+###### E110
+E110: Function `<>` expects `<>` arguments, not `<>` arguments
+###### E111
+E111: Function `<>` expects argument #`<>` to be type `<>`, not `<>`
+###### E112
+E112: Expected return type of `<>`, got type `<>`
+###### E120
+E120: `if` statement condition should be type `bool`, got type `<>`  
+###### E121
+E121: `elseif` statement condition should be type `bool`, got type `<>`  
+###### E122
+E122: `while` statement condition should be type `bool`, got type `<>`  
+
+#### E2xx errors - Identifier errors
+###### E200
+E200: Unresolved identifier `<>`
+###### E201
+E201: Identifier `<>` has already been initialized
+###### E202
+E202: Function `<>` has already been declared
+###### E210
+E210: Duplicate parameter `<>` in declaration for function `<>`
+
+#### E3xx errors - Structure errors
+###### E300
+E300: Nested function declarations
+###### E310
+E310: Use of `break` statement outside of loop
+###### E311
+E311: Use of `continue` statement outside of loop
+###### E320
+E320: Use of `return` statement outside of function
+###### E321
+E321: No `return` statement at end of statement list in function
+###### E330
+E330: Use of `elseif` statement not in an `if-elseif-else` stack
+###### E331
+E331: Use of `else` statement not in an `if-elseif-else` stack
+
+#### E4xx errors - Import errors
+
+#### E9xx errors - Internal errors
+E900: Internal error: `<>`
+
+## Warnings
+###### W001 
+W001: Unused identifier `<>`
+###### W002
+W002: Variable `<>` is never written to after initialisation
+###### W010
+W010: Unreachable code after `return` statement
+###### W011
+W011: Unreachable code after `break` statement
+###### W012
+W012: Unreachable code after `continue` statement
+###### W013
+W013: Expression statement has no effect
+
+#### Weak warnings
+###### X000
+X000: Constant identifier `<>` should be uppercase `SNAKE_CASE`
+###### X001
+X001: Variable identifier `<>` should be lowercase `snake_case`
+###### X002
+X002: Function name `<>` should be lowercase `snake_case`
+###### X003
+X003: Only unused identifiers should be prefixed with '\_'
+###### X100
+X100: Constant `<>` could be declared as constexpr
+
+
 `python setup.py build_ext --inplace`
+
+`cloc ./ --not-match-d="(lib|ply|build)" --not-match-f="(parsetab)"`

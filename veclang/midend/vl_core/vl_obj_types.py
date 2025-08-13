@@ -16,7 +16,7 @@ def obj_to_bytes_32(values: list[float]) -> bytes:
 
 
 def obj_to_bytes_64(values: list[float]) -> bytes:
-    return b"".join(struct.pack("<f", x) for x in values)
+    return b"".join(struct.pack("<d", x) for x in values)
 
 
 class VlComplex(VlTypeABC):

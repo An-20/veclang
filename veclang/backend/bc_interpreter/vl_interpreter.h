@@ -40,6 +40,12 @@ namespace vl_interpreter
             instruction_pointer = 0;
             uint32_t num_instructions = instructions.size() / 4;
 
+            userdef_functions = std::vector<std::pair<uint32_t, uint32_t>>();
+            for (vl_sedf::VlFunction fn : program.header.functions)
+            {
+                userdef_functions.push_back(std::make_pair(fn.instruction_offset, fn.stack_size));
+            }
+
             global_stack = std::vector<uint8_t>(program.header.globals_stack_size);
             local_stack = std::vector<uint8_t>();
             call_stack = std::stack<StackFrame>();
@@ -162,6 +168,7 @@ namespace vl_interpreter
         uint32_t instruction_pointer = 0;
         std::vector<uint8_t> constants;
         std::vector<uint8_t> instructions;
+        std::vector<std::pair<uint32_t, uint32_t>> userdef_functions;
 
         std::vector<uint8_t> global_stack;
         std::vector<uint8_t> local_stack;
@@ -200,8 +207,8 @@ namespace vl_interpreter
             case vl_program::OP_POP_OBJ:
                 op_pop_obj(instruction);
                 break;
-            case vl_program::OP_CALL:
-                op_call(instruction);
+            case vl_program::OP_CALL_USERDEF:
+                op_call_userdef(instruction);
                 break;
             case vl_program::OP_CALL_BUILTIN:
                 op_call_builtin(instruction);
@@ -424,7 +431,7 @@ namespace vl_interpreter
         void op_pop_val(const uint8_t *instruction);
         void op_pop_obj(const uint8_t *instruction);
         void op_call_builtin(const uint8_t *instruction);
-        void op_call(const uint8_t *instruction);
+        void op_call_userdef(const uint8_t *instruction);
         void op_return(const uint8_t *instruction);
         void op_get_local_val(const uint8_t *instruction);
         void op_set_local_val(const uint8_t *instruction);

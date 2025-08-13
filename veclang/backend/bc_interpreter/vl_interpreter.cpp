@@ -95,10 +95,24 @@ namespace vl_interpreter
         vl_builtins::call_builtin(delegate, builtin_id);
     }
 
-    void Interpreter::op_call(const uint8_t *instruction)
+    void Interpreter::op_call_userdef(const uint8_t *instruction)
     {
-        uint16_t func_id = get_1_operand(instruction);
-        throw std::runtime_error("Function call not implemented yet: " + std::to_string(func_id));
+        uint16_t fn_idx = get_1_operand(instruction);
+        auto [instruction_offset, stack_size] = userdef_functions[fn_idx];
+
+        if (call_stack.size() > 1000)
+        {
+            throw std::runtime_error("stack overflow!");
+        }
+        local_stack.resize(get_local_stack_offset() + stack_size, 0);
+
+        uint32_t current_local_stack_end = 0;
+        if (!call_stack.empty())
+        {
+            current_local_stack_end = get_local_stack_offset() + call_stack.top().stack_size;
+        }
+        call_stack.push(StackFrame(instruction_pointer, current_local_stack_end, stack_size));
+        instruction_pointer = instruction_offset;
     }
 
     void Interpreter::op_return(const uint8_t *instruction)
@@ -110,7 +124,6 @@ namespace vl_interpreter
         }
         instruction_pointer = call_stack.top().return_address;
         call_stack.pop();
-        // TODO: mess with instruction_pointer to return to the caller
     }
 
     void Interpreter::op_get_local_val(const uint8_t *instruction)

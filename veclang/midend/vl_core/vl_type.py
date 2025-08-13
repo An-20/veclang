@@ -232,8 +232,16 @@ class VlFunctionParameterTypeProfile:
 
 
 @dataclasses.dataclass
-class VlFunctionTypeProfile:
+class VlBuiltinFunctionTypeProfile:
     identifier: str
-    fn_id: int
+    builtin_fn_id: int
+    parameters: list[VlFunctionParameterTypeProfile]
+    return_type: VlType
+
+
+@dataclasses.dataclass
+class VlUserdefFunctionTypeProfile:
+    identifier: str
+    userdef_fn_idx: int
     parameters: list[VlFunctionParameterTypeProfile]
     return_type: VlType

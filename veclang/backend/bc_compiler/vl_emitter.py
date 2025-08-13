@@ -8,7 +8,8 @@ from veclang.midend.hir.vl_hir import (
     DeclNode,
     ProgramNode,
     RvalueIdentifierExprNode,
-    FunctionCallExprNode,
+    BuiltinFunctionCallExprNode,
+    UserdefFunctionCallExprNode,
     BinaryOperationExprNode,
     UnaryOperatorExprNode,
     ConstantExprNode,
@@ -227,8 +228,10 @@ class BytecodeEmitter:
     def emit_expr(self, node: ExprNode) -> None:
         if isinstance(node, RvalueIdentifierExprNode):
             self.emit_rvalue_identifier_expr(node)
-        elif isinstance(node, FunctionCallExprNode):
-            self.emit_function_call_expr(node)
+        elif isinstance(node, BuiltinFunctionCallExprNode):
+            self.emit_builtin_function_call_expr(node)
+        elif isinstance(node, UserdefFunctionCallExprNode):
+            self.emit_userdef_function_call_expr(node)
         elif isinstance(node, BinaryOperationExprNode):
             self.emit_binary_operator_expr(node)
         elif isinstance(node, UnaryOperatorExprNode):
@@ -266,12 +269,21 @@ class BytecodeEmitter:
             return
         raise FatalCompileError(f"Unknown identifier '{identifier}'")
 
-    def emit_function_call_expr(self, node: FunctionCallExprNode) -> None:
-        # TODO: FIXME FOR USER DEFINED FUNCTIONS
+    def emit_builtin_function_call_expr(
+        self, node: BuiltinFunctionCallExprNode
+    ) -> None:
         # arguments are pushed onto the stack in order
         for argument in node.arguments:
             self.emit_expr(argument)
         self.add_instruction("OP_CALL_BUILTIN", int_to_2_bytes(node.callee_fn_id))
+
+    def emit_userdef_function_call_expr(
+        self, node: UserdefFunctionCallExprNode
+    ) -> None:
+        # arguments are pushed onto the stack in order
+        for argument in node.arguments:
+            self.emit_expr(argument)
+        self.add_instruction("OP_CALL_USERDEF", int_to_2_bytes(node.callee_fn_idx))
 
     def emit_unary_operator_expr(self, node: UnaryOperatorExprNode) -> None:
         self.emit_expr(node.operand)
@@ -572,7 +584,9 @@ class BytecodeEmitter:
             raise FatalCompileError("IE: Already checked in loop scope")
 
     def emit_expr_stmt(self, node: ExprStmtNode):
-        if isinstance(node.expr, FunctionCallExprNode):
+        if isinstance(
+            node.expr, (BuiltinFunctionCallExprNode, UserdefFunctionCallExprNode)
+        ):
             self.emit_expr(node.expr)
             if node.expr.vl_type.is_val():
                 self.add_instruction("OP_POP_VAL")
@@ -593,7 +607,22 @@ class BytecodeEmitter:
         - a list[Diagnostic]
         """
         try:
-            self.emit_stmts(hir_node.stmts)
+            function_decls = [
+                x for x in hir_node.stmts if isinstance(x, FunctionDeclNode)
+            ]
+            other_stmts = [
+                x for x in hir_node.stmts if not isinstance(x, FunctionDeclNode)
+            ]
+
+            if function_decls:
+                # add a JMP at the start to skip all the function code
+                self.add_instruction("OP_JMP", int_to_2_bytes(0x0000))
+                self.emit_stmts(function_decls)
+                next_instruction_offset = self.next_instruction_offset()
+                self.modify_instruction_16b(0x00, next_instruction_offset)
+
+            self.emit_stmts(other_stmts)
+
             functions: list[bc.VlFunction] = []
             for function in self.functions:
                 functions.append(

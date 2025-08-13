@@ -16,7 +16,7 @@ namespace vl_program
         OP_POP_VAL = 0x04,
         OP_POP_OBJ = 0x05,
         OP_CALL_BUILTIN = 0x06,
-        OP_CALL = 0x07,
+        OP_CALL_USERDEF = 0x07,
         OP_RETURN = 0x08,
         OP_GET_LOCAL_VAL = 0x10,
         OP_SET_LOCAL_VAL = 0x11,

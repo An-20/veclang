@@ -63,7 +63,7 @@ OpcodeMap: dict[int, Instruction] = {
     0x04: Instruction(0x04, "OP_POP_VAL", 0),
     0x05: Instruction(0x05, "OP_POP_OBJ", 0),
     0x06: Instruction(0x06, "OP_CALL_BUILTIN", 1),
-    0x07: Instruction(0x07, "OP_CALL", 1),
+    0x07: Instruction(0x07, "OP_CALL_USERDEF", 1),
     0x08: Instruction(0x08, "OP_RETURN", 0),
     0x10: Instruction(0x10, "OP_GET_LOCAL_VAL", 1),
     0x11: Instruction(0x11, "OP_SET_LOCAL_VAL", 1),

@@ -15,7 +15,8 @@ from veclang.midend.hir.vl_hir import (
     DeclNode,
     ProgramNode,
     RvalueIdentifierExprNode,
-    FunctionCallExprNode,
+    BuiltinFunctionCallExprNode,
+    UserdefFunctionCallExprNode,
     BinaryOperationExprNode,
     UnaryOperatorExprNode,
     ConstantExprNode,
@@ -40,7 +41,8 @@ from veclang.midend.vl_core import (
     VlOperation,
     VlConstexprOperation,
     VlConstexprCast,
-    VlFunctionTypeProfile,
+    VlBuiltinFunctionTypeProfile,
+    VlUserdefFunctionTypeProfile,
     VlFunctionParameterTypeProfile,
     VlNull,
     VlInt,
@@ -78,19 +80,22 @@ class Lowerer:
 
         self.imported_constants: list[tuple[str, str]] = []
         self.imported_functions: list[tuple[str, str]] = []
-        self.functions: dict[str, VlFunctionTypeProfile] = {
-            "print": VlFunctionTypeProfile(
-                "print", 0x0000, [VlFunctionParameterTypeProfile("arg", VlInt)], VlNull
+        self.builtin_functions: dict[str, VlBuiltinFunctionTypeProfile] = {
+            "print": VlBuiltinFunctionTypeProfile(
+                "print",
+                0x0000,
+                [VlFunctionParameterTypeProfile("arg", VlInt)],
+                VlNull,
             ),
-            "printr": VlFunctionTypeProfile(
+            "printr": VlBuiltinFunctionTypeProfile(
                 "printr",
                 0x0001,
                 [VlFunctionParameterTypeProfile("arg", VlReal)],
                 VlNull,
             ),
         }
+        self.userdef_functions: dict[str, VlUserdefFunctionTypeProfile] = {}
 
-        self.ctx_function_name: str | None = None
         self.scopes: list[Scope] = [
             self.create_scope(GLOBAL_FN_NAME, None, None, None, ASTPositionInfo(0, 0))
         ]
@@ -365,6 +370,17 @@ class Lowerer:
             identifier, "var", vl_type, None, ast_position_info, is_loop_var=True
         )
 
+    # def add_userdef_function(self, identifier: str) -> None:
+    #     if identifier in self.userdef_function_idxs:
+    #         raise ValueError("")
+    #
+    # def get_userdef_function_idx(self, identifier: str) -> int:
+    #     if identifier not in self.userdef_function_idxs:
+    #         raise FatalCompileError(
+    #             f"IE: could not find function with identifier '{identifier}'"
+    #         )
+    #     return self.userdef_function_idxs[identifier]
+
     # Lowering
     # ====================
 
@@ -381,7 +397,18 @@ class Lowerer:
 
         stmts_lowered = None
         try:
-            stmts_lowered = self.lower_stmts(ast_node.stmts)
+            # emit all functions first
+            function_decls = []
+            other_stmts = []
+            for stmt in ast_node.stmts.stmts:
+                if isinstance(stmt, vl_ast.FunctionDeclNode):
+                    function_decls.append(stmt)
+                    self.lookahead_function_decl(stmt)
+                else:
+                    other_stmts.append(stmt)
+
+            stmts_lowered = self.lower_stmts(function_decls + other_stmts)
+
         except Exception as e:
             if isinstance(e, FatalCompileError):
                 self.add_diagnostic(
@@ -447,7 +474,7 @@ class Lowerer:
                 else:
                     constexpr_value = None
 
-                return FunctionCallExprNode(
+                return BuiltinFunctionCallExprNode(
                     cast.fn_id,
                     [expr],
                     cls.lower_vl_type(cast.to_type),
@@ -495,7 +522,7 @@ class Lowerer:
         constructor_fn_id = {"vec2": 0x1300, "vec3": 0x1301, "vec4": 0x1302}[
             vl_type_str
         ]
-        return FunctionCallExprNode(
+        return BuiltinFunctionCallExprNode(
             constructor_fn_id,
             casted_elements,
             self.lower_vl_type(vl_type_str),
@@ -505,7 +532,7 @@ class Lowerer:
 
     def lower_member_access_expr(
         self, expr: vl_ast.MemberAccessExprNode
-    ) -> FunctionCallExprNode:
+    ) -> BuiltinFunctionCallExprNode:
         target = self.lower_expr(expr.target)
         identifier = expr.name.name
         # TODO: FIXME FOR METHODS - would require introducing some
@@ -514,7 +541,7 @@ class Lowerer:
         for method in target.vl_type.get_properties():
             if identifier != method.name:
                 continue
-            return FunctionCallExprNode(
+            return BuiltinFunctionCallExprNode(
                 method.fn_id,
                 [target],
                 self.lower_vl_type(method.return_type),
@@ -528,33 +555,39 @@ class Lowerer:
                 f"which does not have identifier '{identifier}'"
             )
 
-    def lower_index_expr(self, expr: vl_ast.IndexExprNode) -> FunctionCallExprNode:
+    def lower_index_expr(
+        self, expr: vl_ast.IndexExprNode
+    ) -> BuiltinFunctionCallExprNode:
         """Call the underlying index fn"""
         # TODO
 
-    def lower_function_call_expr(
-        self, expr: vl_ast.FunctionCallExprNode
-    ) -> FunctionCallExprNode:
-        if expr.callee.name not in self.functions:
+    def lower_function_call_expr(self, expr: vl_ast.FunctionCallExprNode) -> ExprNode:
+        identifier = expr.callee.name
+        function_data: VlBuiltinFunctionTypeProfile | VlUserdefFunctionTypeProfile
+        if identifier in self.builtin_functions:
+            function_data = self.builtin_functions[expr.callee.name]
+        elif identifier in self.userdef_functions:
+            function_data = self.userdef_functions[expr.callee.name]
+        else:
             self.add_diagnostic(
                 "E200",
                 f"Unresolved identifier '{expr.callee.name}'",
                 expr.position_info,
             )
-        function = self.functions[expr.callee.name]
+            raise FatalCompileError()
 
         arguments: list[ExprNode] = [
             self.lower_expr(x) for x in expr.arguments.arguments
         ]
-        if len(arguments) != len(function.parameters):
+        if len(arguments) != len(function_data.parameters):
             self.add_diagnostic(
                 "E110",
-                f"Function {expr.callee.name} expected {len(function.parameters)} arguments, got {len(arguments)}",
+                f"Function {expr.callee.name} expected {len(function_data.parameters)} arguments, got {len(arguments)}",
                 expr.position_info,
             )
 
         for idx, (argument, parameter) in enumerate(
-            zip(arguments, function.parameters)
+            zip(arguments, function_data.parameters)
         ):
             if argument.vl_type != parameter.vl_type:
                 self.add_diagnostic(
@@ -564,14 +597,51 @@ class Lowerer:
                     expr.position_info,
                 )
 
-        function_profile = self.functions[expr.callee.name]
-        return FunctionCallExprNode(
-            function_profile.fn_id,
-            arguments,
-            function_profile.return_type,
-            None,  # no such thing as constexpr function call apart from casts
+        if isinstance(function_data, VlBuiltinFunctionTypeProfile):
+            return BuiltinFunctionCallExprNode(
+                function_data.builtin_fn_id,
+                arguments,
+                function_data.return_type,
+                None,  # no such thing as constexpr function call apart from casts
+                expr.position_info,
+            )
+        elif isinstance(function_data, VlUserdefFunctionTypeProfile):
+            return UserdefFunctionCallExprNode(
+                function_data.userdef_fn_idx,
+                arguments,
+                function_data.return_type,
+                None,
+                expr.position_info,
+            )
+        else:
+            raise FatalCompileError("IE: unknown function_data type")
+
+    def lower_cast_expr(self, expr: vl_ast.CastExprNode) -> BuiltinFunctionCallExprNode:
+        argument = self.lower_expr(expr.argument)
+        desired_type = self.lower_vl_type(expr.cast_type.name)
+
+        for cast in argument.vl_type.get_casts():
+            if cast.to_type == desired_type:
+                # attempt constexpr cast
+                if isinstance(cast, VlConstexprCast) and argument.constexpr_value:
+                    constexpr_value = cast.evaluate(argument.constexpr_value)
+                else:
+                    constexpr_value = None
+
+                return BuiltinFunctionCallExprNode(
+                    cast.fn_id,
+                    [argument],
+                    self.lower_vl_type(cast.to_type),
+                    constexpr_value,
+                    expr.position_info,
+                    is_type_cast=True,
+                )
+        self.add_diagnostic(
+            "E104",
+            f"Cannot cast from {argument.vl_type.to_vl_type_str()} to {desired_type.to_vl_type_str()}",
             expr.position_info,
         )
+        raise FatalCompileError
 
     @staticmethod
     def _try_eval_constexpr_binary_operation_expr(
@@ -725,27 +795,12 @@ class Lowerer:
             expr.position_info,
         )
 
-    def lower_function_decl(self, decl: vl_ast.FunctionDeclNode) -> FunctionDeclNode:
-        # Construct attribute tags
-        attribute_tags_dict = {}
-        for tag in decl.attribute_tags.tags:
-            if tag.key.name in attribute_tags_dict:
-                raise ValueError(f"TODO: Duplicate attribute tag key '{tag.key.name}'")
-            if not tag.values:
-                attribute_tags_dict[tag.key.name] = None
-            else:
-                tag_values = []
-                for value in tag.values.values:
-                    lowered_value = self.lower_expr(value)
-                    if not isinstance(lowered_value, ConstantExprNode):
-                        raise ValueError(
-                            f"TODO: Attribute tag value (for key '{tag.key.name}') must be a constant value."
-                        )
-                    tag_values.append(lowered_value)
-                attribute_tags_dict[tag.key.name] = tag_values
-
+    def lookahead_function_decl(self, decl: vl_ast.FunctionDeclNode) -> None:
+        """
+        Lookahead to get information on builtin functions before they are actually lowered.
+        """
         identifier = decl.identifier.name
-        if identifier in self.functions:
+        if identifier in self.builtin_functions or identifier in self.userdef_functions:
             self.add_diagnostic(
                 "E202",
                 f"Function '{decl.identifier.name}' has already been declared",
@@ -769,18 +824,51 @@ class Lowerer:
                 decl.position_info,
             )
 
+        userdef_fn_idx = len(self.userdef_functions)
+        self.userdef_functions[identifier] = VlUserdefFunctionTypeProfile(
+            identifier, userdef_fn_idx, parameters, return_type
+        )
+
+    def lower_function_decl(self, decl: vl_ast.FunctionDeclNode) -> FunctionDeclNode:
+        # Construct attribute tags
+        attribute_tags_dict = {}
+        for tag in decl.attribute_tags.tags:
+            if tag.key.name in attribute_tags_dict:
+                raise ValueError(f"TODO: Duplicate attribute tag key '{tag.key.name}'")
+            if not tag.values:
+                attribute_tags_dict[tag.key.name] = None
+            else:
+                tag_values = []
+                for value in tag.values.values:
+                    lowered_value = self.lower_expr(value)
+                    if not isinstance(lowered_value, ConstantExprNode):
+                        raise ValueError(
+                            f"TODO: Attribute tag value (for key '{tag.key.name}') must be a constant value."
+                        )
+                    tag_values.append(lowered_value)
+                attribute_tags_dict[tag.key.name] = tag_values
+
+        if decl.identifier.name not in self.userdef_functions:
+            raise FatalCompileError(
+                "IE: decl.identifier.name not in self.userdef_functions"
+            )
+        fn_data = self.userdef_functions[decl.identifier.name]
+        identifier = fn_data.identifier
+        parameters = fn_data.parameters
+        return_type = fn_data.return_type
+
         self.scope_in_fn(
-            decl.identifier.name,
-            self.lower_vl_type(decl.return_type.name),
+            identifier,
+            return_type,
             decl.position_info,
         )
-        for parameter in decl.parameters.parameters:
+        for parameter in parameters:
             self.init_parameter(
-                parameter.name.name,
-                self.lower_vl_type(parameter.type.name),
-                parameter.position_info,
+                parameter.identifier,
+                parameter.vl_type,
+                decl.position_info,
             )
-        stmts = self.lower_stmts(decl.stmts)
+        stmts = self.lower_stmts(decl.stmts.stmts)
         self.scope_out_fn()
 
         if not isinstance(decl.stmts.stmts[-1], vl_ast.ReturnStmtNode):
@@ -991,7 +1079,8 @@ class Lowerer:
             )
             blocks.append(
                 SelectionBlock(
-                    self.lower_expr(block.condition), self.lower_stmts(block.stmts)
+                    self.lower_expr(block.condition),
+                    self.lower_stmts(block.stmts.stmts),
                 )
             )
             self.scope_out_selection()
@@ -1003,7 +1092,7 @@ class Lowerer:
                     "IE: Unreachable, already checked else_stmt was a ElseStmtNode"
                 )
             self.scope_in_selection("else", else_stmt.position_info)
-            else_stmts = self.lower_stmts(else_stmt.stmts)
+            else_stmts = self.lower_stmts(else_stmt.stmts.stmts)
             self.scope_out_selection()
 
         else:
@@ -1027,7 +1116,7 @@ class Lowerer:
         self.init_loop_var(
             identifier, self.lower_vl_type(vl_type_str), stmt.position_info
         )
-        stmts_lowered = self.lower_stmts(stmt.stmts)
+        stmts_lowered = self.lower_stmts(stmt.stmts.stmts)
         self.scope_out_loop()
 
         return RangedForStmtNode(
@@ -1052,7 +1141,7 @@ class Lowerer:
 
         # lower stmts with updated loop context
         self.scope_in_loop("while", stmt.position_info)
-        stmts_lowered = self.lower_stmts(stmt.stmts)
+        stmts_lowered = self.lower_stmts(stmt.stmts.stmts)
         self.scope_out_loop()
 
         return WhileStmtNode(
@@ -1104,7 +1193,7 @@ class Lowerer:
             )
         return ExprStmtNode(self.lower_expr(stmt.expr), stmt.position_info)
 
-    def lower_stmts(self, stmts: vl_ast.StmtsNode) -> list[StmtNode]:
+    def lower_stmts(self, stmts: list[vl_ast.StmtNode]) -> list[StmtNode]:
         out_stmts: list[StmtNode] = []
         selection_stmts = []
 
@@ -1113,7 +1202,7 @@ class Lowerer:
         has_continue = False
         emitted_unreachable_diagnostic = False
 
-        for stmt in stmts.stmts:
+        for stmt in stmts:
             for has_x, x_str, x_code in [
                 (has_return, "return", "W010"),
                 (has_break, "break", "W011"),
@@ -1225,6 +1314,8 @@ class Lowerer:
             expr_lowered = self.lower_index_expr(expr)
         elif isinstance(expr, vl_ast.FunctionCallExprNode):
             expr_lowered = self.lower_function_call_expr(expr)
+        elif isinstance(expr, vl_ast.CastExprNode):
+            expr_lowered = self.lower_cast_expr(expr)
         elif isinstance(expr, vl_ast.BinaryOperationExprNode):
             expr_lowered = self.lower_binary_operation_expr(expr)
         elif isinstance(expr, vl_ast.UnaryOperatorExprNode):

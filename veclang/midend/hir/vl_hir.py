@@ -81,8 +81,8 @@ class RvalueIdentifierExprNode(ExprNode):
         self.identifier = identifier
 
 
-class FunctionCallExprNode(ExprNode):
-    """A HIR node for a function call"""
+class BuiltinFunctionCallExprNode(ExprNode):
+    """A HIR node for a builtin function call"""
 
     def __init__(
         self,
@@ -101,6 +101,22 @@ class FunctionCallExprNode(ExprNode):
         self.is_type_cast = is_type_cast
         self.is_method = is_method
         self.is_property = is_property
+
+
+class UserdefFunctionCallExprNode(ExprNode):
+    """A HIR node for a user-defined function call"""
+
+    def __init__(
+        self,
+        callee_fn_idx: int,
+        arguments: list[ExprNode],
+        vl_type: VlType,
+        constexpr_value: VlTypeABC | None,
+        ast_position_info: ASTPositionInfo,
+    ) -> None:
+        super().__init__(vl_type, constexpr_value, ast_position_info)
+        self.callee_fn_idx = callee_fn_idx
+        self.arguments = arguments
 
 
 class BinaryOperationExprNode(ExprNode):

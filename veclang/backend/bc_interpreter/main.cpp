@@ -95,7 +95,7 @@ int main()
     using std::chrono::high_resolution_clock;
     using std::chrono::milliseconds;
 
-    vl_sedf::VlProgram program = vl_sedf::load("C:\\Users\\xiada\\Documents\\veclang\\veclang\\tests\\outmandle.sedf");
+    vl_sedf::VlProgram program = vl_sedf::load("C:\\Users\\xiada\\Documents\\veclang\\veclang\\tests\\out.sedf");
     std::cout << "Loaded VL SEDF program with magic: " << program.header.magic << "\n";
     std::cout << "Version: " << program.header.version << "\n";
     std::cout << "Functions:\n";
@@ -126,10 +126,11 @@ int main()
     const uint32_t WIDTH = 256;
 
     vl_interpreter::Interpreter interpreter;
-    // interpreter.interpret(program);
 
     auto t1 = high_resolution_clock::now();
-    std::vector<vl_types::VlVec3> data = interpreter.generate_img(program, HEIGHT, WIDTH);
+    // std::vector<vl_types::VlVec3> data = interpreter.generate_img(program, HEIGHT, WIDTH);
+    // writeBMPToFile("out.bmp", data, HEIGHT, WIDTH);
+    interpreter.interpret(program);
     auto t2 = high_resolution_clock::now();
 
     /* Getting number of milliseconds as an integer. */
@@ -140,8 +141,6 @@ int main()
 
     std::cout << ms_int.count() << "ms\n";
     std::cout << ms_double.count() << "ms\n";
-
-    writeBMPToFile("out.bmp", data, HEIGHT, WIDTH);
 
     return 0;
 }

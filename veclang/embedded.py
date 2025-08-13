@@ -2,21 +2,12 @@ import json
 
 from veclang.frontend.parser.vl_parser import parse
 from veclang.midend.hir import lower
-from veclang.backend.bc_compiler.vl_emitter import BytecodeEmitter
-from veclang.backend.bc_compiler.vl_disassembler import disassemble_vl_program
+from veclang.backend.bc_compiler.vl_emitter import emit
+from veclang.backend.bc_compiler.vl_disassembler import (
+    disassemble_vl_program,
+    default_format,
+)
 from veclang.backend.bc_common.py.vl_sedf import VlSEDF
-
-
-def default_format(data: bytes) -> str:
-    """Default formatter taken from CEDF"""
-    lines = []
-    width = 16
-    for i in range(0, len(data), width):
-        chunk = data[i : i + width]
-        hex_part = " ".join(f"{b:02X}" for b in chunk)
-        ascii_part = "".join(chr(b) if 32 <= b < 127 else "." for b in chunk)
-        lines.append(f"{i:08X}  {hex_part:<48}  {ascii_part}")
-    return "\n".join(lines)
 
 
 def vl_compile(input_str: str) -> tuple[str, str, str, bytes]:
@@ -27,23 +18,29 @@ def vl_compile(input_str: str) -> tuple[str, str, str, bytes]:
     - str of diagnostics HR-formatted
     - bytes of raw VlSEDF data
     """
-    parsed = parse(input_str)
-    if not parsed:
-        return "", "", "E000: Syntax error in program", b""
+    diagnostics_combined = []
+
+    parsed, diagnostics = parse(input_str)
+    if diagnostics:
+        return "", "", "\n\n".join(str(x) for x in diagnostics), b""
+
     hir, diagnostics = lower(parsed)
-    diagnostics_formatted = "\n".join([str(x) for x in diagnostics])
-    if hir is None:
-        return "", "", diagnostics_formatted, b""
+    if not hir:
+        return "", "", "\n\n".join(str(x) for x in diagnostics), b""
+    elif diagnostics:
+        diagnostics_combined.extend(diagnostics)
 
-    emitter = BytecodeEmitter()
-    vl_program = emitter.emit(hir)
+    vl_program, diagnostics = emit(hir)
+    if diagnostics:
+        return "", "", "\n\n".join(str(x) for x in diagnostics), b""
+
     as_bytes = VlSEDF.dumpb(vl_program)
-
     header_dumped = json.dumps(vl_program["header"], indent=2)
+    diagnostics_combined = sorted(diagnostics_combined, key=lambda x: x.line_no)
+    diagnostics_formatted = "\n\n".join(str(x) for x in diagnostics_combined)
     try:
-        out_str = f"Constants:\n{default_format(vl_program['constants'])}\n\n"
-        out_str += f"Instructions:\n{disassemble_vl_program(vl_program)}"
-        return header_dumped, out_str, diagnostics_formatted, as_bytes
+        disassembled = disassemble_vl_program(vl_program)
+        return header_dumped, disassembled, diagnostics_formatted, as_bytes
     except Exception as e:
         return (
             header_dumped,

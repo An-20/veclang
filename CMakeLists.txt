@@ -34,9 +34,12 @@ include_directories(veclang/utils)
 # Native build
 if (EMSCRIPTEN)
     list(APPEND SOURCES "veclang/backend/bc_interpreter/main_bindings.cpp")
+    add_executable(veclang ${SOURCES})
+else()
+    add_executable(veclang veclang/backend/bc_interpreter/main.cpp ${SOURCES})
 endif()
 
-add_executable(veclang veclang/backend/bc_interpreter/main.cpp ${SOURCES})
+
 target_compile_options(veclang PRIVATE -Wall -O3 -g)
 if (EMSCRIPTEN)
     target_link_options(veclang PRIVATE --bind -lembind)

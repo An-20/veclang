@@ -9,7 +9,7 @@
 namespace vl_sedf
 {
     constexpr uint32_t VL_SEDF_ID = 0x00010000;
-    constexpr uint32_t VL_SEDF_VERSION = 0x00010000;
+    constexpr uint32_t VL_SEDF_VERSION = 0x00020000;
 
     struct VlFunction
     {

@@ -33,13 +33,13 @@ py::list interpret_fn(py::bytes program_bytes, py::list arguments, py::int_ retu
         }
         else if (py::isinstance<py::int_>(obj))
         {
-            long val = obj.cast<long>();
+            long val = obj.cast<int64_t>();
             value_params.push_back(vl_types::int_to_rv(val));
         }
         else if (py::isinstance<py::float_>(obj))
         {
             double val = obj.cast<double>();
-            value_params.push_back(vl_types::float_to_rv(val));
+            value_params.push_back(vl_types::double_to_rv(val));
         }
         else if (PyComplex_Check(obj.ptr()))
         {

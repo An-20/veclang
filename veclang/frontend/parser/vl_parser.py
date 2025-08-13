@@ -57,6 +57,8 @@ from veclang.frontend.parser.vl_ast import (
     ContinueStmtNode,
 )
 
+from veclang.common import Diagnostic, FatalCompileError
+
 
 DEBUG: bool = False
 
@@ -673,7 +675,9 @@ def p_error(p):
     """Parser error"""
     # get formatted representation of stack
     stack_state_str = " ".join([symbol.type for symbol in parser.sym_stack][1:])
-    print(f"Syntax error in input! Parser State:{parser.state} {stack_state_str} . {p}")
+    raise FatalCompileError(
+        f"Syntax error: Parser State:{parser.state} {stack_state_str} . {p}"
+    )
 
 
 PARSER_FUNCTION_SPEC = {
@@ -759,7 +763,26 @@ parser = yacc.yacc(
 parser.lexer = lexer
 
 
-def parse(input_str: str) -> ProgramNode:
-    """Parse a string and return an AST"""
-    result = parser.parse(input_str)
-    return result
+def parse(input_str: str) -> tuple[ProgramNode | None, list[Diagnostic]]:
+    """
+    Parses a string to an AST, returning a tuple of:
+    - an AST ProgramNode or None
+    - a list[Diagnostic]
+    """
+    diagnostics: list[Diagnostic] = []
+
+    result: ProgramNode | None = None
+    try:
+        result = parser.parse(input_str)
+    except FatalCompileError as e:
+        diagnostics.append(Diagnostic(0, 0, "E000", "<vl_global>", f"{e}"))
+        diagnostics.append(
+            Diagnostic(
+                0,
+                0,
+                "E900",
+                "<vl_global>",
+                f"The previous error that occurred during parsing was fatal and compilation has terminated.",
+            )
+        )
+    return result, diagnostics

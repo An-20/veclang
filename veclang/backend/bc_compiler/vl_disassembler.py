@@ -24,8 +24,31 @@ def disassemble(bytecode: list[bytes]) -> str:
     return out_str
 
 
-def disassemble_vl_program(vl_program: VlProgram) -> str:
+def default_format(data: bytes) -> str:
+    """Default formatter taken from CEDF"""
+    lines = []
+    width = 16
+    for i in range(0, len(data), width):
+        chunk = data[i : i + width]
+        hex_part = " ".join(f"{b:02X}" for b in chunk)
+        ascii_part = "".join(chr(b) if 32 <= b < 127 else "." for b in chunk)
+        lines.append(f"{i:08X}  {hex_part:<48}  {ascii_part}")
+    return "\n".join(lines)
+
+
+def disassemble_vl_program(
+    vl_program: VlProgram, include_constants: bool = True
+) -> str:
+    constants = vl_program["constants"]
     instructions = vl_program["instructions"]
-    return disassemble(
+
+    out_str = ""
+    if include_constants:
+        out_str = f"Constants:\n{default_format(constants)}\n\n"
+
+    instructions_disassembled = disassemble(
         [instructions[i : i + 4] for i in range(0, len(instructions), 4)]
     )
+    out_str += f"Instructions:\n{instructions_disassembled}"
+
+    return out_str

@@ -420,3 +420,9 @@ X100: Constant `<>` could be declared as constexpr
 `python setup.py build_ext --inplace`
 
 `cloc ./ --not-match-d="(lib|ply|build)" --not-match-f="(parsetab)"`
+
+```commandline
+cd C:\Users\xiada\Documents\veclang\build.em
+emcmake cmake ..
+cmake --build .
+```

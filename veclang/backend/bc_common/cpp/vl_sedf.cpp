@@ -24,7 +24,7 @@ namespace vl_sedf
             throw std::runtime_error("Invalid magic in VL SEDF header, got '" + program.header.magic + "', expected 'VECL'");
         program.header.version = j["version"].get<uint32_t>();
         if (program.header.version != VL_SEDF_VERSION)
-            throw std::runtime_error("Unsupported VL SEDF version, got " + std::to_string(program.header.version) + ", expected 1");
+            throw std::runtime_error("Unsupported VL SEDF version, got " + std::to_string(program.header.version) + ", expected " + std::to_string(VL_SEDF_VERSION));
         for (const auto &flag : j["flags"].items())
         {
             program.header.flags[flag.key()] = flag.value().get<uint32_t>();

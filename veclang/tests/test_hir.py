@@ -4,8 +4,7 @@ from veclang.midend.hir import lower
 from veclang.midend.hir.vl_hlr_io import print_hir, format_hir
 
 
-parsed = parse(
-    """
+PROGRAM_STR = """
 <generate_img>
 fn main(x: int, y: int, res_x: int, res_y: int) -> vec3 { return [255, 255, 255]; }
 
@@ -29,9 +28,18 @@ fn mandlebrot(
     return [255, 255, 255];
 }
 """
-)
+parsed, diagnostics = parse(PROGRAM_STR)
+if diagnostics:
+    raise ValueError(f"Error when parsing: {diagnostics}")
 print_ast(parsed)
-hir = lower(parsed)
+
+hir, diagnostics = lower(parsed)
+if not hir:
+    raise ValueError(f"Error when lowering: {diagnostics}")
+elif diagnostics:
+    print("Diagnostics emitted during lowering:")
+    for d in diagnostics:
+        print(d)
 print_hir(hir)
 
 print(len(format_ast(parsed)), len(format_hir(hir)))

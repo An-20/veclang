@@ -1,0 +1,19 @@
+<generate_img>
+fn mandlebrot(
+    x: int,
+    y: int,
+    res_x: int,
+    res_y: int
+) -> vec3 {
+    constexpr ITERATIONS: int = 50;
+    constexpr THRESHOLD: real = 100;
+    const c: complex = (x / res_x - 0.5) + (y / res_y) * 1i;
+    let z: complex = 0;
+    for (_: int in 0:ITERATIONS) {
+        if (z.re * z.re + z.im * z.im > THRESHOLD) {
+            return [0, 0, 0];
+        }
+        z = z * z + c;
+    }
+    return [0, 255, 255];
+}

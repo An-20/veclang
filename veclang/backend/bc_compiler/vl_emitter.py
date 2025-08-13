@@ -34,7 +34,7 @@ from veclang.backend.bc_compiler.vl_emitter_utils import (
     int_to_1_byte,
     int_to_2_bytes,
 )
-from veclang.compiler_common import LANGUAGE_VERSION_INT
+from veclang.common import LANGUAGE_VERSION_INT, Diagnostic, FatalCompileError
 
 
 class BytecodeEmitter:
@@ -68,7 +68,7 @@ class BytecodeEmitter:
     ) -> None:
         for scope in self.scopes:
             if scope.fn_name != GLOBAL_FN_NAME:
-                raise ValueError("Cannot nest function declarations!")
+                raise FatalCompileError("Cannot nest function declarations!")
         self.scopes.append(
             FunctionScope(
                 fn_name,
@@ -84,9 +84,11 @@ class BytecodeEmitter:
 
     def scope_out_fn(self) -> None:
         if len(self.scopes) == 1:
-            raise ValueError("Cannot scope out of global scope!")
+            raise FatalCompileError("Cannot scope out of global scope!")
         if not self.scopes[-1].fn_name:
-            raise ValueError("Mismatched scope: current scope is not a function scope")
+            raise FatalCompileError(
+                "Mismatched scope: current scope is not a function scope"
+            )
         self.functions.append(self.scopes.pop())
 
     def subscope_add_block_end_update(self, instruction_offset: int):
@@ -119,7 +121,7 @@ class BytecodeEmitter:
         scope.data_offset_counter += vl_type.get_info()[3][1]
 
         if scope.data_offset_counter > 65536:
-            raise ValueError(
+            raise FatalCompileError(
                 "IE: a Veclang function can have a maximum stack frame size of 65536 bytes"
             )
 
@@ -133,7 +135,7 @@ class BytecodeEmitter:
 
     def add_instruction(self, opcode_hr: str, *operands: bytes) -> int:
         if opcode_hr not in OpcodeHRMap:
-            raise ValueError(f"Unknown opcode '{opcode_hr}'")
+            raise FatalCompileError(f"Unknown opcode '{opcode_hr}'")
         self.instructions.append(OpcodeHRMap[opcode_hr].pack(operands))
         return len(self.instructions) - 1
 
@@ -149,7 +151,7 @@ class BytecodeEmitter:
         self.constant_offsets[constant_as_bytes] = constant_offset
 
         if len(self.constants) > 65536:
-            raise ValueError(
+            raise FatalCompileError(
                 "IE: a Veclang program can have a maximum constant table size of 65536 bytes"
             )
         return constant_offset
@@ -157,7 +159,9 @@ class BytecodeEmitter:
     def modify_instruction_16b(self, instruction_offset: int, arg_16b: int):
         current_instruction = self.instructions[instruction_offset]
         if current_instruction[0] not in [0x20, 0x21, 0x22]:
-            raise ValueError("IE: modification of arg_16b for a non-JMP instruction")
+            raise FatalCompileError(
+                "IE: modification of arg_16b for a non-JMP instruction"
+            )
         self.instructions[instruction_offset] = current_instruction[
             :2
         ] + int_to_2_bytes(arg_16b)
@@ -171,7 +175,7 @@ class BytecodeEmitter:
             opcode = instruction[0]
             if opcode in [0x20, 0x21, 0x22]:
                 if instruction[2] == 0xFF and instruction[3] == 0xFF:
-                    raise ValueError("IE: instruction with unset offset")
+                    raise FatalCompileError("IE: instruction with unset offset")
 
     def emit_stmt(self, node: StmtNode) -> None:
         if isinstance(node, DeclNode):
@@ -195,7 +199,7 @@ class BytecodeEmitter:
         elif isinstance(node, ExprStmtNode):
             self.emit_expr_stmt(node)
         else:
-            raise ValueError(f"IE: Unknown stmt type {type(node)}")
+            raise FatalCompileError(f"IE: Unknown stmt type {type(node)}")
 
     def emit_decl(self, node: DeclNode) -> None:
         if isinstance(node, FunctionDeclNode):
@@ -203,7 +207,7 @@ class BytecodeEmitter:
         elif isinstance(node, DataDeclNode):
             self.emit_data_decl(node)
         else:
-            raise ValueError(f"IE: Unknown decl type {type(node)}")
+            raise FatalCompileError(f"IE: Unknown decl type {type(node)}")
 
     def emit_expr(self, node: ExprNode) -> None:
         if isinstance(node, RvalueIdentifierExprNode):
@@ -217,7 +221,7 @@ class BytecodeEmitter:
         elif isinstance(node, ConstantExprNode):
             self.emit_constant_expr(node)
         else:
-            raise ValueError(f"IE: Unknown expr type {type(node)}")
+            raise FatalCompileError(f"IE: Unknown expr type {type(node)}")
 
     def emit_rvalue_identifier_expr(self, node: RvalueIdentifierExprNode) -> None:
         identifier = node.identifier
@@ -245,7 +249,7 @@ class BytecodeEmitter:
                     int_to_2_bytes(data_offset),
                 )
             return
-        raise ValueError(f"Unknown identifier '{identifier}'")
+        raise FatalCompileError(f"Unknown identifier '{identifier}'")
 
     def emit_function_call_expr(self, node: FunctionCallExprNode) -> None:
         # TODO: FIXME FOR USER DEFINED FUNCTIONS
@@ -519,7 +523,9 @@ class BytecodeEmitter:
 
     def emit_return_stmt(self, node: ReturnStmtNode):
         if self.scopes[-1].fn_name == GLOBAL_FN_NAME:
-            raise ValueError("IE: Already checked that return was inside function")
+            raise FatalCompileError(
+                "IE: Already checked that return was inside function"
+            )
         self.emit_expr(node.value)
         self.add_instruction("OP_RETURN")
 
@@ -530,7 +536,7 @@ class BytecodeEmitter:
                 subscope.block_end_update_offsets.append(self.last_instruction_offset())
                 return
         else:
-            raise ValueError("IE: Already checked in loop scope")
+            raise FatalCompileError("IE: Already checked in loop scope")
 
     def emit_continue_stmt(self, _node: ContinueStmtNode):
         for subscope in reversed(self.scopes[-1].sub_scopes):
@@ -540,7 +546,7 @@ class BytecodeEmitter:
                 )
                 return
         else:
-            raise ValueError("IE: Already checked in loop scope")
+            raise FatalCompileError("IE: Already checked in loop scope")
 
     def emit_expr_stmt(self, node: ExprStmtNode):
         if isinstance(node.expr, FunctionCallExprNode):
@@ -555,29 +561,60 @@ class BytecodeEmitter:
         for stmt in stmts:
             self.emit_stmt(stmt)
 
-    def emit(self, hir_node: ProgramNode) -> bc.VlProgram:
-        self.emit_stmts(hir_node.stmts)
+    def emit(
+        self, hir_node: ProgramNode
+    ) -> tuple[bc.VlProgram | None, list[Diagnostic]]:
+        """
+        Emits bytecode from a HIR, returning a tuple of:
+        - a VlProgram or None
+        - a list[Diagnostic]
+        """
+        try:
+            self.emit_stmts(hir_node.stmts)
+            functions: list[bc.VlFunction] = []
+            for function in self.functions:
+                functions.append(
+                    {
+                        "name": function.fn_name if function.fn_name else "",
+                        "stack_size": function.data_offset_counter,
+                        "instruction_offset": function.instruction_offset,
+                        "arg_types": [p.to_vl_type_code() for p in function.arg_types],
+                        "return_type": function.return_type.to_vl_type_code(),
+                    }
+                )
+            header: bc.VlHeader = {
+                "magic": "VECL",
+                "version": LANGUAGE_VERSION_INT,
+                "flags": {},
+                "functions": functions,
+                "globals_stack_size": self.scopes[0].data_offset_counter,
+            }
+            vl_program: bc.VlProgram = {
+                "header": header,
+                "constants": self.constants,
+                "instructions": b"".join(self.instructions),
+            }
+            return vl_program, []
 
-        functions: list[bc.VlFunction] = []
-        for function in self.functions:
-            functions.append(
-                {
-                    "name": function.fn_name if function.fn_name else "",
-                    "stack_size": function.data_offset_counter,
-                    "instruction_offset": function.instruction_offset,
-                    "arg_types": [p.to_vl_type_code() for p in function.arg_types],
-                    "return_type": function.return_type.to_vl_type_code(),
-                }
-            )
-        header: bc.VlHeader = {
-            "magic": "VECL",
-            "version": LANGUAGE_VERSION_INT,
-            "flags": {},
-            "functions": functions,
-            "globals_stack_size": self.scopes[0].data_offset_counter,
-        }
-        return {
-            "header": header,
-            "constants": self.constants,
-            "instructions": b"".join(self.instructions),
-        }
+        except Exception as e:
+            return None, [
+                Diagnostic(0, 0, "E900", "<vl_global>", f"{e}"),
+                Diagnostic(
+                    0,
+                    0,
+                    "E900",
+                    "<vl_global>",
+                    f"The previous error that occurred during bytecode emission "
+                    "was fatal and compilation has terminated.",
+                ),
+            ]
+
+
+def emit(hir_node: ProgramNode) -> tuple[bc.VlProgram | None, list[Diagnostic]]:
+    """
+    Emits bytecode from a HIR, returning a tuple of:
+    - a VlProgram or None
+    - a list[Diagnostic]
+    """
+    emitter = BytecodeEmitter()
+    return emitter.emit(hir_node)

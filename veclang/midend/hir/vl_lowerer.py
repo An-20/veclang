@@ -66,13 +66,13 @@ from veclang.midend.hir.vl_lowerer_utils import (
     check_constant_case,
 )
 
-from veclang.compiler_common import (
+from veclang.common import (
     Diagnostic,
     DiagnosticCode,
     FatalCompileError,
 )
 
-GLOBAL_FN_NAME = "vl_global!"
+GLOBAL_FN_NAME = "!vl_global"
 
 
 class Lowerer:
@@ -388,7 +388,7 @@ class Lowerer:
             if isinstance(e, FatalCompileError):
                 self.add_diagnostic(
                     "E900",
-                    "The previous error was fatal and compilation has terminated.",
+                    "The previous error that occurred during HIR lowering was fatal and compilation has terminated.",
                     ast_node.position_info,
                 )
             else:
@@ -397,10 +397,6 @@ class Lowerer:
                     f"Internal error: {e}; {traceback.format_exc()}",
                     ast_node.position_info,
                 )
-
-        self.diagnostics = sorted(
-            self.diagnostics, key=lambda x: (x.line_no, x.char_no)
-        )
 
         if self.error:
             return None, self.diagnostics
@@ -497,7 +493,7 @@ class Lowerer:
         else:
             constexpr_value = None
 
-        # TODO: Emitting a constant to add to constant table instead of calling the function
+        # the constructor fn won't be used if is_constexpr
         constructor_fn_id = {"vec2": 0x1300, "vec3": 0x1301, "vec4": 0x1302}[
             vl_type_str
         ]
@@ -1251,5 +1247,10 @@ class Lowerer:
 
 
 def lower(ast_node: vl_ast.ProgramNode) -> tuple[ProgramNode | None, list[Diagnostic]]:
+    """
+    Lowers an AST to a HIR, returning a tuple of:
+    - a HIR ProgramNode or None
+    - a list[Diagnostic]
+    """
     lowerer = Lowerer()
     return lowerer.lower(ast_node)

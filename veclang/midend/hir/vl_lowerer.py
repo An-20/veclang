@@ -66,18 +66,16 @@ from veclang.midend.hir.vl_lowerer_utils import (
     check_constant_case,
 )
 
-from veclang.common import (
-    Diagnostic,
-    DiagnosticCode,
-    FatalCompileError,
-)
+from veclang.common import Diagnostic, DiagnosticCode, FatalCompileError, CompilerFlags
 
 GLOBAL_FN_NAME = "!vl_global"
 
 
 class Lowerer:
 
-    def __init__(self):
+    def __init__(self, compiler_flags: CompilerFlags):
+        self.compiler_flags: CompilerFlags = compiler_flags
+
         self.imported_constants: list[tuple[str, str]] = []
         self.imported_functions: list[tuple[str, str]] = []
         self.functions: dict[str, VlFunctionTypeProfile] = {
@@ -1246,11 +1244,13 @@ class Lowerer:
         return expr_lowered
 
 
-def lower(ast_node: vl_ast.ProgramNode) -> tuple[ProgramNode | None, list[Diagnostic]]:
+def lower(
+    ast_node: vl_ast.ProgramNode, compiler_flags: CompilerFlags
+) -> tuple[ProgramNode | None, list[Diagnostic]]:
     """
     Lowers an AST to a HIR, returning a tuple of:
     - a HIR ProgramNode or None
     - a list[Diagnostic]
     """
-    lowerer = Lowerer()
+    lowerer = Lowerer(compiler_flags)
     return lowerer.lower(ast_node)

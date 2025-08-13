@@ -34,12 +34,19 @@ from veclang.backend.bc_compiler.vl_emitter_utils import (
     int_to_1_byte,
     int_to_2_bytes,
 )
-from veclang.common import LANGUAGE_VERSION_INT, Diagnostic, FatalCompileError
+from veclang.common import (
+    LANGUAGE_VERSION_INT,
+    Diagnostic,
+    FatalCompileError,
+    CompilerFlags,
+)
 
 
 class BytecodeEmitter:
 
-    def __init__(self):
+    def __init__(self, compiler_flags: CompilerFlags):
+        self.compiler_flags: CompilerFlags = compiler_flags
+
         self.instructions: list[bytes] = []
         self.constants: bytearray = bytearray()
         self.constant_offsets: dict[bytes, int] = {}
@@ -117,8 +124,16 @@ class BytecodeEmitter:
         self.scopes[-1].data[identifier] = IdentifierData(
             qualifier, vl_type, data_offset
         )
-        # TODO: FIXME FOR 32 / 64
-        scope.data_offset_counter += vl_type.get_info()[3][1]
+
+        if self.compiler_flags.runtime_precision == 32:
+            type_canonical_size = vl_type.get_info()[3][0]
+        elif self.compiler_flags.runtime_precision == 64:
+            type_canonical_size = vl_type.get_info()[3][1]
+        else:
+            raise FatalCompileError(
+                f"IE: runtime precision set to {self.compiler_flags.runtime_precision}"
+            )
+        scope.data_offset_counter += type_canonical_size
 
         if scope.data_offset_counter > 65536:
             raise FatalCompileError(
@@ -269,7 +284,15 @@ class BytecodeEmitter:
         self.add_instruction(node.operation.opcode_hr)
 
     def emit_constant_expr(self, node: ConstantExprNode) -> None:
-        as_bytes = node.value.to_bytes_64()
+        if self.compiler_flags.runtime_precision == 32:
+            as_bytes = node.value.to_bytes_32()
+        elif self.compiler_flags.runtime_precision == 64:
+            as_bytes = node.value.to_bytes_64()
+        else:
+            raise FatalCompileError(
+                f"IE: runtime precision set to {self.compiler_flags.runtime_precision}"
+            )
+
         if node.value.to_vl_type_str() in {"int", "bool"} and len(as_bytes) <= 2:
             # direct loading
             self.add_instruction("OP_CONSTANT_VAL_DIRECT", as_bytes.rjust(2, bytes(1)))
@@ -585,7 +608,7 @@ class BytecodeEmitter:
             header: bc.VlHeader = {
                 "magic": "VECL",
                 "version": LANGUAGE_VERSION_INT,
-                "flags": {},
+                "flags": {"runtime_precision": self.compiler_flags.runtime_precision},
                 "functions": functions,
                 "globals_stack_size": self.scopes[0].data_offset_counter,
             }
@@ -610,11 +633,13 @@ class BytecodeEmitter:
             ]
 
 
-def emit(hir_node: ProgramNode) -> tuple[bc.VlProgram | None, list[Diagnostic]]:
+def emit(
+    hir_node: ProgramNode, compiler_flags: CompilerFlags
+) -> tuple[bc.VlProgram | None, list[Diagnostic]]:
     """
     Emits bytecode from a HIR, returning a tuple of:
     - a VlProgram or None
     - a list[Diagnostic]
     """
-    emitter = BytecodeEmitter()
+    emitter = BytecodeEmitter(compiler_flags)
     return emitter.emit(hir_node)

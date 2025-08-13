@@ -5,19 +5,21 @@ from veclang.midend.hir.vl_hlr_io import print_hir
 from veclang.backend.bc_compiler.vl_emitter import emit
 from veclang.backend.bc_compiler.vl_disassembler import disassemble_vl_program
 from veclang.backend.bc_common.py.vl_sedf import VlSEDF
+from veclang.common import CompilerFlags
 
 
+COMPILER_FLAGS: CompilerFlags = CompilerFlags(64)
 PROGRAM_STR = """
 for (x: int in 0:10) {
     print(x);
 }
 """
-parsed, diagnostics = parse(PROGRAM_STR)
+parsed, diagnostics = parse(PROGRAM_STR, COMPILER_FLAGS)
 if diagnostics:
     raise ValueError(f"Error when parsing: {diagnostics}")
 print_ast(parsed)
 
-hir, diagnostics = lower(parsed)
+hir, diagnostics = lower(parsed, COMPILER_FLAGS)
 if not hir:
     raise ValueError(f"Error when lowering: {diagnostics}")
 elif diagnostics:
@@ -26,7 +28,7 @@ elif diagnostics:
         print(d)
 print_hir(hir)
 
-bytecode, diagnostics = emit(hir)
+bytecode, diagnostics = emit(hir, COMPILER_FLAGS)
 if diagnostics:
     raise ValueError(f"Error when emitting: {diagnostics}")
 print(disassemble_vl_program(bytecode))

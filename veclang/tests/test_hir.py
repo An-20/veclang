@@ -2,8 +2,10 @@ from veclang.frontend.parser.vl_parser import parse
 from veclang.frontend.parser.vl_ast_io import print_ast, format_ast
 from veclang.midend.hir import lower
 from veclang.midend.hir.vl_hlr_io import print_hir, format_hir
+from veclang.common import CompilerFlags
 
 
+COMPILER_FLAGS: CompilerFlags = CompilerFlags(64)
 PROGRAM_STR = """
 <generate_img>
 fn main(x: int, y: int, res_x: int, res_y: int) -> vec3 { return [255, 255, 255]; }
@@ -28,12 +30,12 @@ fn mandlebrot(
     return [255, 255, 255];
 }
 """
-parsed, diagnostics = parse(PROGRAM_STR)
+parsed, diagnostics = parse(PROGRAM_STR, COMPILER_FLAGS)
 if diagnostics:
     raise ValueError(f"Error when parsing: {diagnostics}")
 print_ast(parsed)
 
-hir, diagnostics = lower(parsed)
+hir, diagnostics = lower(parsed, COMPILER_FLAGS)
 if not hir:
     raise ValueError(f"Error when lowering: {diagnostics}")
 elif diagnostics:

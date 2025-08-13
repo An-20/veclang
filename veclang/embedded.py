@@ -9,6 +9,8 @@ from veclang.backend.bc_compiler.vl_disassembler import (
 )
 from veclang.backend.bc_common.py.vl_sedf import VlSEDF
 
+from veclang.common import CompilerFlags
+
 
 def vl_compile(input_str: str) -> tuple[str, str, str, bytes]:
     """
@@ -19,18 +21,19 @@ def vl_compile(input_str: str) -> tuple[str, str, str, bytes]:
     - bytes of raw VlSEDF data
     """
     diagnostics_combined = []
+    compiler_flags: CompilerFlags = CompilerFlags(64)
 
-    parsed, diagnostics = parse(input_str)
+    parsed, diagnostics = parse(input_str, compiler_flags)
     if diagnostics:
         return "", "", "\n\n".join(str(x) for x in diagnostics), b""
 
-    hir, diagnostics = lower(parsed)
+    hir, diagnostics = lower(parsed, compiler_flags)
     if not hir:
         return "", "", "\n\n".join(str(x) for x in diagnostics), b""
     elif diagnostics:
         diagnostics_combined.extend(diagnostics)
 
-    vl_program, diagnostics = emit(hir)
+    vl_program, diagnostics = emit(hir, compiler_flags)
     if diagnostics:
         return "", "", "\n\n".join(str(x) for x in diagnostics), b""
 

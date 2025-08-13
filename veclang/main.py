@@ -13,6 +13,8 @@ from veclang.backend.bc_compiler.vl_emitter import emit
 from veclang.backend.bc_compiler.vl_disassembler import disassemble_vl_program
 from veclang.backend.bc_common.py.vl_sedf import VlSEDF
 
+from veclang.common import CompilerFlags
+
 
 def dump_output(label, content, color, file_path=None):
     """Dump text either to stdout or to a file."""
@@ -52,6 +54,13 @@ def main():
         const=True,
         help="Dump disassembled bytecode (optionally to file)",
     )
+    compile_cmd.add_argument(
+        "--runtime-precision",
+        type=int,
+        choices=[32, 64],
+        default=64,
+        help="Target runtime precision (32 or 64 bits, default 64)",
+    )
 
     # --- run command ---
     run_cmd = subparsers.add_parser("run", help="Run a Veclang bytecode file")
@@ -67,10 +76,14 @@ def main():
     # ------------------ COMMAND HANDLING ------------------
 
     if args.command == "compile":
+        if args.runtime_precision not in {32, 64}:
+            raise ValueError("IE: args.runtime_precision not in {32, 64}")
+        compiler_flags: CompilerFlags = CompilerFlags(args.runtime_precision)
+
         with open(args.input) as f:
             source = f.read()
 
-        ast, diagnostics = parse(source)
+        ast, diagnostics = parse(source, compiler_flags)
         if diagnostics:
             print(colored(f"Error(s) when parsing AST:", "red", attrs=["bold"]))
             print("\n\n".join([str(x) for x in diagnostics]))
@@ -92,7 +105,7 @@ def main():
                 None if args.dump_ast is True else args.dump_ast,
             )
 
-        hir, diagnostics = lower(ast)
+        hir, diagnostics = lower(ast, compiler_flags)
         if diagnostics:
             has_errors = any([x.code.startswith("E") for x in diagnostics])
             if has_errors:
@@ -129,7 +142,7 @@ def main():
                 None if args.dump_hir is True else args.dump_hir,
             )
 
-        vl_program, diagnostics = emit(hir)
+        vl_program, diagnostics = emit(hir, compiler_flags)
         if diagnostics:
             print(colored(f"Error(s) when emitting bytecode:", "red", attrs=["bold"]))
             print("\n\n".join([str(x) for x in diagnostics]))

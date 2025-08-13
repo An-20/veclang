@@ -57,7 +57,7 @@ from veclang.frontend.parser.vl_ast import (
     ContinueStmtNode,
 )
 
-from veclang.common import Diagnostic, FatalCompileError
+from veclang.common import Diagnostic, FatalCompileError, CompilerFlags
 
 
 DEBUG: bool = False
@@ -763,7 +763,9 @@ parser = yacc.yacc(
 parser.lexer = lexer
 
 
-def parse(input_str: str) -> tuple[ProgramNode | None, list[Diagnostic]]:
+def parse(
+    input_str: str, _compiler_flags: CompilerFlags
+) -> tuple[ProgramNode | None, list[Diagnostic]]:
     """
     Parses a string to an AST, returning a tuple of:
     - an AST ProgramNode or None

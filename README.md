@@ -426,3 +426,5 @@ cd C:\Users\xiada\Documents\veclang\build.em
 emcmake cmake ..
 cmake --build .
 ```
+
+`./main.exe compile "C:/Users/xiada/Documents/veclang/veclang/tests/test.vl" --debug`

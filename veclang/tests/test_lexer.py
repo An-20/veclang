@@ -1,5 +1,8 @@
 from veclang.frontend.parser.vl_lexer import lexer
+from veclang.common import CompilerFlags
 
+
+COMPILER_FLAGS: CompilerFlags = CompilerFlags(64)
 VL_PROGRAM = """
 <generate_img>
 fn main(x: int, y: int, res_x: int, res_y: int) -> vec3 { return [255, 255, 255]; }

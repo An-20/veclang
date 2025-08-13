@@ -1,6 +1,9 @@
 from veclang.frontend.parser.vl_parser import parse
 from veclang.frontend.parser.vl_ast_io import print_ast
+from veclang.common import CompilerFlags
 
+
+COMPILER_FLAGS: CompilerFlags = CompilerFlags(64)
 PROGRAM_STR = """
 <generate_img>
 fn main(x: int, y: int, res_x: int, res_y: int) -> vec3 { return [255, 255, 255]; }
@@ -32,7 +35,7 @@ fn main(
     return real(0);
 }
 """
-parsed, diagnostics = parse(PROGRAM_STR)
+parsed, diagnostics = parse(PROGRAM_STR, COMPILER_FLAGS)
 if diagnostics:
     raise ValueError(f"Error when parsing: {diagnostics}")
 print_ast(parsed)

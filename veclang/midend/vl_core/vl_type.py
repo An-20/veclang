@@ -165,7 +165,7 @@ class VlTypeABC(abc.ABC):
         - its identifier
         - its type code
         - its type ("VAL" or "OBJ")
-        - its size in bytes in 32-bit and 64-bit mode
+        - its canonical size in bytes in 32-bit and 64-bit runtime precision
         :return: tuple[type_name, type_type, tuple[32bit_bytes, 64bit_byte]]
         """
         pass

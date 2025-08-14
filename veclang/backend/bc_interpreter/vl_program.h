@@ -18,6 +18,7 @@ namespace vl_program
         OP_CALL_BUILTIN = 0x06,
         OP_CALL_USERDEF = 0x07,
         OP_RETURN = 0x08,
+
         OP_GET_LOCAL_VAL = 0x10,
         OP_SET_LOCAL_VAL = 0x11,
         OP_GET_GLOBAL_VAL = 0x12,
@@ -26,6 +27,7 @@ namespace vl_program
         OP_SET_LOCAL_OBJ = 0x15,
         OP_GET_GLOBAL_OBJ = 0x16,
         OP_SET_GLOBAL_OBJ = 0x17,
+
         OP_JMP = 0x20,
         OP_JMP_IF_TRUE = 0x21,
         OP_JMP_IF_FALSE = 0x22,
@@ -56,15 +58,11 @@ namespace vl_program
         OP_INT_NOT = 0x90,
         OP_INT_LEFT_SHIFT = 0x91,
         OP_INT_RIGHT_SHIFT = 0x92,
-        OP_INT_JMP_IF_EQUAL = 0x93,
-        OP_INT_JMP_IF_NOT_EQUAL = 0x94,
-        OP_INT_JMP_IF_GREATER = 0x95,
-        OP_INT_JMP_IF_GREATER_OR_EQUAL = 0x96,
-        OP_INT_JMP_IF_LESS = 0x97,
-        OP_INT_JMP_IF_LESS_OR_EQUAL = 0x98,
+
         OP_BOOLEAN_AND = 0x9C,
         OP_BOOLEAN_OR = 0x9D,
         OP_BOOLEAN_NOT = 0x9E,
+
         OP_REAL_EQUAL = 0xA0,
         OP_REAL_NOT_EQUAL = 0xA1,
         OP_REAL_GREATER = 0xA2,
@@ -78,6 +76,7 @@ namespace vl_program
         OP_REAL_MOD = 0xAA,
         OP_REAL_POW = 0xAB,
         OP_REAL_NEG = 0xAC,
+
         OP_COMPLEX_EQUAL = 0xB0,
         OP_COMPLEX_NOT_EQUAL = 0xB1,
         OP_COMPLEX_ADD = 0xB2,
@@ -86,12 +85,7 @@ namespace vl_program
         OP_COMPLEX_DIV = 0xB5,
         OP_COMPLEX_POW = 0xB6,
         OP_COMPLEX_NEG = 0xB7,
-        OP_REAL_JMP_IF_EQUAL = 0xBA,
-        OP_REAL_JMP_IF_NOT_EQUAL = 0xBB,
-        OP_REAL_JMP_IF_GREATER = 0xBC,
-        OP_REAL_JMP_IF_GREATER_OR_EQUAL = 0xBD,
-        OP_REAL_JMP_IF_LESS = 0xBE,
-        OP_REAL_JMP_IF_LESS_OR_EQUAL = 0xBF,
+
         OP_VECTOR_ADD = 0xC0,
         OP_VECTOR_SUB = 0xC1,
         OP_VECTOR_MUL = 0xC2,

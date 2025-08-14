@@ -3,6 +3,7 @@ AST classes
 
 Side-note: why do we even support serializing and deserializing the AST to JSON?
 Next time this file is re-written, maybe just drop that...
+no actually why the fuck do we support serialising a fucking ast
 """
 
 import abc
@@ -457,7 +458,7 @@ class FunctionCallExprNode(ExprNode):
 
     def __init__(
         self,
-        callee: IdentifierNode,
+        callee: ExprNode,
         arguments: FunctionCallArgumentsNode,
         ast_position_info: ASTPositionInfo,
     ) -> None:
@@ -471,7 +472,7 @@ class FunctionCallExprNode(ExprNode):
 
     def _to_dict(self) -> dict:
         return {
-            "callee_fn_id": self.callee.to_dict(),
+            "callee": self.callee.to_dict(),
             "arguments": self.arguments.to_dict(),
         }
 
@@ -480,7 +481,7 @@ class FunctionCallExprNode(ExprNode):
         cls, input_dict: dict, ast_position_info: ASTPositionInfo
     ) -> "FunctionCallExprNode":
         return cls(
-            IdentifierNode.from_dict(input_dict["callee_fn_id"]),
+            expr_from_dict(input_dict["callee"]),
             FunctionCallArgumentsNode.from_dict(input_dict["arguments"]),
             ast_position_info,
         )

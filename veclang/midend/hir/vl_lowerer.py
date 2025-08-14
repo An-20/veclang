@@ -260,14 +260,14 @@ class Lowerer:
                     f"and can't be used as an lvalue (assigned to)",
                     ast_position_info,
                 )
-                raise FatalCompileError
+                raise FatalCompileError()
             scope.data[identifier].ref_write_count += 1
             return scope.data[identifier]
 
         self.add_diagnostic(
             "E200", f"Unresolved identifier '{identifier}'", ast_position_info
         )
-        raise FatalCompileError
+        raise FatalCompileError()
 
     def resolve_rvalue_identifier(
         self, identifier: str, ast_position_info: ASTPositionInfo
@@ -280,7 +280,7 @@ class Lowerer:
         self.add_diagnostic(
             "E200", f"Unresolved identifier '{identifier}'", ast_position_info
         )
-        raise FatalCompileError
+        raise FatalCompileError()
 
     def _check_if_identifier_declared(
         self, identifier: str, ast_position_info: ASTPositionInfo
@@ -535,21 +535,40 @@ class Lowerer:
             expr.position_info,
         )
 
-    def lower_member_access_expr(
+    def lower_rvalue_member_access_expr(
         self, expr: vl_ast.MemberAccessExprNode
     ) -> BuiltinFunctionCallExprNode:
+        """
+        Lowers a 'rvalue member access expression'
+        A member access is permitted to be used:
+        - In a lvalue for assignment e.g. vec2Instance.x = 15;
+        - In a rvalue expression for calling a property e.g. complexInstance.real
+        - In a rvalue expression for calling a method e.g. a.dot(b)
+
+        This function only handles member access for calling a property.
+        Calling a method is handled separately as function calls have a
+         separate callee resolution process separate from main expr lowering.
+        """
+
         target = self.lower_expr(expr.target)
         identifier = expr.name.name
-        # TODO: FIXME FOR METHODS - would require introducing some
-        # compiler type to indicate this resolves to a function - or not?
-        # could just handle method resolving when handling fn calls
-        for method in target.vl_type.get_properties():
+
+        for method in target.vl_type.get_methods():
             if identifier != method.name:
                 continue
+            self.add_diagnostic(
+                "E106",
+                "Member access results in callable; Veclang does not support first-class functions.",
+                expr.position_info,
+            )
+
+        for _property in target.vl_type.get_properties():
+            if identifier != _property.name:
+                continue
             return BuiltinFunctionCallExprNode(
-                method.fn_id,
+                _property.fn_id,
                 [target],
-                self.lower_vl_type(method.return_type),
+                self.lower_vl_type(_property.return_type),
                 None,  # no such thing as static member access
                 expr.position_info,
                 is_property=True,
@@ -560,13 +579,37 @@ class Lowerer:
                 f"which does not have identifier '{identifier}'"
             )
 
-    def lower_index_expr(
+    def lower_rvalue_index_expr(
         self, expr: vl_ast.IndexExprNode
     ) -> BuiltinFunctionCallExprNode:
-        """Call the underlying index fn"""
+        """
+        Lowers a 'rvalue index expression'
+        An index expression is permitted to be used:
+        - In a lvalue for assignment e.g. vec2Instance[0] = 15;
+        - In a rvalue to resolve to a VlType e.g. printr(a[0]);
+
+        This function only handles indexing that results in a VlType,
+        by calling the index function.
+        """
         # TODO
 
     def lower_function_call_expr(self, expr: vl_ast.FunctionCallExprNode) -> ExprNode:
+        # two different things
+        if isinstance(expr.callee, vl_ast.IdentifierNode):
+            pass
+
+        elif isinstance(expr, vl_ast.MemberAccessExprNode):
+            # TODO!
+            raise ValueError("Unimplemented!")
+
+        else:
+            self.add_diagnostic(
+                "E113",
+                f"Calling non-callable expression '{type(expr.callee)}'",
+                expr.position_info,
+            )
+            raise FatalCompileError()
+
         identifier = expr.callee.name
         function_data: VlBuiltinFunctionTypeProfile | VlUserdefFunctionTypeProfile
         if identifier in self.builtin_functions:
@@ -642,11 +685,11 @@ class Lowerer:
                     is_type_cast=True,
                 )
         self.add_diagnostic(
-            "E104",
+            "E105",
             f"Cannot cast from {argument.vl_type.to_vl_type_str()} to {desired_type.to_vl_type_str()}",
             expr.position_info,
         )
-        raise FatalCompileError
+        raise FatalCompileError()
 
     @staticmethod
     def _try_eval_constexpr_binary_operation_expr(
@@ -734,7 +777,7 @@ class Lowerer:
             )
 
         self.add_diagnostic(
-            "E103",
+            "E104",
             f"Operator {format_operator(expr.operator)} "
             f"not supported between instances of {left.vl_type.to_vl_type_str()} "
             f"and {right.vl_type.to_vl_type_str()} (after attempted widening)",
@@ -754,7 +797,7 @@ class Lowerer:
         ]
         if not operation:
             self.add_diagnostic(
-                "E103",
+                "E104",
                 f"Operator {format_operator(expr.operator)} "
                 f"not supported for instance of {operand.vl_type.to_vl_type_str()}",
                 expr.position_info,
@@ -947,7 +990,7 @@ class Lowerer:
                     f"Assignment of non-constexpr expression to constexpr '{identifier}'",
                     decl.position_info,
                 )
-                raise FatalCompileError
+                raise FatalCompileError()
 
         else:
             raise ValueError(f"IE: Unknown data decl type {type(decl)}")
@@ -990,16 +1033,23 @@ class Lowerer:
         # TODO: RUN THE IMPORT then add to context
 
     def lower_assignment_stmt(self, stmt: vl_ast.AssignmentStmtNode) -> StmtNode | None:
-        target = self.lower_expr(stmt.target)
-        # TODO: add special handling for indexing and member access (lvalues)
-        # probably need to add a LvalueIdentifierExprNode with separate lowering pathway
-        if not isinstance(target, RvalueIdentifierExprNode):
-            raise ValueError("IE: TODO; can't handle assignment to non lvalues")
+        if isinstance(stmt.target, vl_ast.IdentifierNode):
+            pass
 
+        # TODO: add special handling for indexing and member access (lvalues)
+        else:
+            self.add_diagnostic(
+                "E104",
+                f"Assignment to non-lvalue, node type {type(stmt.target)}",
+                stmt.position_info,
+            )
+            raise FatalCompileError()
+
+        target_identifier = stmt.target.name
         value_lowered = self.lower_expr(stmt.value)
 
         identifier_data = self.resolve_lvalue_identifier(
-            target.identifier, stmt.position_info
+            target_identifier, stmt.position_info
         )
         vl_type = identifier_data.vl_type
         vl_qualifier = identifier_data.vl_qualifier
@@ -1010,7 +1060,7 @@ class Lowerer:
                 hr_qualifier = "const parameter"
             self.add_diagnostic(
                 "E102",
-                f"Assignment to {hr_qualifier} '{target.identifier}' "
+                f"Assignment to {hr_qualifier} '{target_identifier}' "
                 f"after initialization",
                 stmt.position_info,
             )
@@ -1033,7 +1083,7 @@ class Lowerer:
         # check for statements like 'x = x;'
         if (
             isinstance(stmt.value, vl_ast.IdentifierNode)
-            and stmt.value.name == target.identifier
+            and stmt.value.name == target_identifier
         ):
             self.add_diagnostic(
                 "W014",
@@ -1042,7 +1092,7 @@ class Lowerer:
             )
             return
 
-        return AssignmentStmtNode(target.identifier, value_lowered, stmt.position_info)
+        return AssignmentStmtNode(target_identifier, value_lowered, stmt.position_info)
 
     def lower_augmented_assignment_stmt(
         self, stmt: vl_ast.AugmentedAssignmentStmtNode
@@ -1355,9 +1405,9 @@ class Lowerer:
         elif isinstance(expr, vl_ast.ArrayLiteralExprNode):
             expr_lowered = self.lower_array_literal_expr(expr)
         elif isinstance(expr, vl_ast.MemberAccessExprNode):
-            expr_lowered = self.lower_member_access_expr(expr)
+            expr_lowered = self.lower_rvalue_member_access_expr(expr)
         elif isinstance(expr, vl_ast.IndexExprNode):
-            expr_lowered = self.lower_index_expr(expr)
+            expr_lowered = self.lower_rvalue_index_expr(expr)
         elif isinstance(expr, vl_ast.FunctionCallExprNode):
             expr_lowered = self.lower_function_call_expr(expr)
         elif isinstance(expr, vl_ast.CastExprNode):

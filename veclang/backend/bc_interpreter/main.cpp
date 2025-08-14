@@ -125,12 +125,12 @@ int main()
     const uint32_t HEIGHT = 256;
     const uint32_t WIDTH = 256;
 
-    vl_interpreter::Interpreter interpreter;
+    vl_interpreter::Interpreter interpreter(program);
 
     auto t1 = high_resolution_clock::now();
     // std::vector<vl_types::VlVec3> data = interpreter.generate_img(program, HEIGHT, WIDTH);
     // writeBMPToFile("out.bmp", data, HEIGHT, WIDTH);
-    interpreter.interpret(program);
+    interpreter.interpret_program();
     auto t2 = high_resolution_clock::now();
 
     /* Getting number of milliseconds as an integer. */

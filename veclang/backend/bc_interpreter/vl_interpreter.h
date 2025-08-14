@@ -39,8 +39,8 @@ namespace vl_interpreter
         {
             constants = program.constants;
             instructions = program.instructions;
+            header = program.header;
             instruction_pointer = 0;
-            uint32_t num_instructions = instructions.size() / 4;
 
             userdef_functions = std::vector<std::pair<uint32_t, uint32_t>>();
             for (vl_sedf::VlFunction fn : program.header.functions)
@@ -55,17 +55,19 @@ namespace vl_interpreter
             object_stack = std::stack<vl_types::RawObject>();
         }
 
-        std::pair<vl_types::RawValue, vl_types::RawObject> interpret_fn_preload(
+        std::pair<vl_types::RawValue, vl_types::RawObject> interpret_fn(
             uint32_t fn_idx,
             std::vector<vl_types::RawValue> value_params,
             std::vector<vl_types::RawObject> object_params,
             bool returns_val)
         {
-            uint32_t local_stack_size = userdef_functions[fn_idx].second;
+            uint32_t fn_local_stack_size = header.functions.at(fn_idx).stack_size;
+            uint32_t fn_instruction_offset = header.functions.at(fn_idx).instruction_offset;
 
             uint32_t total = 0;
-            instruction_pointer = userdef_functions[fn_idx].first;
-            call_stack.push(StackFrame(instructions.size(), 0, local_stack_size));
+            instruction_pointer = fn_instruction_offset;
+            uint32_t num_instructions = instructions.size() / 4;
+            call_stack.push(StackFrame(instructions.size(), 0, fn_local_stack_size));
 
             for (vl_types::RawValue v : value_params)
             {
@@ -76,10 +78,10 @@ namespace vl_interpreter
                 object_stack.push(o);
             }
 
-            while (instruction_pointer < instructions.size())
+            while (instruction_pointer < num_instructions)
             {
                 const uint8_t *instruction = &instructions[instruction_pointer * 4];
-                instruction_pointer += 1;
+                instruction_pointer++;
                 total++;
                 interpret_instruction(instruction);
             }
@@ -100,20 +102,12 @@ namespace vl_interpreter
             return std::make_pair(value, object);
         }
 
-        void interpret(const vl_sedf::VlProgram &program)
+        void interpret_program()
         {
-            constants = program.constants;
-            instructions = program.instructions;
             instruction_pointer = 0;
             uint32_t num_instructions = instructions.size() / 4;
 
-            userdef_functions = std::vector<std::pair<uint32_t, uint32_t>>();
-            for (vl_sedf::VlFunction fn : program.header.functions)
-            {
-                userdef_functions.push_back(std::make_pair(fn.instruction_offset, fn.stack_size));
-            }
-
-            global_stack = std::vector<uint8_t>(program.header.globals_stack_size);
+            global_stack = std::vector<uint8_t>(header.globals_stack_size);
             local_stack = std::vector<uint8_t>();
             call_stack = std::stack<StackFrame>();
             value_stack = std::stack<vl_types::RawValue>();
@@ -127,79 +121,17 @@ namespace vl_interpreter
             }
         }
 
-        std::pair<vl_types::RawValue, vl_types::RawObject> interpret_fn(
-            const vl_sedf::VlProgram &program,
-            uint32_t fn_idx,
-            std::vector<vl_types::RawValue> value_params,
-            std::vector<vl_types::RawObject> object_params,
-            bool returns_val)
-        {
-            constants = program.constants;
-            instructions = program.instructions;
-            uint32_t num_instructions = instructions.size() / 4;
-
-            userdef_functions = std::vector<std::pair<uint32_t, uint32_t>>();
-            for (vl_sedf::VlFunction fn : program.header.functions)
-            {
-                userdef_functions.push_back(std::make_pair(fn.instruction_offset, fn.stack_size));
-            }
-            uint32_t local_stack_size = userdef_functions[fn_idx].second;
-
-            global_stack = std::vector<uint8_t>(program.header.globals_stack_size);
-            local_stack = std::vector<uint8_t>(local_stack_size);
-            call_stack = std::stack<StackFrame>();
-            value_stack = std::stack<vl_types::RawValue>();
-            object_stack = std::stack<vl_types::RawObject>();
-
-            uint32_t total = 0;
-            instruction_pointer = userdef_functions[fn_idx].first;
-            call_stack.push(StackFrame(num_instructions, 0, local_stack_size));
-
-            for (vl_types::RawValue v : value_params)
-            {
-                value_stack.push(v);
-            }
-            for (vl_types::RawObject o : object_params)
-            {
-                object_stack.push(o);
-            }
-
-            while (instruction_pointer < num_instructions)
-            {
-                const uint8_t *instruction = &instructions[instruction_pointer * 4];
-                instruction_pointer += 1;
-                total++;
-                interpret_instruction(instruction);
-            }
-
-            vl_types::RawValue value;
-            vl_types::RawObject object;
-            if (returns_val)
-            {
-                value = value_stack.top();
-                value_stack.pop();
-            }
-            else
-            {
-                object = object_stack.top();
-                object_stack.pop();
-            }
-            std::cout << total << std::endl;
-            return std::make_pair(value, object);
-        }
-
         std::vector<vl_types::VlVec3> generate_img(
-            const vl_sedf::VlProgram &program,
+            uint32_t fn_idx,
             const uint32_t height,
             const uint32_t width)
         {
-            constants = program.constants;
-            instructions = program.instructions;
             uint32_t num_instructions = instructions.size() / 4;
-            uint32_t local_stack_size = program.header.functions.at(0).stack_size;
+            uint32_t fn_local_stack_size = header.functions.at(fn_idx).stack_size;
+            uint32_t fn_instruction_offset = header.functions.at(fn_idx).instruction_offset;
 
-            global_stack = std::vector<uint8_t>(program.header.globals_stack_size);
-            local_stack = std::vector<uint8_t>(local_stack_size);
+            global_stack = std::vector<uint8_t>(header.globals_stack_size);
+            local_stack = std::vector<uint8_t>(fn_local_stack_size);
             call_stack = std::stack<StackFrame>();
             value_stack = std::stack<vl_types::RawValue>();
             object_stack = std::stack<vl_types::RawObject>();
@@ -213,8 +145,8 @@ namespace vl_interpreter
             {
                 for (uint32_t x = 0; x < width; x++)
                 {
-                    instruction_pointer = 0;
-                    call_stack.push(StackFrame(num_instructions, 0, local_stack_size));
+                    instruction_pointer = fn_instruction_offset;
+                    call_stack.push(StackFrame(num_instructions, 0, fn_local_stack_size));
 
                     value_stack.push(vl_types::int_to_rv(x));
                     value_stack.push(vl_types::int_to_rv(y));
@@ -232,9 +164,8 @@ namespace vl_interpreter
                     output.push_back(vl_types::ro_to_vec3(object_stack.top()));
                     object_stack.pop();
                 }
-                // std::cout << "done with row " << y << std::endl;
             }
-            std::cout << total << std::endl;
+            // std::cout << total << std::endl;
             return output;
         }
 
@@ -242,6 +173,7 @@ namespace vl_interpreter
         uint32_t instruction_pointer = 0;
         std::vector<uint8_t> constants;
         std::vector<uint8_t> instructions;
+        vl_sedf::VlHeader header;
         std::vector<std::pair<uint32_t, uint32_t>> userdef_functions;
 
         std::vector<uint8_t> global_stack;

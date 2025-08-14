@@ -79,8 +79,8 @@ std::vector<uint8_t> generate_img(std::vector<uint8_t> program_data, uint32_t di
     const uint32_t WIDTH = dim;
 
     vl_sedf::VlProgram program = vl_sedf::loadb(program_data);
-    vl_interpreter::Interpreter interpreter;
-    std::vector<vl_types::VlVec3> data = interpreter.generate_img(program, HEIGHT, WIDTH);
+    vl_interpreter::Interpreter interpreter(program);
+    std::vector<vl_types::VlVec3> data = interpreter.generate_img(0, HEIGHT, WIDTH);
     std::vector<uint8_t> bmp_data = buildBMP(data, HEIGHT, WIDTH);
     return bmp_data;
 }

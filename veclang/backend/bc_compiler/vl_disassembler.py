@@ -15,11 +15,11 @@ def disassemble(bytecode: list[bytes]) -> str:
         if info.num_operands == 0:
             out_str += f"{idx:04} {idx:04X} 0x{opcode:02X} {info.opcode_hr.ljust(30)}\n"
         elif info.num_operands == 1:
-            operand_1 = int.from_bytes(operation[2:])
+            operand_1 = int.from_bytes(operation[2:], byteorder="little")
             out_str += f"{idx:04} {idx:04X} 0x{opcode:02X} {info.opcode_hr.ljust(30)} 0x{operand_1:04X}\n"
         else:
             operand_1 = operation[1]
-            operand_2 = int.from_bytes(operation[2:])
+            operand_2 = int.from_bytes(operation[2:], byteorder="little")
             out_str += f"{idx:04} {idx:04X} 0x{opcode:02X} {info.opcode_hr.ljust(30)} 0x{operand_1:02X}   0x{operand_2:04X}\n"
     return out_str
 

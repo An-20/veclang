@@ -1,3 +1,4 @@
+import struct
 import dataclasses
 
 from veclang.frontend.parser.vl_ast import ASTPositionInfo
@@ -48,11 +49,11 @@ class FunctionScope:
 
 def int_to_1_byte(x: int) -> bytes:
     if x not in range(0x100):
-        raise ValueError("Int must be in range(0x100)")
-    return x.to_bytes(length=1)
+        raise ValueError("IE: int must be in range(0x100) to pack to 1 byte")
+    return bytes(struct.pack("<B", x))
 
 
 def int_to_2_bytes(x: int) -> bytes:
     if x not in range(0x10000):
-        raise ValueError("Int must be in range(0x10000)")
-    return x.to_bytes(length=2).rjust(2, bytes(1))
+        raise ValueError("IE: int must be in range(0x10000) to pack to 2 bytes")
+    return bytes(struct.pack("<H", x))

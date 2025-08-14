@@ -33,6 +33,73 @@ namespace vl_interpreter
     class Interpreter
     {
     public:
+        Interpreter() {}
+
+        Interpreter(const vl_sedf::VlProgram &program)
+        {
+            constants = program.constants;
+            instructions = program.instructions;
+            instruction_pointer = 0;
+            uint32_t num_instructions = instructions.size() / 4;
+
+            userdef_functions = std::vector<std::pair<uint32_t, uint32_t>>();
+            for (vl_sedf::VlFunction fn : program.header.functions)
+            {
+                userdef_functions.push_back(std::make_pair(fn.instruction_offset, fn.stack_size));
+            }
+
+            global_stack = std::vector<uint8_t>(program.header.globals_stack_size);
+            local_stack = std::vector<uint8_t>(65536);
+            call_stack = std::stack<StackFrame>();
+            value_stack = std::stack<vl_types::RawValue>();
+            object_stack = std::stack<vl_types::RawObject>();
+        }
+
+        std::pair<vl_types::RawValue, vl_types::RawObject> interpret_fn_preload(
+            uint32_t fn_idx,
+            std::vector<vl_types::RawValue> value_params,
+            std::vector<vl_types::RawObject> object_params,
+            bool returns_val)
+        {
+            uint32_t local_stack_size = userdef_functions[fn_idx].second;
+
+            uint32_t total = 0;
+            instruction_pointer = userdef_functions[fn_idx].first;
+            call_stack.push(StackFrame(instructions.size(), 0, local_stack_size));
+
+            for (vl_types::RawValue v : value_params)
+            {
+                value_stack.push(v);
+            }
+            for (vl_types::RawObject o : object_params)
+            {
+                object_stack.push(o);
+            }
+
+            while (instruction_pointer < instructions.size())
+            {
+                const uint8_t *instruction = &instructions[instruction_pointer * 4];
+                instruction_pointer += 1;
+                total++;
+                interpret_instruction(instruction);
+            }
+
+            vl_types::RawValue value;
+            vl_types::RawObject object;
+            if (returns_val)
+            {
+                value = value_stack.top();
+                value_stack.pop();
+            }
+            else
+            {
+                object = object_stack.top();
+                object_stack.pop();
+            }
+            // std::cout << total << std::endl;
+            return std::make_pair(value, object);
+        }
+
         void interpret(const vl_sedf::VlProgram &program)
         {
             constants = program.constants;
@@ -62,6 +129,7 @@ namespace vl_interpreter
 
         std::pair<vl_types::RawValue, vl_types::RawObject> interpret_fn(
             const vl_sedf::VlProgram &program,
+            uint32_t fn_idx,
             std::vector<vl_types::RawValue> value_params,
             std::vector<vl_types::RawObject> object_params,
             bool returns_val)
@@ -69,7 +137,13 @@ namespace vl_interpreter
             constants = program.constants;
             instructions = program.instructions;
             uint32_t num_instructions = instructions.size() / 4;
-            uint32_t local_stack_size = program.header.functions.size() ? program.header.functions.at(0).stack_size : 0;
+
+            userdef_functions = std::vector<std::pair<uint32_t, uint32_t>>();
+            for (vl_sedf::VlFunction fn : program.header.functions)
+            {
+                userdef_functions.push_back(std::make_pair(fn.instruction_offset, fn.stack_size));
+            }
+            uint32_t local_stack_size = userdef_functions[fn_idx].second;
 
             global_stack = std::vector<uint8_t>(program.header.globals_stack_size);
             local_stack = std::vector<uint8_t>(local_stack_size);
@@ -78,7 +152,7 @@ namespace vl_interpreter
             object_stack = std::stack<vl_types::RawObject>();
 
             uint32_t total = 0;
-            instruction_pointer = 0;
+            instruction_pointer = userdef_functions[fn_idx].first;
             call_stack.push(StackFrame(num_instructions, 0, local_stack_size));
 
             for (vl_types::RawValue v : value_params)
@@ -248,6 +322,12 @@ namespace vl_interpreter
                 break;
             case vl_program::OP_JMP_IF_FALSE:
                 op_jmp_if_false(instruction);
+                break;
+            case vl_program::OP_FAST_INT_INPLACE_ADD:
+                op_fast_int_inplace_add(instruction);
+                break;
+            case vl_program::OP_FAST_INT_INPLACE_ADD_DIRECT:
+                op_fast_int_inplace_add_direct(instruction);
                 break;
             case vl_program::OP_INT_EQUAL:
                 op_int_equal(instruction);
@@ -444,6 +524,9 @@ namespace vl_interpreter
         void op_jmp(const uint8_t *instruction);
         void op_jmp_if_true(const uint8_t *instruction);
         void op_jmp_if_false(const uint8_t *instruction);
+
+        void op_fast_int_inplace_add(const uint8_t *instruction);
+        void op_fast_int_inplace_add_direct(const uint8_t *instruction);
 
         void op_int_equal(const uint8_t *instruction);
         void op_int_not_equal(const uint8_t *instruction);

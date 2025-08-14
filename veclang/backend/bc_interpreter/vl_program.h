@@ -29,6 +29,8 @@ namespace vl_program
         OP_JMP = 0x20,
         OP_JMP_IF_TRUE = 0x21,
         OP_JMP_IF_FALSE = 0x22,
+        OP_FAST_INT_INPLACE_ADD = 0x28,
+        OP_FAST_INT_INPLACE_ADD_DIRECT = 0x29,
         OP_INT_EQUAL = 0x80,
         OP_INT_NOT_EQUAL = 0x81,
         OP_INT_GREATER = 0x82,

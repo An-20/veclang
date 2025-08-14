@@ -305,9 +305,9 @@ class BytecodeEmitter:
                 f"IE: runtime precision set to {self.compiler_flags.runtime_precision}"
             )
 
-        if node.value.to_vl_type_str() in {"int", "bool"} and len(as_bytes) <= 2:
+        if node.value.to_vl_type_str() in {"int", "bool"} and len(as_bytes) == 2:
             # direct loading
-            self.add_instruction("OP_CONSTANT_VAL_DIRECT", as_bytes.rjust(2, bytes(1)))
+            self.add_instruction("OP_CONSTANT_VAL_DIRECT", as_bytes)
             return
 
         # add to constant table
@@ -380,7 +380,41 @@ class BytecodeEmitter:
                 int_to_2_bytes(data_offset),
             )
 
+    def emit_fast_inplace_add(self, node: AssignmentStmtNode):
+        pass
+
     def emit_assignment_stmt(self, node: AssignmentStmtNode):
+        # special case for fast add
+        if (
+            isinstance(node.value, BinaryOperationExprNode)
+            and node.value.vl_type == VlInt
+            and node.value.operation.op_type == "PLUS"
+            and isinstance(node.value.left, RvalueIdentifierExprNode)
+            and node.value.left.identifier == node.target
+            and isinstance(node.value.right.constexpr_value, VlInt)
+            and abs(node.value.right.constexpr_value.underlying) < 128
+        ):
+            # FIXME FOR GLOBAL / LOCAL
+            data_offset = self.scopes[-1].data[node.target].data_offset
+            right = node.value.right.constexpr_value.to_byte()
+            self.add_instruction(
+                "OP_FAST_INT_INPLACE_ADD_DIRECT", right, int_to_2_bytes(data_offset)
+            )
+            return
+
+        if (
+            isinstance(node.value, BinaryOperationExprNode)
+            and node.value.vl_type == VlInt
+            and node.value.operation.op_type == "PLUS"
+            and isinstance(node.value.left, RvalueIdentifierExprNode)
+            and node.value.left.identifier == node.target
+        ):
+            # FIXME FOR GLOBAL / LOCAL
+            self.emit_expr(node.value.right)
+            data_offset = self.scopes[-1].data[node.target].data_offset
+            self.add_instruction("OP_FAST_INT_INPLACE_ADD", int_to_2_bytes(data_offset))
+            return
+
         self.emit_expr(node.value)
         if len(self.scopes) == 1:
             instruction_pre = "OP_SET_GLOBAL_"

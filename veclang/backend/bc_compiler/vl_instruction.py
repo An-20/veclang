@@ -77,6 +77,11 @@ OpcodeMap: dict[int, Instruction] = {
     0x21: Instruction(0x21, "OP_JMP_IF_TRUE", 1),
     0x22: Instruction(0x22, "OP_JMP_IF_FALSE", 1),
     # ========================================
+    # 0x28 - 0x2F - FAST INSTRUCTIONS
+    # ========================================
+    0x28: Instruction(0x28, "OP_FAST_INT_INPLACE_ADD", 1),
+    0x29: Instruction(0x29, "OP_FAST_INT_INPLACE_ADD_DIRECT", 2),
+    # ========================================
     # 0x80 - 0xDF - OPERATIONS
     # ========================================
     # 0x80 - 0x9F - INTEGER OPERATIONS AND BOOLEAN OPERATIONS

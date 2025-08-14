@@ -34,4 +34,4 @@ fn main(a: int, b: int) -> int {
     return a + b;
 }
 """
-print(interpret_fn(compile_vl(PROGRAM_STR), [1, 2]).return_value)
+print(interpret_fn(compile_vl(PROGRAM_STR), 0, [1, 2]).return_value)

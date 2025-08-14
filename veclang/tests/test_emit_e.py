@@ -10,18 +10,20 @@ from veclang.common import CompilerFlags
 
 COMPILER_FLAGS: CompilerFlags = CompilerFlags(64)
 PROGRAM_STR = """
-fn main(n: int) -> int {
-    for (x: int in 0:n) {
-        print(add(42, x));
+fn fac(n: int) -> int {
+    if (n <= 1) {
+        return 1;
     }
-    return 0;
+    return fac(n - 1) * n;
 }
 
-fn add(a: int, b: int) -> int {
-    return a + b;
+fn fib(n: int) -> int {
+    if (n <= 2) { return 1; }
+    return fib(n - 1) + fib(n - 2);
 }
 
-main(10);
+print(fac(10));
+print(fib(10));
 """
 parsed, diagnostics = parse(PROGRAM_STR, COMPILER_FLAGS)
 if diagnostics:

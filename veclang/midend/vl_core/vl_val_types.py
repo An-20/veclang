@@ -64,22 +64,30 @@ class VlInt(VlTypeABC):
         self.underlying: int
         super().__init__(underlying)
 
+    def to_byte(self) -> bytes:
+        # FIXME, add checking
+        return bytes(struct.pack("<b", self.underlying))
+
     def to_bytes_32(self) -> bytes:
-        if 0 <= self.underlying <= 0xFFFF:
-            # TODO: Use struct.pack
-            return self.underlying.to_bytes().rjust(2, bytes(1))
-        elif self.underlying <= 0xFFFFFFFF:
-            return self.underlying.to_bytes().rjust(4, bytes(1))
+        if self.underlying in range(0xFFFF):
+            # FIXME for signs
+            return bytes(struct.pack("<h", self.underlying))
+        elif self.underlying in range(0xFFFFFFFF):
+            return bytes(struct.pack("<i", self.underlying))
         else:
-            raise ValueError(f"IE: Int value too large: {self.underlying}")
+            raise ValueError(
+                f"IE: int value too large to pack to 32 bits: {self.underlying}"
+            )
 
     def to_bytes_64(self) -> bytes:
-        if 0 <= self.underlying <= 0xFFFF:
-            return self.underlying.to_bytes().rjust(2, bytes(1))
-        elif self.underlying <= 0xFFFFFFFF_FFFFFFFF:
-            return self.underlying.to_bytes().rjust(8, bytes(1))
+        if self.underlying in range(0xFFFF):
+            return bytes(struct.pack("<h", self.underlying))
+        elif self.underlying in range(0xFFFFFFFF_FFFFFFFF):
+            return bytes(struct.pack("<q", self.underlying))
         else:
-            raise ValueError(f"IE: Int value too large: {self.underlying}")
+            raise ValueError(
+                f"IE: int value too large to pack to 64 bits: {self.underlying}"
+            )
 
     @staticmethod
     def get_info() -> tuple[VlTypeStr, VlTypeCode, VlTypeType, tuple[int, int]]:

@@ -14,7 +14,8 @@
 uint16_t get_1_operand(const uint8_t *instruction)
 {
     // get a uint16_t operand from the third and fourth bytes of the instruction
-    return (static_cast<uint16_t>(instruction[2]) << 8) | instruction[3];
+    // all values are little endian!
+    return (static_cast<uint16_t>(instruction[3]) << 8) | instruction[2];
 }
 
 std::pair<uint8_t, uint16_t> get_2_operands(const uint8_t *instruction)
@@ -30,9 +31,9 @@ namespace vl_interpreter
 {
     void Interpreter::op_constant_val_direct(const uint8_t *instruction)
     {
-        uint16_t value_16b = get_1_operand(instruction);
+        int16_t value_16b = static_cast<int16_t>(get_1_operand(instruction));
         vl_types::RawValue value;
-        value.bits = value_16b;
+        value.bits = static_cast<uint64_t>(static_cast<int64_t>(value_16b));
         value_stack.push(value);
     }
 
@@ -104,13 +105,13 @@ namespace vl_interpreter
         {
             throw std::runtime_error("stack overflow!");
         }
-        local_stack.resize(get_local_stack_offset() + stack_size, 0);
 
         uint32_t current_local_stack_end = 0;
         if (!call_stack.empty())
         {
             current_local_stack_end = get_local_stack_offset() + call_stack.top().stack_size;
         }
+        local_stack.resize(current_local_stack_end + stack_size);
         call_stack.push(StackFrame(instruction_pointer, current_local_stack_end, stack_size));
         instruction_pointer = instruction_offset;
     }
@@ -232,6 +233,26 @@ namespace vl_interpreter
             instruction_pointer = offset;
         }
         value_stack.pop();
+    }
+
+    void Interpreter::op_fast_int_inplace_add(const uint8_t *instruction)
+    {
+        uint32_t offset = get_1_operand(instruction) + get_local_stack_offset();
+        int64_t value;
+        memcpy(&value, local_stack.data() + offset, sizeof(vl_types::RawValue));
+        value += vl_types::rv_to_int(value_stack.top());
+        value_stack.pop();
+        memcpy(local_stack.data() + offset, &value, sizeof(vl_types::RawValue));
+    }
+
+    void Interpreter::op_fast_int_inplace_add_direct(const uint8_t *instruction)
+    {
+        auto [delta_8b, offset_16b] = get_2_operands(instruction);
+        uint32_t offset = offset_16b + get_local_stack_offset();
+        int64_t value;
+        memcpy(&value, local_stack.data() + offset, sizeof(vl_types::RawValue));
+        value += static_cast<int8_t>(delta_8b);
+        memcpy(local_stack.data() + offset, &value, sizeof(vl_types::RawValue));
     }
 
 // Macro to define binary value operations using vl_types functions

@@ -4,6 +4,11 @@ from veclang.backend.bc_compiler.vl_instruction import OpcodeMap
 
 def disassemble(bytecode: list[bytes]) -> str:
     out_str = ""
+    max_opcode_len = max(
+        len(OpcodeMap[x[0]].opcode_hr) if x[0] in OpcodeMap else 10 for x in bytecode
+    )
+    pad_len = max_opcode_len + 4
+
     for idx, operation in enumerate(bytecode):
         if len(operation) != 4:
             raise ValueError
@@ -13,14 +18,16 @@ def disassemble(bytecode: list[bytes]) -> str:
 
         info = OpcodeMap[opcode]
         if info.num_operands == 0:
-            out_str += f"{idx:04} {idx:04X} 0x{opcode:02X} {info.opcode_hr.ljust(30)}\n"
+            out_str += (
+                f"{idx:04} {idx:04X} 0x{opcode:02X} {info.opcode_hr.ljust(pad_len)}\n"
+            )
         elif info.num_operands == 1:
             operand_1 = int.from_bytes(operation[2:], byteorder="little")
-            out_str += f"{idx:04} {idx:04X} 0x{opcode:02X} {info.opcode_hr.ljust(30)} 0x{operand_1:04X}\n"
+            out_str += f"{idx:04} {idx:04X} 0x{opcode:02X} {info.opcode_hr.ljust(pad_len)} 0x{operand_1:04X}\n"
         else:
             operand_1 = operation[1]
             operand_2 = int.from_bytes(operation[2:], byteorder="little")
-            out_str += f"{idx:04} {idx:04X} 0x{opcode:02X} {info.opcode_hr.ljust(30)} 0x{operand_1:02X}   0x{operand_2:04X}\n"
+            out_str += f"{idx:04} {idx:04X} 0x{opcode:02X} {info.opcode_hr.ljust(pad_len)} 0x{operand_1:02X}   0x{operand_2:04X}\n"
     return out_str
 
 

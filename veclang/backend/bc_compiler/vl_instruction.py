@@ -1,9 +1,6 @@
 import typing
 
 
-Opcode = typing.Literal[0x00, 0x01, 0x02, 0x03, 0x10, 0x11, 0x12, 0x13]
-
-
 class Instruction:
 
     def __init__(
@@ -77,10 +74,14 @@ OpcodeMap: dict[int, Instruction] = {
     0x21: Instruction(0x21, "OP_JMP_IF_TRUE", 1),
     0x22: Instruction(0x22, "OP_JMP_IF_FALSE", 1),
     # ========================================
-    # 0x28 - 0x2F - FAST INSTRUCTIONS
+    # 0x28 - 0x3F - FAST INSTRUCTIONS
     # ========================================
-    0x28: Instruction(0x28, "OP_FAST_INT_INPLACE_ADD", 1),
-    0x29: Instruction(0x29, "OP_FAST_INT_INPLACE_ADD_DIRECT", 2),
+    0x24: Instruction(0x24, "OP_FAST_LOCAL_INT_INPLACE_ADD", 1),
+    0x25: Instruction(0x25, "OP_FAST_LOCAL_INT_INPLACE_ADD_DIRECT", 2),
+    0x26: Instruction(0x26, "OP_FAST_GLOBAL_INT_INPLACE_ADD", 1),
+    0x27: Instruction(0x27, "OP_FAST_GLOBAL_INT_INPLACE_ADD_DIRECT", 2),
+    0x28: Instruction(0x28, "OP_FAST_LOCAL_INT_INPLACE_SUB", 1),
+    0x29: Instruction(0x29, "OP_FAST_GLOBAL_INT_INPLACE_SUB", 1),
     # ========================================
     # 0x80 - 0xDF - OPERATIONS
     # ========================================

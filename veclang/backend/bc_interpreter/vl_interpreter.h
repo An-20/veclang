@@ -323,12 +323,26 @@ namespace vl_interpreter
             case vl_program::OP_JMP_IF_FALSE:
                 op_jmp_if_false(instruction);
                 break;
-            case vl_program::OP_FAST_INT_INPLACE_ADD:
-                op_fast_int_inplace_add(instruction);
+
+            case vl_program::OP_FAST_LOCAL_INT_INPLACE_ADD:
+                op_fast_local_int_inplace_add(instruction);
                 break;
-            case vl_program::OP_FAST_INT_INPLACE_ADD_DIRECT:
-                op_fast_int_inplace_add_direct(instruction);
+            case vl_program::OP_FAST_LOCAL_INT_INPLACE_ADD_DIRECT:
+                op_fast_local_int_inplace_add_direct(instruction);
                 break;
+            case vl_program::OP_FAST_GLOBAL_INT_INPLACE_ADD:
+                op_fast_global_int_inplace_add(instruction);
+                break;
+            case vl_program::OP_FAST_GLOBAL_INT_INPLACE_ADD_DIRECT:
+                op_fast_global_int_inplace_add_direct(instruction);
+                break;
+            case vl_program::OP_FAST_LOCAL_INT_INPLACE_SUB:
+                op_fast_local_int_inplace_sub(instruction);
+                break;
+            case vl_program::OP_FAST_GLOBAL_INT_INPLACE_SUB:
+                op_fast_global_int_inplace_sub(instruction);
+                break;
+
             case vl_program::OP_INT_EQUAL:
                 op_int_equal(instruction);
                 break;
@@ -525,8 +539,12 @@ namespace vl_interpreter
         void op_jmp_if_true(const uint8_t *instruction);
         void op_jmp_if_false(const uint8_t *instruction);
 
-        void op_fast_int_inplace_add(const uint8_t *instruction);
-        void op_fast_int_inplace_add_direct(const uint8_t *instruction);
+        void op_fast_local_int_inplace_add(const uint8_t *instruction);
+        void op_fast_local_int_inplace_add_direct(const uint8_t *instruction);
+        void op_fast_global_int_inplace_add(const uint8_t *instruction);
+        void op_fast_global_int_inplace_add_direct(const uint8_t *instruction);
+        void op_fast_local_int_inplace_sub(const uint8_t *instruction);
+        void op_fast_global_int_inplace_sub(const uint8_t *instruction);
 
         void op_int_equal(const uint8_t *instruction);
         void op_int_not_equal(const uint8_t *instruction);

@@ -235,7 +235,7 @@ namespace vl_interpreter
         value_stack.pop();
     }
 
-    void Interpreter::op_fast_int_inplace_add(const uint8_t *instruction)
+    void Interpreter::op_fast_local_int_inplace_add(const uint8_t *instruction)
     {
         uint32_t offset = get_1_operand(instruction) + get_local_stack_offset();
         int64_t value;
@@ -245,7 +245,7 @@ namespace vl_interpreter
         memcpy(local_stack.data() + offset, &value, sizeof(vl_types::RawValue));
     }
 
-    void Interpreter::op_fast_int_inplace_add_direct(const uint8_t *instruction)
+    void Interpreter::op_fast_local_int_inplace_add_direct(const uint8_t *instruction)
     {
         auto [delta_8b, offset_16b] = get_2_operands(instruction);
         uint32_t offset = offset_16b + get_local_stack_offset();
@@ -253,6 +253,46 @@ namespace vl_interpreter
         memcpy(&value, local_stack.data() + offset, sizeof(vl_types::RawValue));
         value += static_cast<int8_t>(delta_8b);
         memcpy(local_stack.data() + offset, &value, sizeof(vl_types::RawValue));
+    }
+
+    void Interpreter::op_fast_global_int_inplace_add(const uint8_t *instruction)
+    {
+        uint32_t offset = get_1_operand(instruction);
+        int64_t value;
+        memcpy(&value, global_stack.data() + offset, sizeof(vl_types::RawValue));
+        value += vl_types::rv_to_int(value_stack.top());
+        value_stack.pop();
+        memcpy(global_stack.data() + offset, &value, sizeof(vl_types::RawValue));
+    }
+
+    void Interpreter::op_fast_global_int_inplace_add_direct(const uint8_t *instruction)
+    {
+        auto [delta_8b, offset_16b] = get_2_operands(instruction);
+        uint32_t offset = offset_16b;
+        int64_t value;
+        memcpy(&value, global_stack.data() + offset, sizeof(vl_types::RawValue));
+        value += static_cast<int8_t>(delta_8b);
+        memcpy(global_stack.data() + offset, &value, sizeof(vl_types::RawValue));
+    }
+
+    void Interpreter::op_fast_local_int_inplace_sub(const uint8_t *instruction)
+    {
+        uint32_t offset = get_1_operand(instruction) + get_local_stack_offset();
+        int64_t value;
+        memcpy(&value, local_stack.data() + offset, sizeof(vl_types::RawValue));
+        value -= vl_types::rv_to_int(value_stack.top());
+        value_stack.pop();
+        memcpy(local_stack.data() + offset, &value, sizeof(vl_types::RawValue));
+    }
+
+    void Interpreter::op_fast_global_int_inplace_sub(const uint8_t *instruction)
+    {
+        uint32_t offset = get_1_operand(instruction);
+        int64_t value;
+        memcpy(&value, global_stack.data() + offset, sizeof(vl_types::RawValue));
+        value -= vl_types::rv_to_int(value_stack.top());
+        value_stack.pop();
+        memcpy(global_stack.data() + offset, &value, sizeof(vl_types::RawValue));
     }
 
 // Macro to define binary value operations using vl_types functions

@@ -247,35 +247,40 @@ class Lowerer:
                 return scope.fn_return_type
         return None
 
-    def _resolve(
-        self,
-        identifier: str,
-        increment_read_ref: bool,
-        increment_write_ref: bool,
-        ast_position_info: ASTPositionInfo,
+    def resolve_lvalue_identifier(
+        self, identifier: str, ast_position_info: ASTPositionInfo
     ) -> IdentifierData:
-        # FIXME: fix for lvalue resolution to prevent modifying globals
         for scope in reversed(self.scopes):
-            if identifier in scope.data:
-                scope.data[identifier].ref_read_count += 1 if increment_read_ref else 0
-                scope.data[identifier].ref_write_count += (
-                    1 if increment_write_ref else 0
+            if identifier not in scope.data:
+                continue
+            if scope.fn_name == GLOBAL_FN_NAME:
+                self.add_diagnostic(
+                    "E200",
+                    f"Identifier '{identifier}' is in the global scope "
+                    f"and can't be used as an lvalue (assigned to)",
+                    ast_position_info,
                 )
-                return scope.data[identifier]
+                raise FatalCompileError
+            scope.data[identifier].ref_write_count += 1
+            return scope.data[identifier]
+
         self.add_diagnostic(
             "E200", f"Unresolved identifier '{identifier}'", ast_position_info
         )
         raise FatalCompileError
 
-    def resolve_lvalue_identifier(
-        self, identifier: str, ast_position_info: ASTPositionInfo
-    ):
-        return self._resolve(identifier, False, True, ast_position_info)
-
     def resolve_rvalue_identifier(
         self, identifier: str, ast_position_info: ASTPositionInfo
-    ):
-        return self._resolve(identifier, True, False, ast_position_info)
+    ) -> IdentifierData:
+        for scope in reversed(self.scopes):
+            if identifier not in scope.data:
+                continue
+            scope.data[identifier].ref_read_count += 1
+            return scope.data[identifier]
+        self.add_diagnostic(
+            "E200", f"Unresolved identifier '{identifier}'", ast_position_info
+        )
+        raise FatalCompileError
 
     def _check_if_identifier_declared(
         self, identifier: str, ast_position_info: ASTPositionInfo
@@ -984,7 +989,7 @@ class Lowerer:
 
         # TODO: RUN THE IMPORT then add to context
 
-    def lower_assignment_stmt(self, stmt: vl_ast.AssignmentStmtNode) -> StmtNode:
+    def lower_assignment_stmt(self, stmt: vl_ast.AssignmentStmtNode) -> StmtNode | None:
         target = self.lower_expr(stmt.target)
         # TODO: add special handling for indexing and member access (lvalues)
         # probably need to add a LvalueIdentifierExprNode with separate lowering pathway
@@ -1024,6 +1029,18 @@ class Lowerer:
                     f"{value_lowered.vl_type.to_vl_type_str()}",
                     stmt.position_info,
                 )
+
+        # check for statements like 'x = x;'
+        if (
+            isinstance(stmt.value, vl_ast.IdentifierNode)
+            and stmt.value.name == target.identifier
+        ):
+            self.add_diagnostic(
+                "W014",
+                f"Statement has no effect",
+                stmt.position_info,
+            )
+            return
 
         return AssignmentStmtNode(target.identifier, value_lowered, stmt.position_info)
 
@@ -1119,12 +1136,40 @@ class Lowerer:
         stmts_lowered = self.lower_stmts(stmt.stmts.stmts)
         self.scope_out_loop()
 
+        start = self.lower_expr(range_node.start)
+        end = self.lower_expr(range_node.end)
+        step = self.lower_expr(range_node.step)
+        for val_name, val in [("start", start), ("end", end), ("step", step)]:
+            if val.vl_type != VlInt:
+                self.add_diagnostic(
+                    "E123",
+                    f"for statement range literal {val_name} must be an int",
+                    range_node.start.position_info,
+                )
+
+        if start.constexpr_value and end.constexpr_value:
+            is_ascending = (
+                start.constexpr_value.underlying <= end.constexpr_value.underlying
+            )
+        elif step.constexpr_value:
+            is_ascending = step.constexpr_value.underlying >= 0
+        else:
+            self.add_diagnostic(
+                "E123",
+                f"for statement range literal must either be start:stop:constexpr_step "
+                f"or constexpr_start:constexpr_stop:step",
+                range_node.start.position_info,
+            )
+            # non-fatal because we don't need to know asc/desc until bytecode emission
+            is_ascending = True
+
         return RangedForStmtNode(
             identifier,
             self.lower_vl_type(stmt.init_stmt.init_type.name),
-            self.lower_expr(range_node.start),
-            self.lower_expr(range_node.end),
-            self.lower_expr(range_node.step),
+            start,
+            end,
+            step,
+            is_ascending,
             stmts_lowered,
             stmt.position_info,
         )
@@ -1245,42 +1290,43 @@ class Lowerer:
 
             # handle other statements now
             if isinstance(stmt, vl_ast.DeclNode):
-                decl_lowered = self.lower_decl(stmt)
-                if decl_lowered:
-                    out_stmts.append(decl_lowered)
+                stmt_lowered = self.lower_decl(stmt)
 
             elif isinstance(stmt, vl_ast.AssignmentStmtNode):
-                out_stmts.append(self.lower_assignment_stmt(stmt))
+                stmt_lowered = self.lower_assignment_stmt(stmt)
 
             elif isinstance(stmt, vl_ast.AugmentedAssignmentStmtNode):
-                out_stmts.append(self.lower_augmented_assignment_stmt(stmt))
+                stmt_lowered = self.lower_augmented_assignment_stmt(stmt)
 
             elif isinstance(stmt, vl_ast.ForStmtNode):
-                out_stmts.append(self.lower_ranged_for_stmt(stmt))
+                stmt_lowered = self.lower_ranged_for_stmt(stmt)
 
             elif isinstance(stmt, vl_ast.WhileStmtNode):
-                out_stmts.append(self.lower_while_stmt(stmt))
+                stmt_lowered = self.lower_while_stmt(stmt)
 
             elif isinstance(stmt, vl_ast.BreakStmtNode):
-                out_stmts.append(self.lower_break_stmt(stmt))
+                stmt_lowered = self.lower_break_stmt(stmt)
                 has_break = True
 
             elif isinstance(stmt, vl_ast.ContinueStmtNode):
-                out_stmts.append(self.lower_continue_stmt(stmt))
+                stmt_lowered = self.lower_continue_stmt(stmt)
                 has_continue = True
 
             elif isinstance(stmt, vl_ast.ReturnStmtNode):
-                out_stmts.append(self.lower_return_stmt(stmt))
+                stmt_lowered = self.lower_return_stmt(stmt)
                 has_return = True
 
             elif isinstance(stmt, vl_ast.ExprStmtNode):
-                out_stmts.append(self.lower_expr_stmt(stmt))
+                stmt_lowered = self.lower_expr_stmt(stmt)
 
             elif isinstance(stmt, vl_ast.CommentNode):
-                pass
+                stmt_lowered = None
 
             else:
                 raise ValueError(f"IE: Unknown stmt type '{type(stmt)}'")
+
+            if stmt_lowered:
+                out_stmts.append(stmt_lowered)
 
         # if there are still selection statements left over
         if selection_stmts:

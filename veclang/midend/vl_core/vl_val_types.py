@@ -64,29 +64,35 @@ class VlInt(VlTypeABC):
         self.underlying: int
         super().__init__(underlying)
 
+    def fits_in_signed(self, n_bytes: int) -> bool:
+        bits = n_bytes * 8
+        return -(1 << (bits - 1)) <= self.underlying <= (1 << (bits - 1)) - 1
+
     def to_byte(self) -> bytes:
-        # FIXME, add checking
+        if not self.fits_in_signed(1):
+            raise ValueError(
+                f"IE: int value too large to pack into 1 byte: {self.underlying}"
+            )
         return bytes(struct.pack("<b", self.underlying))
 
     def to_bytes_32(self) -> bytes:
-        if self.underlying in range(0xFFFF):
-            # FIXME for signs
+        if self.fits_in_signed(2):
             return bytes(struct.pack("<h", self.underlying))
-        elif self.underlying in range(0xFFFFFFFF):
+        elif self.fits_in_signed(4):
             return bytes(struct.pack("<i", self.underlying))
         else:
             raise ValueError(
-                f"IE: int value too large to pack to 32 bits: {self.underlying}"
+                f"IE: int value too large to pack into 4 bytes: {self.underlying}"
             )
 
     def to_bytes_64(self) -> bytes:
-        if self.underlying in range(0xFFFF):
+        if self.fits_in_signed(2):
             return bytes(struct.pack("<h", self.underlying))
-        elif self.underlying in range(0xFFFFFFFF_FFFFFFFF):
+        elif self.fits_in_signed(8):
             return bytes(struct.pack("<q", self.underlying))
         else:
             raise ValueError(
-                f"IE: int value too large to pack to 64 bits: {self.underlying}"
+                f"IE: int value too large to pack into 64 bytes: {self.underlying}"
             )
 
     @staticmethod
@@ -283,21 +289,10 @@ class VlBool(VlTypeABC):
         super().__init__(underlying)
 
     def to_bytes_32(self) -> bytes:
-        # TODO: use struct
-        if 0 <= self.underlying <= 0xFFFF:
-            return self.underlying.to_bytes().rjust(2, bytes(1))
-        elif self.underlying <= 0xFFFFFFFF:
-            return self.underlying.to_bytes().rjust(4, bytes(1))
-        else:
-            raise ValueError(f"Value too large: {self.underlying}")
+        return bytes(struct.pack("<h", self.underlying))
 
     def to_bytes_64(self) -> bytes:
-        if 0 <= self.underlying <= 0xFFFF:
-            return self.underlying.to_bytes().rjust(2, bytes(1))
-        elif self.underlying <= 0xFFFFFFFF_FFFFFFFF:
-            return self.underlying.to_bytes().rjust(8, bytes(1))
-        else:
-            raise ValueError(f"Value too large: {self.underlying}")
+        return self.to_bytes_32()
 
     @staticmethod
     def get_info() -> tuple[VlTypeStr, VlTypeCode, VlTypeType, tuple[int, int]]:

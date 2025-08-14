@@ -16,7 +16,6 @@ from veclang.midend.hir.vl_hir import (
     FunctionDeclNode,
     DataDeclNode,
     AssignmentStmtNode,
-    AugmentedAssignmentStmtNode,
     ExprStmtNode,
     SelectionStackStmt,
     RangedForStmtNode,
@@ -198,8 +197,6 @@ class BytecodeEmitter:
             self.emit_decl(node)
         elif isinstance(node, AssignmentStmtNode):
             self.emit_assignment_stmt(node)
-        elif isinstance(node, AugmentedAssignmentStmtNode):
-            self.emit_augmented_assignment_stmt(node)
         elif isinstance(node, SelectionStackStmt):
             self.emit_selection_stack_stmt(node)
         elif isinstance(node, RangedForStmtNode):
@@ -380,39 +377,71 @@ class BytecodeEmitter:
                 int_to_2_bytes(data_offset),
             )
 
-    def emit_fast_inplace_add(self, node: AssignmentStmtNode):
-        pass
+    def try_emit_fast_inplace(self, node: AssignmentStmtNode) -> bool:
+        """
+        Emits a fast inplace instructions for statements like:
+        - z = z + 1;
+        - c = c - 1;
+        """
+        if not isinstance(node.value, BinaryOperationExprNode):
+            return False
+        if node.value.vl_type != VlInt:
+            return False
+        if node.value.operation.op_type not in {"PLUS", "MINUS"}:
+            return False
+
+        # find if either left or right is the same as target
+        if (
+            isinstance(node.value.left, RvalueIdentifierExprNode)
+            and node.value.left.identifier == node.target
+        ):
+            delta = node.value.right
+        elif (
+            isinstance(node.value.right, RvalueIdentifierExprNode)
+            and node.value.right.identifier == node.target
+        ):
+            delta = node.value.left
+        else:
+            # there has to be a common identifier
+            return False
+
+        if delta.vl_type != VlInt:
+            return False
+
+        if len(self.scopes) == 1:
+            scope = "GLOBAL"
+        else:
+            scope = "LOCAL"
+        if node.value.operation.op_type == "PLUS":
+            op_name = "ADD"
+        else:
+            op_name = "SUB"
+
+        if (
+            delta.constexpr_value
+            and isinstance(delta.constexpr_value, VlInt)
+            and -128 < delta.constexpr_value.underlying < 127
+            and op_name == "ADD"
+        ):
+            data_offset = self.scopes[-1].data[node.target].data_offset
+            delta = delta.constexpr_value.to_byte()
+            self.add_instruction(
+                f"OP_FAST_{scope}_INT_INPLACE_ADD_DIRECT",
+                delta,
+                int_to_2_bytes(data_offset),
+            )
+            return True
+
+        # slightly slower but we can still call the non-direct method
+        self.emit_expr(delta)
+        data_offset = self.scopes[-1].data[node.target].data_offset
+        self.add_instruction(
+            f"OP_FAST_{scope}_INT_INPLACE_{op_name}", int_to_2_bytes(data_offset)
+        )
+        return True
 
     def emit_assignment_stmt(self, node: AssignmentStmtNode):
-        # special case for fast add
-        if (
-            isinstance(node.value, BinaryOperationExprNode)
-            and node.value.vl_type == VlInt
-            and node.value.operation.op_type == "PLUS"
-            and isinstance(node.value.left, RvalueIdentifierExprNode)
-            and node.value.left.identifier == node.target
-            and isinstance(node.value.right.constexpr_value, VlInt)
-            and abs(node.value.right.constexpr_value.underlying) < 128
-        ):
-            # FIXME FOR GLOBAL / LOCAL
-            data_offset = self.scopes[-1].data[node.target].data_offset
-            right = node.value.right.constexpr_value.to_byte()
-            self.add_instruction(
-                "OP_FAST_INT_INPLACE_ADD_DIRECT", right, int_to_2_bytes(data_offset)
-            )
-            return
-
-        if (
-            isinstance(node.value, BinaryOperationExprNode)
-            and node.value.vl_type == VlInt
-            and node.value.operation.op_type == "PLUS"
-            and isinstance(node.value.left, RvalueIdentifierExprNode)
-            and node.value.left.identifier == node.target
-        ):
-            # FIXME FOR GLOBAL / LOCAL
-            self.emit_expr(node.value.right)
-            data_offset = self.scopes[-1].data[node.target].data_offset
-            self.add_instruction("OP_FAST_INT_INPLACE_ADD", int_to_2_bytes(data_offset))
+        if self.try_emit_fast_inplace(node):
             return
 
         self.emit_expr(node.value)
@@ -433,9 +462,6 @@ class BytecodeEmitter:
                 int_to_1_byte(vl_type_code),
                 int_to_2_bytes(data_offset),
             )
-
-    def emit_augmented_assignment_stmt(self, node: AugmentedAssignmentStmtNode):
-        pass
 
     def emit_selection_stack_stmt(self, node: SelectionStackStmt):
         block_end_updates = []
@@ -512,15 +538,17 @@ class BytecodeEmitter:
         )
         loop_start_offset = self.next_instruction_offset()
 
-        # so now we start the loop
-        # TODO: FIXME for different loop stmts
-        # uh we might
         self.emit_expr(node.loop_var_end)
         self.add_instruction(
             get_val_instruction,
             int_to_2_bytes(self.scopes[-1].data[node.loop_var_identifier].data_offset),
         )
-        self.add_instruction("OP_INT_LESS")
+
+        if node.loop_var_is_ascending:
+            self.add_instruction("OP_INT_LESS")
+        else:
+            self.add_instruction("OP_INT_GREATER")
+
         self.add_instruction("OP_JMP_IF_FALSE", int_to_2_bytes(0xFFFF))
         block_end_updates.append(self.last_instruction_offset())
 

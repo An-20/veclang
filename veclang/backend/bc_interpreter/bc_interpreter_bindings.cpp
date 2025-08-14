@@ -143,6 +143,7 @@ public:
         }
         return ret;
     }
+
     py::object interpret_fn_preload_fast(py::int_ fn_idx, py::list arguments, py::int_ return_type_code)
     {
         using std::chrono::duration;
@@ -218,7 +219,6 @@ private:
 
 PYBIND11_MODULE(_bc_interpreter_core, m)
 {
-    std::cout << "here!" << std::endl;
     m.doc() = "Example module for passing arbitrary args to C++ and returning mixed objects";
     m.def("interpret_fn", &interpret_fn, "Process arbitrary Python arguments");
 

@@ -555,14 +555,14 @@ def p_unary_prec_expr(p):
         p[0] = p[1]
     else:
         operator: UnaryOperatorType
-        if p[2] == "+":
+        if p[1] == "+":
             operator = "UNARY_PLUS"
-        elif p[2] == "-":
+        elif p[1] == "-":
             operator = "UNARY_MINUS"
-        elif p[2] == "~":
+        elif p[1] == "~":
             operator = "BITWISE_NOT"
         else:
-            raise ValueError(f"Unknown operator '{p[2]}'")
+            raise ValueError(f"Unknown operator '{p[1]}'")
         p[0] = UnaryOperatorExprNode(p[2], operator, get_ast_pos_info(p))
 
 

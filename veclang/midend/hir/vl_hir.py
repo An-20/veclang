@@ -5,7 +5,6 @@ import dataclasses
 
 from veclang.frontend.parser import vl_ast
 from veclang.frontend.parser.vl_parser import (
-    AugmentedAssignmentOperatorType,
     BinaryOperatorType,
     UnaryOperatorType,
     ASTPositionInfo,
@@ -231,22 +230,6 @@ class AssignmentStmtNode(StmtNode):
         self.value: ExprNode = value
 
 
-class AugmentedAssignmentStmtNode(StmtNode):
-    """A HIR node for augmented assignment"""
-
-    def __init__(
-        self,
-        target: str,
-        operator: AugmentedAssignmentOperatorType,
-        value: ExprNode,
-        ast_position_info: ASTPositionInfo,
-    ) -> None:
-        super().__init__(ast_position_info)
-        self.target: str = target
-        self.operator: AugmentedAssignmentOperatorType = operator
-        self.value: ExprNode = value
-
-
 class ExprStmtNode(StmtNode):
     """A HIR node for a statement that is formed by an expression e.g. a();"""
 
@@ -289,6 +272,7 @@ class RangedForStmtNode(StmtNode):
         loop_var_start: ExprNode,
         loop_var_end: ExprNode,
         loop_var_step: ExprNode,
+        loop_var_is_ascending: bool,
         stmts: list[StmtNode],
         ast_position_info: ASTPositionInfo,
     ) -> None:
@@ -298,6 +282,7 @@ class RangedForStmtNode(StmtNode):
         self.loop_var_start: ExprNode = loop_var_start
         self.loop_var_end: ExprNode = loop_var_end
         self.loop_var_step: ExprNode = loop_var_step
+        self.loop_var_is_ascending: bool = loop_var_is_ascending
         self.stmts: list[StmtNode] = stmts
 
 

@@ -32,35 +32,13 @@ def compile_vl(program_str: str):
 
 
 PROGRAM_STR = """
-fn sum(n: int) -> int {
-    let s: int = 0;
-    for (_: int in 0:100000) {
-        s = 0;
-        for (x: int in 0:n) {
-            s += x;
-        }
+fn main() -> int {
+    for (x: int in 0:-10:-2) {
+        print(x);
     }
-    return s;
+    return 0;
 }
 """
 COMPILED = compile_vl(PROGRAM_STR)
 INTERPRETER = Interpreter(COMPILED)
-
-
-def sum_veclang(n: int):
-    return INTERPRETER.interpret_fn(0, [n]).return_value
-
-
-def sum_python(n: int):
-    s = 0
-    for x in range(n):
-        s += x
-    return s
-
-
-print(sum_veclang(100000))
-print(sum_python(100000))
-
-
-print("Veclang: ", timeit.timeit("sum_veclang(100000)", globals=globals(), number=1))
-print("Python: ", timeit.timeit("sum_python(100000)", globals=globals(), number=100))
+INTERPRETER.interpret_fn(0, [])

@@ -40,8 +40,10 @@ All Veclang types have an associated **type code**, which are used in some objec
 
 The **canonical size** of a Veclang type is the least number of bytes needed to represent it (like a struct with zero padding). When data is stored in a constant table or in stack memory, it is always arranged contiguously.
 
+All values in Veclang bytecode, including the constant table, and operands for instructions, are stored in little endian order.
+
 #### Casts
-Veclang has type casts with the `cast<IntoType>(val)` syntax. A type cast can either be a narrowing or widening conversion:
+Veclang has type casts with the `IntoType(val)` syntax. A type cast can either be a narrowing or widening conversion:
 - A **narrowing** conversion causes data loss, e.g. a `real` to an `int`, and must always be performed explicitly.
 - A **widening** conversion does not cause data loss (apart from potential floating-point imprecisions), e.g. a `real` to a `complex`. 
 
@@ -57,28 +59,6 @@ Veclang is a stack-based interpreted language, with operands and function parame
 - The **local stack**, which stores all local variables, organised in stack frames
 
 The reason for this separation is so that globals can be easily added when using Veclang in a REPL or similar.
-
-
-## Veclang Grammar
-Veclang has the tradition separation between expressions and statements:
-- An **expression** evaluates to a value, including operations, function calls, type casts, etc. An expression is a **constexpr** expression if it can be evaluated at compile time; compound expressions are **constexpr** if all their children are also constexpr.
-- A **statement** forms part of the program structure and does not evaluate to a value, including selection, loops, and declarations. Declarations are treated in Veclang as a subclass of statements that only belong in certain places.
-
-#### Hoisting
-Veclang only has two ways to pass data into a function:
-- Through parameters
-- Through global `constexpr`s. Global variables and constants cannot be accessed from within functions (for parallelisability).
-
-When a Veclang program is compiled to bytecode, function bytecode is placed at the beginning of the bytecode. The exact order is:
-- A JMP instruction to the end of all the function bytecode.
-- For each function, the bytecode is emitted with all function bytecode placed contiguously.
-- After all the function bytecode, the global bytecode.
-
-#### Lvalues and rvalues
-In Veclang, all **expressions** can be treated as `rvalues`, which can be on the right-hand side of an assignment statement. However, only specific expressions can be treated as `lvalues`, which are expressions on the left-hand side of an assignment statement that can actually be assigned to:
-- Bare identifiers that identify a piece of data (not a function)
-- Member access expressions, e.g. `vector.x`
-- Index expressions, e.g. `matrix[2, 3]`
 
 ## Functions
 Each Veclang function's **stack frame** can have a maximum of 65,536 bytes allocated for local stack variables (values and objects), as a result of the `offset` operand for instructions being 16 bytes. Similarly, a Veclang program can have a maximum of 65,536 bytes used for values in the constant table (across all global and local constexpr values). All Veclang functions must return some data.
@@ -102,6 +82,48 @@ Various elements of Veclang functionality are implemented by calling **builtin f
 
 When the AST is lowered to a HIR, type casts, methods, and property calls are all converted into function call HIR nodes to simplify the compilation process.
 
+#### User-defined Functions
+User-defined functions are resolved at the HIR lowering stage. Function declarations are hoisted to the top of a Veclang program, and each function is assigned an index in declaration order before the HIR is properly lowered. This allows functions to call other functions which have not yet been declared, or call themselves. When the HIR is lowered, this `userdef_fn_idx` is stored and later emitted.
+
+When a Veclang program is loaded into the interpreter, the interpreter creates a list of functions that acts as a lookup table, mapping a `userdef_fn_idx` to a tuple of `fn_instruction_offset` and `fn_stack_size`.
+
+When a user-defined function is called, the `userdef_fn_idx` is looked up and the instruction offset and stack size are used to create a stack frame and jump to the necessary instructions.
+
+## Veclang Grammar
+Veclang has the tradition separation between expressions and statements:
+- An **expression** evaluates to a value, including operations, function calls, type casts, etc. An expression is a **constexpr** expression if it can be evaluated at compile time; compound expressions are **constexpr** if all their children are also constexpr.
+- A **statement** forms part of the program structure and does not evaluate to a value, including selection, loops, and declarations. Declarations are treated in Veclang as a subclass of statements that only belong in certain places.
+
+#### Hoisting
+Veclang only has two ways to pass data into a function:
+- Through parameters
+- Through global `constexpr`s. Global variables and constants cannot be accessed from within functions (for parallelisability).
+
+When a Veclang program is compiled to bytecode, function bytecode is placed at the beginning of the bytecode. The exact order is:
+- A JMP instruction to the end of all the function bytecode.
+- For each function, the bytecode is emitted with all function bytecode placed contiguously.
+- After all the function bytecode, the global bytecode.
+
+#### Lvalues and rvalues
+In Veclang, all **expressions** can be treated as **rvalues**, which can be on the right-hand side of an assignment statement. However, only specific expressions can be treated as **lvalues**, which are expressions on the left-hand side of an assignment statement that can actually be assigned to:
+- Bare identifiers that identify a piece of data (not a function)
+- Member access expressions, e.g. `vector.x`
+- Index expressions, e.g. `matrix[2, 3]`
+
+Similarly, only certain expressions can be called:
+- Bare identifiers that identify a function
+- Member access expressions, e.g. `a.dot(b)`
+
+In the HIR lowering process, all expressions must be a VlType. Thus, when lowering function calls (which can involve member access expression callees), there is separate logic, as Veclang does not have first-class functions. With the exception of member access and index operations, all other expression types can only ever be used as rvalues.
+##### Member access expressions
+A **member access expression** e.g. `a.b` is permitted to be used:  
+- In a lvalue for assignment e.g. `vec2Instance.x = 15;`
+- In a rvalue expression for calling a property and resolving to a VlType e.g. `complexInstance.real`
+- In a rvalue expression for calling a method and resolving to a VlType e.g. `a.dot(b)`
+##### Index expressions
+An **index expression** e.g. `a[0]` or `b[1, 2]` is permitted to be used:
+- In a lvalue for assignment e.g. `vec2Instance[0] = 15;`
+- In a rvalue to resolve to a VlType e.g. `printr(a[0]);`
 
 # Veclang Implementation
 ## Veclang Compiler
@@ -130,10 +152,10 @@ There are three main types of instructions, classified by how they take operands
 - 0 operand instructions e.g. `OP_POP_VAL`.
 - 1 operand instructions e.g. `OP_CONSTANT_VAL_TABLE`, that take 1 16-bit operand.
 - 2 operand instructions e.g. `OP_VECTOR_ADD`, that take 1 8-bit operand and 1 16-bit operand.
-Each instruction consisting of opcode and operand(s) is stored as 4 bytes.
+Each instruction consisting of opcode and operand(s) is stored as 4 bytes. The operands are interpreted as unsigned 8 bit and 16 bit integers in little-endian order.
 
-### Instruction reference
-#### 0x00 - 0x2F - Basic variable and constant manipulations
+## Instruction reference
+### 0x00 - 0x2F - Basic variable and constant manipulations
 #### Constant loading
 ##### `0x00: OP_CONSTANT_VAL_DIRECT`
 `OP_CONSTANT_VAL_DIRECT value_16b`
@@ -164,15 +186,15 @@ Pops a value off the top of the object stack.
 #### Function calls
 ##### `0x06: OP_CALL_BUILTIN`
 `OP_CALL_BUILTIN builtin_id_16b`
-Calls a builtin function. All arguments in Veclang must be evaluated in left-to-right order, therfore this operation will pop arguments off the value and object stacks in 
+Calls a builtin function.
 
-##### `0x07: OP_CALL`
-`OP_CALL_BUILTIN function_id_16b`
-Calls a function. Unimplemented.
+##### `0x07: OP_CALL_USERDEF`
+`OP_CALL_USERDEF function_idx_16b`
+Calls a user-defined function. This instruction causes a new stack frame to be pushed and the instruction pointer to be set to the beginning of the function.
 
 ##### `0x08: OP_RETURN`
 `OP_RETURN`
-Returns from a function. Before this instruction is executed, the return value should be at the top of the object or value stacks.
+Returns from a function. Before this instruction is executed, the return value should be at the top of the object or value stacks. This instruction causes the instruction pointer to be set to the return address, and 
 
 #### Getting and setting values
 ##### `0x10: OP_GET_LOCAL_VAL`
@@ -220,98 +242,131 @@ Pops the top value off the value stack, and jumps to the instruction at `offset`
 `OP_JMP_IF_FALSE offset_16b`
 Pops the top value off the value stack, and jumps to the instruction at `offset` if the value is zero.
 
+### 0x24 - 0x3F - Fast instructions
+##### `0x24: OP_FAST_LOCAL_INT_INPLACE_ADD`
+`OP_FAST_LOCAL_INT_INPLACE_ADD offset_16b`
+Performs an inplace addition operation on the int at `offset` in the local stack, popping the top value off the value stack, and adding it to the int at `offset`.
+
+##### `0x25: OP_FAST_LOCAL_INT_INPLACE_ADD_DIRECT`
+`OP_FAST_LOCAL_INT_INPLACE_ADD_DIRECT delta_8b offset_16b`
+Performs an inplace addition operation on the int at `offset` in the local stack, taking `delta_8b` as a signed 8-bit integer, which is added to the int at `offset`.
+
+##### `0x26: OP_FAST_GLOBAL_INT_INPLACE_ADD`
+`OP_FAST_GLOBAL_INT_INPLACE_ADD offset_16b`
+Performs an inplace addition operation on the int at `offset` in the global stack, popping the top value off the value stack, and adding it to the int at `offset`.
+
+##### `0x27: OP_FAST_GLOBAL_INT_INPLACE_ADD_DIRECT`
+`OP_FAST_GLOBAL_INT_INPLACE_ADD_DIRECT delta_8b offset_16b`
+Performs an inplace addition operation on the int at `offset` in the global stack, taking `delta_8b` as a signed 8-bit integer, which is added to the int at `offset`.
+
+##### `0x28: OP_FAST_LOCAL_INT_INPLACE_SUB`
+`OP_FAST_LOCAL_INT_INPLACE_SUB offset_16b`
+Performs an inplace subtraction operation on the int at `offset` in the local stack, popping the top value off the value stack, and subtracting it from the int at `offset`.
+
+##### `0x29: OP_FAST_GLOBAL_INT_INPLACE_SUB`
+`OP_FAST_GLOBAL_INT_INPLACE_SUB offset_16b`
+Performs an inplace subtraction operation on the int at `offset` in the global stack, popping the top value off the value stack, and subtracting it from the int at `offset`.
+
+
 ### 0x80 - 0x9F - Integer and Boolean Operations
 
 ### Full Opcode Reference
 ```
 enum VlOpcode : uint8 {  
-    OP_CONSTANT_VAL_DIRECT=0x00,  
-    OP_CONSTANT_OBJ_DIRECT=0x01,  
-    OP_CONSTANT_VAL_TABLE=0x02,  
-    OP_CONSTANT_OBJ_TABLE=0x03,  
-    OP_POP_VAL=0x04,  
-    OP_POP_OBJ=0x05,  
-    OP_CALL_BUILTIN=0x06,  
-    OP_CALL=0x07,  
-    OP_RETURN=0x08,  
-  
-    OP_GET_LOCAL_VAL=0x10,  
-    OP_SET_LOCAL_VAL=0x11,  
-    OP_GET_GLOBAL_VAL=0x12,  
-    OP_SET_GLOBAL_VAL=0x13,  
-    OP_GET_LOCAL_OBJ=0x14,  
-    OP_SET_LOCAL_OBJ=0x15,  
-    OP_GET_GLOBAL_OBJ=0x16,  
-    OP_SET_GLOBAL_OBJ=0x17,  
-  
-    OP_JMP=0x20,  
-    OP_JMP_IF_TRUE=0x20,  
-    OP_JMP_IF_FALSE=0x21,  
-  
-    OP_INT_EQUAL=0x80,  
-    OP_INT_NOT_EQUAL=0x81,  
-    OP_INT_GREATER=0x82,  
-    OP_INT_GREATER_OR_EQUAL=0x83,  
-    OP_INT_LESS=0x84,  
-    OP_INT_LESS_OR_EQUAL=0x85,  
-    OP_INT_ADD=0x86,  
-    OP_INT_SUB=0x87,  
-    OP_INT_MUL=0x88,  
-    OP_INT_DIV=0x89,  
-    OP_INT_MOD=0x8A,  
-    OP_INT_POW=0x8B,  
-    OP_INT_NEG=0x8C,  
-    OP_INT_AND=0x8D,  
-    OP_INT_OR=0x8E,  
-    OP_INT_XOR=0x8F,  
-  
-    OP_INT_NOT=0x90,  
-    OP_INT_LEFT_SHIFT=0x91,  
-    OP_INT_RIGHT_SHIFT=0x92,  
-    OP_BOOLEAN_AND=0x9C,  
-    OP_BOOLEAN_OR=0x9D,  
-    OP_BOOLEAN_NOT=0x9E,  
-  
-    OP_REAL_EQUAL=0xA0,  
-    OP_REAL_NOT_EQUAL=0xA1,  
-    OP_REAL_GREATER=0xA2,  
-    OP_REAL_GREATER_OR_EQUAL=0xA3,  
-    OP_REAL_LESS=0xA4,  
-    OP_REAL_LESS_OR_EQUAL=0xA5,  
-    OP_REAL_ADD=0xA6,  
-    OP_REAL_SUB=0xA7,  
-    OP_REAL_MUL=0xA8,  
-    OP_REAL_DIV=0xA9,  
-    OP_REAL_MOD=0xAA,  
-    OP_REAL_POW=0xAB,  
-    OP_REAL_NEG=0xAC,  
-  
-    OP_COMPLEX_EQUAL=0xB0,  
-    OP_COMPLEX_NOT_EQUAL=0xB1,  
-    OP_COMPLEX_ADD=0xB2,  
-    OP_COMPLEX_SUB=0xB3,  
-    OP_COMPLEX_MUL=0xB4,  
-    OP_COMPLEX_DIV=0xB5,  
-    OP_COMPLEX_POW=0xB6,  
-    OP_COMPLEX_NEG=0xB7,  
-  
-    OP_VECTOR_ADD=0xC0,  
-    OP_VECTOR_SUB=0xC1,  
-    OP_VECTOR_MUL=0xC2,  
-    OP_VECTOR_DIV=0xC3,  
-    OP_VECTOR_NEG=0xC4,  
-    OP_VECTOR_SCL=0xC5,  
-    OP_VECTOR_DOT=0xC6,  
-    OP_VECTOR_CRS=0xC7,  
-    OP_MATRIX_ADD=0xC8,  
-    OP_MATRIX_SUB=0xC9,  
-    OP_MATRIX_MUL=0xCA,  
-    OP_MATRIX_NEG=0xCB,  
-    OP_MATRIX_SCL=0xCC
+	OP_CONSTANT_VAL_DIRECT = 0x00,
+	OP_CONSTANT_OBJ_DIRECT = 0x01,
+	OP_CONSTANT_VAL_TABLE = 0x02,
+	OP_CONSTANT_OBJ_TABLE = 0x03,
+	OP_POP_VAL = 0x04,
+	OP_POP_OBJ = 0x05,
+	OP_CALL_BUILTIN = 0x06,
+	OP_CALL_USERDEF = 0x07,
+	OP_RETURN = 0x08,
+	
+	OP_GET_LOCAL_VAL = 0x10,
+	OP_SET_LOCAL_VAL = 0x11,
+	OP_GET_GLOBAL_VAL = 0x12,
+	OP_SET_GLOBAL_VAL = 0x13,
+	OP_GET_LOCAL_OBJ = 0x14,
+	OP_SET_LOCAL_OBJ = 0x15,
+	OP_GET_GLOBAL_OBJ = 0x16,
+	OP_SET_GLOBAL_OBJ = 0x17,
+
+	OP_JMP = 0x20,
+	OP_JMP_IF_TRUE = 0x21,
+	OP_JMP_IF_FALSE = 0x22,
+
+	OP_FAST_LOCAL_INT_INPLACE_ADD = 0x24,
+	OP_FAST_LOCAL_INT_INPLACE_ADD_DIRECT = 0x25,
+	OP_FAST_GLOBAL_INT_INPLACE_ADD = 0x26,
+	OP_FAST_GLOBAL_INT_INPLACE_ADD_DIRECT = 0x27,
+	OP_FAST_LOCAL_INT_INPLACE_SUB = 0x28,
+	OP_FAST_GLOBAL_INT_INPLACE_SUB = 0x29,
+
+	OP_INT_EQUAL = 0x80,
+	OP_INT_NOT_EQUAL = 0x81,
+	OP_INT_GREATER = 0x82,
+	OP_INT_GREATER_OR_EQUAL = 0x83,
+	OP_INT_LESS = 0x84,
+	OP_INT_LESS_OR_EQUAL = 0x85,
+	OP_INT_ADD = 0x86,
+	OP_INT_SUB = 0x87,
+	OP_INT_MUL = 0x88,
+	OP_INT_DIV = 0x89,
+	OP_INT_MOD = 0x8A,
+	OP_INT_POW = 0x8B,
+	OP_INT_NEG = 0x8C,
+	OP_INT_AND = 0x8D,
+	OP_INT_OR = 0x8E,
+	OP_INT_XOR = 0x8F,
+	OP_INT_NOT = 0x90,
+	OP_INT_LEFT_SHIFT = 0x91,
+	OP_INT_RIGHT_SHIFT = 0x92,
+
+	OP_BOOLEAN_AND = 0x9C,
+	OP_BOOLEAN_OR = 0x9D,
+	OP_BOOLEAN_NOT = 0x9E,
+
+	OP_REAL_EQUAL = 0xA0,
+	OP_REAL_NOT_EQUAL = 0xA1,
+	OP_REAL_GREATER = 0xA2,
+	OP_REAL_GREATER_OR_EQUAL = 0xA3,
+	OP_REAL_LESS = 0xA4,
+	OP_REAL_LESS_OR_EQUAL = 0xA5,
+	OP_REAL_ADD = 0xA6,
+	OP_REAL_SUB = 0xA7,
+	OP_REAL_MUL = 0xA8,
+	OP_REAL_DIV = 0xA9,
+	OP_REAL_MOD = 0xAA,
+	OP_REAL_POW = 0xAB,
+	OP_REAL_NEG = 0xAC,
+
+	OP_COMPLEX_EQUAL = 0xB0,
+	OP_COMPLEX_NOT_EQUAL = 0xB1,
+	OP_COMPLEX_ADD = 0xB2,
+	OP_COMPLEX_SUB = 0xB3,
+	OP_COMPLEX_MUL = 0xB4,
+	OP_COMPLEX_DIV = 0xB5,
+	OP_COMPLEX_POW = 0xB6,
+	OP_COMPLEX_NEG = 0xB7,
+
+	OP_VECTOR_ADD = 0xC0,
+	OP_VECTOR_SUB = 0xC1,
+	OP_VECTOR_MUL = 0xC2,
+	OP_VECTOR_DIV = 0xC3,
+	OP_VECTOR_NEG = 0xC4,
+	OP_VECTOR_SCL = 0xC5,
+	OP_VECTOR_DOT = 0xC6,
+	OP_VECTOR_CRS = 0xC7,
+	OP_MATRIX_ADD = 0xC8,
+	OP_MATRIX_SUB = 0xC9,
+	OP_MATRIX_MUL = 0xCA,
+	OP_MATRIX_NEG = 0xCB,
+	OP_MATRIX_SCL = 0xCC
 }
 ```
 
-## Builtin Function Reference
+# Builtin Function Reference
 `0x0000 - 0x0FFF` is used for builtin functions
 `0x1000 - 0x1FFF` is used for builtin type methods and properties.
 
@@ -334,9 +389,10 @@ enum VlOpcode : uint8 {
 #### 0x1400 - 0x14FF: mat methods and properties
 
 
-## Error Reference
+# Compiler Diagnostics Reference
 #### E0xx errors - Core program errors
-
+###### E000
+E000: Syntax error
 #### E1xx errors - Type errors
 ###### E100
 E100: Data `<>` is type `<>`, got type `<>`
@@ -345,19 +401,29 @@ E102: Assignment of non-constexpr expression to constexpr `<>`
 ###### E102
 E102: Assignment to constant `<>`after initialization
 ###### E103
-E103: Operator `<>` not supported between instances of `<>` and `<>`
+E103: Assignment to non-lvalue
+###### E104
+E104: Operator `<>` not supported between instances of `<>` and `<>`
+###### E105
+E105: Cannot cast from `<>` to `<>`
+###### E106
+E106: Member access results in callable; Veclang does not support first-class functions.
 ###### E110
 E110: Function `<>` expects `<>` arguments, not `<>` arguments
 ###### E111
 E111: Function `<>` expects argument #`<>` to be type `<>`, not `<>`
 ###### E112
 E112: Expected return type of `<>`, got type `<>`
+###### E113
+E113: Calling non-callable expression
 ###### E120
-E120: `if` statement condition should be type `bool`, got type `<>`  
+E120: `if` statement condition should be type `bool`, got type `<>`
 ###### E121
-E121: `elseif` statement condition should be type `bool`, got type `<>`  
+E121: `elseif` statement condition should be type `bool`, got type `<>` 
 ###### E122
-E122: `while` statement condition should be type `bool`, got type `<>`  
+E122: `while` statement condition should be type `bool`, got type `<>`
+##### E123
+E123: `for` statement range literal must either be `start:stop:constexpr_step` or `constexpr_start:constexpr_stop:step`
 
 #### E2xx errors - Identifier errors
 ###### E200
@@ -403,8 +469,10 @@ W011: Unreachable code after `break` statement
 W012: Unreachable code after `continue` statement
 ###### W013
 W013: Expression statement has no effect
+###### W014
+W014: Statement has no effect
 
-#### Weak warnings
+## Weak warnings
 ###### X000
 X000: Constant identifier `<>` should be uppercase `SNAKE_CASE`
 ###### X001

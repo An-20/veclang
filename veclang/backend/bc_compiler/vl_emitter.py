@@ -24,7 +24,12 @@ from veclang.midend.hir.vl_hir import (
     BreakStmtNode,
     ContinueStmtNode,
 )
-from veclang.midend.vl_core import VlType, VlTypeABC, VlInt, VlNull
+from veclang.midend.vl_core import (
+    VlType,
+    VlTypeABC,
+    VlInt,
+    VlNull,
+)
 from veclang.midend.hir.vl_lowerer import GLOBAL_FN_NAME, VlQualifier
 
 from veclang.backend.bc_compiler.vl_emitter_utils import (
@@ -53,7 +58,7 @@ class BytecodeEmitter:
 
         self.scopes: list[FunctionScope] = [
             FunctionScope(
-                GLOBAL_FN_NAME, ASTPositionInfo(0, 0), {}, 0, 0, [], [], VlNull
+                GLOBAL_FN_NAME, ASTPositionInfo(0, 0), {}, 0, 0, [], [], VlNull, {}
             )
         ]
 
@@ -72,6 +77,7 @@ class BytecodeEmitter:
         ast_position_info: ASTPositionInfo,
         arg_types: list[VlType],
         return_type: VlType,
+        attribute_tags: dict[str, int],
     ) -> None:
         for scope in self.scopes:
             if scope.fn_name != GLOBAL_FN_NAME:
@@ -86,6 +92,7 @@ class BytecodeEmitter:
                 [],
                 arg_types,
                 return_type,
+                attribute_tags,
             )
         )
 
@@ -326,7 +333,13 @@ class BytecodeEmitter:
         # pop arguments off the intermediate value stack and onto the call stack
         arg_types = [p.vl_type for p in node.parameters]
         return_type = node.return_type
-        self.scope_in_fn(fn_identifier, node.ast_position_info, arg_types, return_type)
+        self.scope_in_fn(
+            fn_identifier,
+            node.ast_position_info,
+            arg_types,
+            return_type,
+            node.attribute_tags,
+        )
         for parameter in node.parameters:
             self.fn_add_data("const", parameter.identifier, parameter.vl_type)
 
@@ -694,6 +707,7 @@ class BytecodeEmitter:
                         "instruction_offset": function.instruction_offset,
                         "arg_types": [p.to_vl_type_code() for p in function.arg_types],
                         "return_type": function.return_type.to_vl_type_code(),
+                        "attribute_tags": function.attribute_tags,
                     }
                 )
             header: bc.VlHeader = {

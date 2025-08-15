@@ -11,7 +11,11 @@ from veclang.frontend.parser.vl_parser import (
 )
 
 from veclang.midend.vl_core.vl_type import VlOperation
-from veclang.midend.vl_core import VlType, VlTypeABC, VlFunctionParameterTypeProfile
+from veclang.midend.vl_core import (
+    VlType,
+    VlTypeABC,
+    VlFunctionParameterTypeProfile,
+)
 
 
 class HIRNode(abc.ABC):
@@ -178,7 +182,7 @@ class FunctionDeclNode(DeclNode):
 
     def __init__(
         self,
-        attribute_tags: dict[str, list[ExprNode]],
+        attribute_tags: dict[str, int],
         identifier: str,
         parameters: list[VlFunctionParameterTypeProfile],
         return_type: VlType,
@@ -186,7 +190,7 @@ class FunctionDeclNode(DeclNode):
         ast_position_info: ASTPositionInfo,
     ) -> None:
         super().__init__(ast_position_info)
-        self.attribute_tags: dict[str, list[ExprNode]] = attribute_tags
+        self.attribute_tags: dict[str, int] = attribute_tags
         self.identifier: str = identifier
         self.parameters: list[VlFunctionParameterTypeProfile] = parameters
         self.return_type: VlType = return_type

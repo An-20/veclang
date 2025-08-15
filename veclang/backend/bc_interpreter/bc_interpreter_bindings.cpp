@@ -93,7 +93,14 @@ public:
         {
         case 0:
             return py::int_(vl_types::rv_to_int(rv));
+        case 1:
+            return py::bool_(vl_types::rv_to_bool(rv));
+        case 2:
+            return py::float_(vl_types::rv_to_double(rv));
+        default:
+            return py::none();
         }
+        return py::none();
     }
 
 private:

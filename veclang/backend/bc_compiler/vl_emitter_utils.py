@@ -45,6 +45,7 @@ class FunctionScope:
 
     arg_types: list[VlType]
     return_type: VlType
+    attribute_tags: dict[str, int]
 
 
 def int_to_1_byte(x: int) -> bytes:

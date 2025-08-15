@@ -232,7 +232,7 @@ class VlFunctionParameterTypeProfile:
 
 
 @dataclasses.dataclass
-class VlBuiltinFunctionTypeProfile:
+class VlBuiltinFunctionProfile:
     identifier: str
     builtin_fn_id: int
     parameters: list[VlFunctionParameterTypeProfile]
@@ -240,8 +240,9 @@ class VlBuiltinFunctionTypeProfile:
 
 
 @dataclasses.dataclass
-class VlUserdefFunctionTypeProfile:
+class VlUserdefFunctionProfile:
     identifier: str
     userdef_fn_idx: int
     parameters: list[VlFunctionParameterTypeProfile]
     return_type: VlType
+    attribute_tags: dict[str, int]

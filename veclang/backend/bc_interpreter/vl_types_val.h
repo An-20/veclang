@@ -11,6 +11,7 @@ namespace vl_types
     struct RawValue
     {
         uint64_t bits;
+        RawValue() : bits(0) {}
     };
 
     inline RawValue null()

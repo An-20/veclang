@@ -18,13 +18,14 @@ namespace vl_sedf
         uint32_t instruction_offset;
         std::vector<uint8_t> arg_types;
         uint8_t return_type;
+        std::map<std::string, uint64_t> attribute_tags;
     };
 
     struct VlHeader
     {
         std::string magic; // Should always be "VECL"
         uint32_t version;
-        std::map<std::string, uint32_t> flags;
+        std::map<std::string, uint64_t> flags;
         std::vector<VlFunction> functions;
         uint32_t globals_stack_size;
     };

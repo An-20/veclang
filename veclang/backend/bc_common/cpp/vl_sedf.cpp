@@ -27,7 +27,7 @@ namespace vl_sedf
             throw std::runtime_error("Unsupported VL SEDF version, got " + std::to_string(program.header.version) + ", expected " + std::to_string(VL_SEDF_VERSION));
         for (const auto &flag : j["flags"].items())
         {
-            program.header.flags[flag.key()] = flag.value().get<uint32_t>();
+            program.header.flags[flag.key()] = flag.value().get<uint64_t>();
         }
         for (const auto &func : j["functions"])
         {
@@ -37,6 +37,10 @@ namespace vl_sedf
             vl_func.instruction_offset = func["instruction_offset"].get<uint32_t>();
             vl_func.arg_types = func["arg_types"].get<std::vector<uint8_t>>();
             vl_func.return_type = func["return_type"].get<uint8_t>();
+            for (const auto &tag : func["attribute_tags"].items())
+            {
+                vl_func.attribute_tags[tag.key()] = tag.value().get<uint64_t>();
+            }
             program.header.functions.push_back(vl_func);
         }
         program.header.globals_stack_size = j["globals_stack_size"].get<uint32_t>();

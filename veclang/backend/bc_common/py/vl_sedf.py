@@ -11,12 +11,13 @@ class VlFunction(typing.TypedDict):
     instruction_offset: int
     arg_types: list[int]
     return_type: int
+    attribute_tags: dict[str, int]
 
 
 class VlHeader(typing.TypedDict):
     magic: str  # Should always be "VECL"
     version: int
-    flags: dict
+    flags: dict[str, int]
     functions: list[VlFunction]
     globals_stack_size: int
 

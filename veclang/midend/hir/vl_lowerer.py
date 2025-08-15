@@ -41,9 +41,9 @@ from veclang.midend.vl_core import (
     VlOperation,
     VlConstexprOperation,
     VlConstexprCast,
-    VlBuiltinFunctionTypeProfile,
-    VlUserdefFunctionTypeProfile,
     VlFunctionParameterTypeProfile,
+    VlBuiltinFunctionProfile,
+    VlUserdefFunctionProfile,
     VlNull,
     VlInt,
     VlReal,
@@ -80,21 +80,21 @@ class Lowerer:
 
         self.imported_constants: list[tuple[str, str]] = []
         self.imported_functions: list[tuple[str, str]] = []
-        self.builtin_functions: dict[str, VlBuiltinFunctionTypeProfile] = {
-            "print": VlBuiltinFunctionTypeProfile(
+        self.builtin_functions: dict[str, VlBuiltinFunctionProfile] = {
+            "print": VlBuiltinFunctionProfile(
                 "print",
                 0x0000,
                 [VlFunctionParameterTypeProfile("arg", VlInt)],
                 VlNull,
             ),
-            "printr": VlBuiltinFunctionTypeProfile(
+            "printr": VlBuiltinFunctionProfile(
                 "printr",
                 0x0001,
                 [VlFunctionParameterTypeProfile("arg", VlReal)],
                 VlNull,
             ),
         }
-        self.userdef_functions: dict[str, VlUserdefFunctionTypeProfile] = {}
+        self.userdef_functions: dict[str, VlUserdefFunctionProfile] = {}
 
         self.scopes: list[Scope] = [
             self.create_scope(GLOBAL_FN_NAME, None, None, None, ASTPositionInfo(0, 0))
@@ -431,7 +431,13 @@ class Lowerer:
         if self.error:
             return None, self.diagnostics
 
-        return ProgramNode(stmts_lowered, ast_node.position_info), self.diagnostics
+        return (
+            ProgramNode(
+                stmts_lowered,
+                ast_node.position_info,
+            ),
+            self.diagnostics,
+        )
 
     @staticmethod
     def lower_vl_type(vl_type_str: str) -> VlType:
@@ -611,7 +617,7 @@ class Lowerer:
             raise FatalCompileError()
 
         identifier = expr.callee.name
-        function_data: VlBuiltinFunctionTypeProfile | VlUserdefFunctionTypeProfile
+        function_data: VlBuiltinFunctionProfile | VlUserdefFunctionProfile
         if identifier in self.builtin_functions:
             function_data = self.builtin_functions[expr.callee.name]
         elif identifier in self.userdef_functions:
@@ -645,7 +651,7 @@ class Lowerer:
                     expr.position_info,
                 )
 
-        if isinstance(function_data, VlBuiltinFunctionTypeProfile):
+        if isinstance(function_data, VlBuiltinFunctionProfile):
             return BuiltinFunctionCallExprNode(
                 function_data.builtin_fn_id,
                 arguments,
@@ -653,7 +659,7 @@ class Lowerer:
                 None,  # no such thing as constexpr function call apart from casts
                 expr.position_info,
             )
-        elif isinstance(function_data, VlUserdefFunctionTypeProfile):
+        elif isinstance(function_data, VlUserdefFunctionProfile):
             return UserdefFunctionCallExprNode(
                 function_data.userdef_fn_idx,
                 arguments,
@@ -843,6 +849,57 @@ class Lowerer:
             expr.position_info,
         )
 
+    def filter_fn_decl_attribute_tags(
+        self, parsed_tags: dict, position_info: ASTPositionInfo
+    ) -> dict:
+        final_tags: dict[str, int] = {}
+        for key, value in parsed_tags.items():
+            if key == "generate_img":
+                final_tags["generate_img"] = 1
+            # elif...
+            else:
+                self.add_diagnostic(
+                    "W020", f"Unknown attribute tag key: '{key}'", position_info
+                )
+        return final_tags
+
+    def filter_fn_param_attribute_tags(
+        self, parsed_tags: dict, position_info: ASTPositionInfo
+    ) -> dict:
+        final_tags: dict[str, int] = {}
+        for key, value in parsed_tags.items():
+            self.add_diagnostic(
+                "W020", f"Unknown attribute tag key: '{key}'", position_info
+            )
+        return final_tags
+
+    def lower_attribute_tags(self, node: vl_ast.AttributeTagsNode) -> dict:
+        parsed_tags: dict = {}
+        for tag in node.tags:
+            if tag.key.name in parsed_tags:
+                self.add_diagnostic(
+                    "E211",
+                    f"Attribute tag parsing error: duplicate key '{tag.key.name}'",
+                    tag.position_info,
+                )
+
+            if not tag.values:
+                parsed_tags[tag.key.name] = None
+            else:
+                tag_values = []
+                for value in tag.values.values:
+                    lowered_value = self.lower_expr(value)
+                    if not isinstance(lowered_value, ConstantExprNode):
+                        self.add_diagnostic(
+                            "E211",
+                            f"Attribute tag parsing error: value (for key '{tag.key.name}') must be a constant",
+                            tag.position_info,
+                        )
+                        raise FatalCompileError
+                    tag_values.append(lowered_value.value.underlying)
+                parsed_tags[tag.key.name] = tag_values
+        return parsed_tags
+
     def lookahead_function_decl(self, decl: vl_ast.FunctionDeclNode) -> None:
         """
         Lookahead to get information on builtin functions before they are actually lowered.
@@ -855,10 +912,23 @@ class Lowerer:
                 decl.position_info,
             )
 
-        parameters = [
-            VlFunctionParameterTypeProfile(x.name.name, self.lower_vl_type(x.type.name))
-            for x in decl.parameters.parameters
-        ]
+        parameters: list[VlFunctionParameterTypeProfile] = []
+        attribute_tags: dict[str, int] = {}
+        for idx, parameter in enumerate(decl.parameters.parameters):
+            parameters.append(
+                VlFunctionParameterTypeProfile(
+                    parameter.name.name, self.lower_vl_type(parameter.type.name)
+                )
+            )
+            param_attribute_tags = self.filter_fn_param_attribute_tags(
+                self.lower_attribute_tags(parameter.attribute_tags),
+                parameter.position_info,
+            )
+            param_attribute_tags = {
+                f"param_{idx}::{k}": v for k, v in param_attribute_tags.items()
+            }
+            attribute_tags.update(param_attribute_tags)
+
         return_type = self.lower_vl_type(decl.return_type.name)
 
         # Check for duplicate parameter identifiers
@@ -873,34 +943,23 @@ class Lowerer:
             )
 
         userdef_fn_idx = len(self.userdef_functions)
-        self.userdef_functions[identifier] = VlUserdefFunctionTypeProfile(
-            identifier, userdef_fn_idx, parameters, return_type
+        attribute_tags.update(
+            self.filter_fn_decl_attribute_tags(
+                self.lower_attribute_tags(decl.attribute_tags), decl.position_info
+            )
+        )
+
+        self.userdef_functions[identifier] = VlUserdefFunctionProfile(
+            identifier, userdef_fn_idx, parameters, return_type, attribute_tags
         )
 
     def lower_function_decl(self, decl: vl_ast.FunctionDeclNode) -> FunctionDeclNode:
-        # Construct attribute tags
-        attribute_tags_dict = {}
-        for tag in decl.attribute_tags.tags:
-            if tag.key.name in attribute_tags_dict:
-                raise ValueError(f"TODO: Duplicate attribute tag key '{tag.key.name}'")
-            if not tag.values:
-                attribute_tags_dict[tag.key.name] = None
-            else:
-                tag_values = []
-                for value in tag.values.values:
-                    lowered_value = self.lower_expr(value)
-                    if not isinstance(lowered_value, ConstantExprNode):
-                        raise ValueError(
-                            f"TODO: Attribute tag value (for key '{tag.key.name}') must be a constant value."
-                        )
-                    tag_values.append(lowered_value)
-                attribute_tags_dict[tag.key.name] = tag_values
-
         if decl.identifier.name not in self.userdef_functions:
             raise FatalCompileError(
                 "IE: decl.identifier.name not in self.userdef_functions"
             )
         fn_data = self.userdef_functions[decl.identifier.name]
+        attribute_tags = fn_data.attribute_tags
         identifier = fn_data.identifier
         parameters = fn_data.parameters
         return_type = fn_data.return_type
@@ -927,7 +986,7 @@ class Lowerer:
             )
 
         return FunctionDeclNode(
-            attribute_tags_dict,
+            attribute_tags,
             identifier,
             parameters,
             return_type,

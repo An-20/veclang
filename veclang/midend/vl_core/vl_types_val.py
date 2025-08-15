@@ -10,7 +10,7 @@ from veclang.midend.vl_core.vl_type import (
     VlCast,
     VlConstexprCast,
 )
-from veclang.midend.vl_core.vl_obj_types import VlComplex
+from veclang.midend.vl_core.vl_types_obj import VlComplex
 
 
 class VlNull(VlTypeABC):

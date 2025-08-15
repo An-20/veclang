@@ -12,8 +12,8 @@ from veclang.midend.vl_core.vl_type import (
     VlConstexprCast,
     VlMethod,
 )
-from veclang.midend.vl_core.vl_val_types import VlNull, VlInt, VlReal, VlBool
-from veclang.midend.vl_core.vl_obj_types import (
+from veclang.midend.vl_core.vl_types_val import VlNull, VlInt, VlReal, VlBool
+from veclang.midend.vl_core.vl_types_obj import (
     VlComplex,
     VlMat2,
     VlMat3,

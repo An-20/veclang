@@ -98,10 +98,10 @@ class BytecodeEmitter:
 
     def scope_out_fn(self) -> None:
         if len(self.scopes) == 1:
-            raise FatalCompileError("Cannot scope out of global scope!")
+            raise FatalCompileError("IE: cannot scope out of global scope!")
         if not self.scopes[-1].fn_name:
             raise FatalCompileError(
-                "Mismatched scope: current scope is not a function scope"
+                "IE: mismatched scope: current scope is not a function scope"
             )
         self.functions.append(self.scopes.pop())
 
@@ -157,7 +157,7 @@ class BytecodeEmitter:
 
     def add_instruction(self, opcode_hr: str, *operands: bytes) -> int:
         if opcode_hr not in OpcodeHRMap:
-            raise FatalCompileError(f"Unknown opcode '{opcode_hr}'")
+            raise FatalCompileError(f"IE: unknown opcode '{opcode_hr}'")
         self.instructions.append(OpcodeHRMap[opcode_hr].pack(operands))
         return len(self.instructions) - 1
 
@@ -219,7 +219,7 @@ class BytecodeEmitter:
         elif isinstance(node, ExprStmtNode):
             self.emit_expr_stmt(node)
         else:
-            raise FatalCompileError(f"IE: Unknown stmt type {type(node)}")
+            raise FatalCompileError(f"IE: unknown stmt type {type(node)}")
 
     def emit_decl(self, node: DeclNode) -> None:
         if isinstance(node, FunctionDeclNode):
@@ -227,7 +227,7 @@ class BytecodeEmitter:
         elif isinstance(node, DataDeclNode):
             self.emit_data_decl(node)
         else:
-            raise FatalCompileError(f"IE: Unknown decl type {type(node)}")
+            raise FatalCompileError(f"IE: unknown decl type {type(node)}")
 
     def emit_expr(self, node: ExprNode) -> None:
         if isinstance(node, RvalueIdentifierExprNode):
@@ -243,7 +243,7 @@ class BytecodeEmitter:
         elif isinstance(node, ConstantExprNode):
             self.emit_constant_expr(node)
         else:
-            raise FatalCompileError(f"IE: Unknown expr type {type(node)}")
+            raise FatalCompileError(f"IE: unknown expr type {type(node)}")
 
     def emit_rvalue_identifier_expr(self, node: RvalueIdentifierExprNode) -> None:
         identifier = node.identifier
@@ -271,7 +271,7 @@ class BytecodeEmitter:
                     int_to_2_bytes(data_offset),
                 )
             return
-        raise FatalCompileError(f"Unknown identifier '{identifier}'")
+        raise FatalCompileError(f"IE: unknown identifier '{identifier}'")
 
     def emit_builtin_function_call_expr(
         self, node: BuiltinFunctionCallExprNode
@@ -433,9 +433,11 @@ class BytecodeEmitter:
         if (
             delta.constexpr_value
             and isinstance(delta.constexpr_value, VlInt)
-            and -128 < delta.constexpr_value.underlying < 127
-            and op_name == "ADD"
+            and abs(delta.constexpr_value.underlying) <= 127
         ):
+            if node.value.operation.op_type == "MINUS":
+                delta.constexpr_value.underlying = -delta.constexpr_value.underlying
+
             data_offset = self.scopes[-1].data[node.target].data_offset
             delta = delta.constexpr_value.to_byte()
             self.add_instruction(
@@ -634,7 +636,7 @@ class BytecodeEmitter:
     def emit_return_stmt(self, node: ReturnStmtNode):
         if self.scopes[-1].fn_name == GLOBAL_FN_NAME:
             raise FatalCompileError(
-                "IE: Already checked that return was inside function"
+                "IE: already checked that return was inside function when lowered"
             )
         self.emit_expr(node.value)
         self.add_instruction("OP_RETURN")
@@ -646,7 +648,7 @@ class BytecodeEmitter:
                 subscope.block_end_update_offsets.append(self.last_instruction_offset())
                 return
         else:
-            raise FatalCompileError("IE: Already checked in loop scope")
+            raise FatalCompileError("IE: already checked in loop scope when lowered")
 
     def emit_continue_stmt(self, _node: ContinueStmtNode):
         for subscope in reversed(self.scopes[-1].sub_scopes):
@@ -656,7 +658,7 @@ class BytecodeEmitter:
                 )
                 return
         else:
-            raise FatalCompileError("IE: Already checked in loop scope")
+            raise FatalCompileError("IE: already checked in loop scope when lowered")
 
     def emit_expr_stmt(self, node: ExprStmtNode):
         if isinstance(

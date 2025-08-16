@@ -41,9 +41,6 @@ from veclang.midend.vl_core import (
     VlOperation,
     VlConstexprOperation,
     VlConstexprCast,
-    VlFunctionParameterTypeProfile,
-    VlBuiltinFunctionProfile,
-    VlUserdefFunctionProfile,
     VlNull,
     VlInt,
     VlReal,
@@ -57,9 +54,21 @@ from veclang.midend.vl_core import (
     VlVec4,
 )
 
+from veclang.midend.vl_stdlib import (
+    StdlibConstexpr,
+    StdlibFnParam,
+    StdlibFunction,
+    StdlibNamespace,
+    VlStdlib,
+)
+
 from veclang.midend.hir.vl_lowerer_utils import (
     Scope,
     IdentifierData,
+    VlFnParamTypeProfile,
+    VlImportedFunctionProfile,
+    VlImportedConstexprProfile,
+    VlUserdefFunctionProfile,
     VlQualifier,
     VlQualifierValues,
     vl_qualifier_to_hr,
@@ -78,22 +87,8 @@ class Lowerer:
     def __init__(self, compiler_flags: CompilerFlags):
         self.compiler_flags: CompilerFlags = compiler_flags
 
-        self.imported_constants: list[tuple[str, str]] = []
-        self.imported_functions: list[tuple[str, str]] = []
-        self.builtin_functions: dict[str, VlBuiltinFunctionProfile] = {
-            "print": VlBuiltinFunctionProfile(
-                "print",
-                0x0000,
-                [VlFunctionParameterTypeProfile("arg", VlInt)],
-                VlNull,
-            ),
-            "printr": VlBuiltinFunctionProfile(
-                "printr",
-                0x0001,
-                [VlFunctionParameterTypeProfile("arg", VlReal)],
-                VlNull,
-            ),
-        }
+        self.imported_constexprs: dict[str, VlImportedConstexprProfile] = {}
+        self.imported_functions: dict[str, VlImportedFunctionProfile] = {}
         self.userdef_functions: dict[str, VlUserdefFunctionProfile] = {}
 
         self.scopes: list[Scope] = [
@@ -277,6 +272,20 @@ class Lowerer:
                 continue
             scope.data[identifier].ref_read_count += 1
             return scope.data[identifier]
+
+        if identifier in self.imported_constexprs:
+            constexpr = self.imported_constexprs[identifier]
+            return IdentifierData(
+                ASTPositionInfo(0, 0),
+                "constexpr",
+                type(constexpr.constexpr_value),
+                constexpr.constexpr_value,
+                0,
+                0,
+                False,
+                False,
+            )
+
         self.add_diagnostic(
             "E200", f"Unresolved identifier '{identifier}'", ast_position_info
         )
@@ -403,16 +412,19 @@ class Lowerer:
         stmts_lowered = None
         try:
             # emit all functions first
+            using_decls = []
             function_decls = []
             other_stmts = []
             for stmt in ast_node.stmts.stmts:
-                if isinstance(stmt, vl_ast.FunctionDeclNode):
+                if isinstance(stmt, vl_ast.UsingDeclNode):
+                    using_decls.append(stmt)
+                elif isinstance(stmt, vl_ast.FunctionDeclNode):
                     function_decls.append(stmt)
                     self.lookahead_function_decl(stmt)
                 else:
                     other_stmts.append(stmt)
 
-            stmts_lowered = self.lower_stmts(function_decls + other_stmts)
+            stmts_lowered = self.lower_stmts(using_decls + function_decls + other_stmts)
 
         except Exception as e:
             if isinstance(e, FatalCompileError):
@@ -454,6 +466,7 @@ class Lowerer:
             "vec2": VlVec2,
             "vec3": VlVec3,
             "vec4": VlVec4,
+            "null": VlNull,
         }[vl_type_str]
 
     def lower_identifier_expr(
@@ -469,6 +482,22 @@ class Lowerer:
             identifier,
             identifier_data.vl_type,
             identifier_data.vl_value,
+            expr.position_info,
+        )
+
+    def lower_scoped_identifier_expr(
+        self, expr: vl_ast.ScopedIdentifierNode
+    ) -> ConstantExprNode:
+        """Only to be called for"""
+        # TODO
+        fr_identifier = "::".join(expr.identifiers)
+        if fr_identifier not in self.imported_constexprs:
+            # FIXME
+            raise ValueError
+        constexpr = self.imported_constexprs[fr_identifier]
+        return ConstantExprNode(
+            type(constexpr.constexpr_value),
+            constexpr.constexpr_value,
             expr.position_info,
         )
 
@@ -617,9 +646,9 @@ class Lowerer:
             raise FatalCompileError()
 
         identifier = expr.callee.name
-        function_data: VlBuiltinFunctionProfile | VlUserdefFunctionProfile
-        if identifier in self.builtin_functions:
-            function_data = self.builtin_functions[expr.callee.name]
+        function_data: VlImportedFunctionProfile | VlUserdefFunctionProfile
+        if identifier in self.imported_functions:
+            function_data = self.imported_functions[expr.callee.name]
         elif identifier in self.userdef_functions:
             function_data = self.userdef_functions[expr.callee.name]
         else:
@@ -651,7 +680,7 @@ class Lowerer:
                     expr.position_info,
                 )
 
-        if isinstance(function_data, VlBuiltinFunctionProfile):
+        if isinstance(function_data, VlImportedFunctionProfile):
             return BuiltinFunctionCallExprNode(
                 function_data.builtin_fn_id,
                 arguments,
@@ -905,18 +934,21 @@ class Lowerer:
         Lookahead to get information on builtin functions before they are actually lowered.
         """
         identifier = decl.identifier.name
-        if identifier in self.builtin_functions or identifier in self.userdef_functions:
+        if (
+            identifier in self.imported_functions
+            or identifier in self.userdef_functions
+        ):
             self.add_diagnostic(
                 "E202",
                 f"Function '{decl.identifier.name}' has already been declared",
                 decl.position_info,
             )
 
-        parameters: list[VlFunctionParameterTypeProfile] = []
+        parameters: list[VlFnParamTypeProfile] = []
         attribute_tags: dict[str, int] = {}
         for idx, parameter in enumerate(decl.parameters.parameters):
             parameters.append(
-                VlFunctionParameterTypeProfile(
+                VlFnParamTypeProfile(
                     parameter.name.name, self.lower_vl_type(parameter.type.name)
                 )
             )
@@ -1067,29 +1099,98 @@ class Lowerer:
         )
 
     def lower_using_decl(self, decl: vl_ast.UsingDeclNode) -> None:
-        # TODO: FIXME, add the identifiers to the ProgramNode
-
         # namespace_identifiers: a list of namespaces that have been imported
         # scoped_identifiers: a list of tuples of (namespace, identifier) that have been imported
-        namespace_identifiers: list[str] | None = None
-        scoped_identifiers: list[tuple[str, str]] | None = None
+        namespace_identifiers: list[str]
+        scoped_identifiers: list[tuple[str, str]]
 
         if decl.namespace_identifiers:
             namespace_identifiers = [
                 x.name for x in decl.namespace_identifiers.identifiers
             ]
-        if decl.namespace_and_identifiers:
+            scoped_identifiers = []
+        elif decl.namespace_and_identifiers:
+            namespace_identifiers = []
             namespace = decl.namespace_and_identifiers[0].name
             scoped_identifiers = [
                 (namespace, x.name)
                 for x in decl.namespace_and_identifiers[1].identifiers
             ]
+        else:
+            raise ValueError("IE: TODO")
+
         if decl.namespace_identifiers and decl.namespace_and_identifiers:
             raise ValueError(
                 "TODO: Expected exactly one non-None argument for initializing UsingDeclNode from AST UsingDeclNode"
             )
 
-        # TODO: RUN THE IMPORT then add to context
+        # logic for importing whole namespaces
+        for namespace in namespace_identifiers:
+            if namespace not in VlStdlib.namespaces:
+                # TODO: graceful
+                raise ValueError
+            for fn in VlStdlib.namespaces[namespace].functions:
+                fr_identifier = f"{namespace}::{fn.fn_name}"
+                if fr_identifier in self.imported_functions:
+                    # TODO: graceful
+                    raise ValueError
+                self.imported_functions[fr_identifier] = VlImportedFunctionProfile(
+                    fr_identifier,
+                    fn.fn_id,
+                    [
+                        VlFnParamTypeProfile(x.name, self.lower_vl_type(x.vl_type))
+                        for x in fn.fn_params
+                    ],
+                    self.lower_vl_type(fn.fn_return_type),
+                )
+            for ce in VlStdlib.namespaces[namespace].constexprs:
+                fr_identifier = f"{namespace}::{ce.constexpr_name}"
+                if fr_identifier in self.imported_constexprs:
+                    # TODO: graceful
+                    raise ValueError
+                self.imported_constexprs[fr_identifier] = VlImportedConstexprProfile(
+                    ce.constexpr_name, ce.constexpr_value
+                )
+
+        # logic for importing specific identifiers from namespaces
+        is_wildcard = any(x[1] == "*" for x in scoped_identifiers)
+        for namespace, identifier in scoped_identifiers:
+            if namespace not in VlStdlib.namespaces:
+                # TODO: graceful
+                raise ValueError
+
+            found = False
+            for fn in VlStdlib.namespaces[namespace].functions:
+                if fn.fn_name != identifier and not is_wildcard:
+                    continue
+                if fn.fn_name in self.imported_functions:
+                    # TODO: graceful
+                    raise ValueError
+                self.imported_functions[fn.fn_name] = VlImportedFunctionProfile(
+                    fn.fn_name,
+                    fn.fn_id,
+                    [
+                        VlFnParamTypeProfile(x.name, self.lower_vl_type(x.vl_type))
+                        for x in fn.fn_params
+                    ],
+                    self.lower_vl_type(fn.fn_return_type),
+                )
+                found = True
+
+            for ce in VlStdlib.namespaces[namespace].constexprs:
+                if ce.constexpr_name != identifier and not is_wildcard:
+                    continue
+                if ce.constexpr_name in self.imported_constexprs:
+                    # TODO: graceful
+                    raise ValueError
+                self.imported_constexprs[ce.constexpr_name] = (
+                    VlImportedConstexprProfile(ce.constexpr_name, ce.constexpr_value)
+                )
+                found = True
+
+            if not found:
+                # TODO: graceful
+                raise ValueError
 
     def lower_assignment_stmt(self, stmt: vl_ast.AssignmentStmtNode) -> StmtNode | None:
         if isinstance(stmt.target, vl_ast.IdentifierNode):
@@ -1443,7 +1544,9 @@ class Lowerer:
         return out_stmts
 
     def lower_decl(self, decl: vl_ast.DeclNode) -> DeclNode | None:
-        if isinstance(decl, vl_ast.FunctionDeclNode):
+        if isinstance(decl, vl_ast.UsingDeclNode):
+            return self.lower_using_decl(decl)
+        elif isinstance(decl, vl_ast.FunctionDeclNode):
             return self.lower_function_decl(decl)
         elif isinstance(
             decl,
@@ -1461,6 +1564,8 @@ class Lowerer:
         """Only to be called on rvalue exprs"""
         if isinstance(expr, vl_ast.IdentifierNode):
             expr_lowered = self.lower_identifier_expr(expr)
+        elif isinstance(expr, vl_ast.ScopedIdentifierNode):
+            expr_lowered = self.lower_scoped_identifier_expr(expr)
         elif isinstance(expr, vl_ast.ArrayLiteralExprNode):
             expr_lowered = self.lower_array_literal_expr(expr)
         elif isinstance(expr, vl_ast.MemberAccessExprNode):

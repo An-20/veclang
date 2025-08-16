@@ -223,26 +223,3 @@ class VlTypeABC(abc.ABC):
 
 
 VlType = typing.Type[VlTypeABC]
-
-
-@dataclasses.dataclass
-class VlFunctionParameterTypeProfile:
-    identifier: str
-    vl_type: VlType
-
-
-@dataclasses.dataclass
-class VlBuiltinFunctionProfile:
-    identifier: str
-    builtin_fn_id: int
-    parameters: list[VlFunctionParameterTypeProfile]
-    return_type: VlType
-
-
-@dataclasses.dataclass
-class VlUserdefFunctionProfile:
-    identifier: str
-    userdef_fn_idx: int
-    parameters: list[VlFunctionParameterTypeProfile]
-    return_type: VlType
-    attribute_tags: dict[str, int]

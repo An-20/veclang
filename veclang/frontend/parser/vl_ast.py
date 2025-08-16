@@ -226,6 +226,38 @@ class TypeNode(IdentifierNode):
         return "TypeNode"
 
 
+class ScopedIdentifierNode(ExprNode):
+    """An AST node for a scoped identifier e.g. a::b::c"""
+
+    def __init__(
+        self,
+        identifiers: typing.Optional["ScopedIdentifierNode"],
+        identifier: typing.Optional["IdentifierNode"],
+        ast_position_info: ASTPositionInfo,
+    ) -> None:
+        super().__init__(ast_position_info)
+        self.identifiers = []
+        if identifiers:
+            self.identifiers.extend(identifiers.identifiers)
+        if identifier:
+            self.identifiers.append(identifier)
+
+    @staticmethod
+    def get_node_type_str() -> str:
+        return "ScopedIdentifierNode"
+
+    def _to_dict(self) -> dict:
+        return {"identifiers": [x.to_dict() for x in self.identifiers]}
+
+    @classmethod
+    def _from_dict(
+        cls, input_dict: dict, ast_position_info: ASTPositionInfo
+    ) -> "ScopedIdentifierNode":
+        node = cls(None, None, ast_position_info)
+        node.stmts = [expr_from_dict(expr) for expr in input_dict["identifiers"]]
+        return node
+
+
 # Exprs
 # ----------------------------------------
 
@@ -995,7 +1027,7 @@ class UsingDeclIdentifiersNode(ASTNode):
         return node
 
 
-class UsingDeclNode(ASTNode):
+class UsingDeclNode(DeclNode):
     """An AST node for using declaration"""
 
     def __init__(

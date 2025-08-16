@@ -1,5 +1,6 @@
 #include "vl_builtins.h"
 
+#include <cmath>
 #include <iostream>
 #include <cstdint>
 
@@ -109,6 +110,13 @@ namespace vl_builtins
         delegate.return_obj(vl_types::vec4_to_ro(vec));
     }
 
+    void bi_0x00f8(BuiltinsDelegate &delegate)
+    {
+        // builtin for sin
+        double x = vl_types::rv_to_double(delegate.get_val_argument());
+        delegate.return_val(vl_types::double_to_rv(std::sin(x)));
+    }
+
     void call_builtin(BuiltinsDelegate delegate, uint16_t builtin_id)
     {
         // std::cout << "Calling builtin with ID: " << static_cast<int>(builtin_id) << "\n";
@@ -143,6 +151,9 @@ namespace vl_builtins
             break;
         case 0x1302:
             bi_0x1302(delegate);
+            break;
+        case 0x00f8:
+            bi_0x00f8(delegate);
             break;
         default:
             std::cerr << "Unknown builtin ID: " << static_cast<int>(builtin_id) << "\n";

@@ -4,9 +4,13 @@ from veclang.tests.test_bc_interpreter_common import compile_vl
 
 def test_basic():
     PROGRAM_STR = """
-        fn main() -> int {
-            printr(42.0 + 3.0);
-            return 42;
+        using core::*;
+        using math::{sin, PI};
+        
+        fn main() -> real {
+            // printr(42.0 + 3.0);
+            // return 42;
+            return sin(PI/4);
         }
     """
     compiled = compile_vl(PROGRAM_STR)

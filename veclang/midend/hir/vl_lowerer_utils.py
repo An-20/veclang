@@ -42,6 +42,35 @@ class IdentifierData:
 
 
 @dataclasses.dataclass
+class VlFnParamTypeProfile:
+    identifier: str
+    vl_type: VlType
+
+
+@dataclasses.dataclass
+class VlImportedConstexprProfile:
+    fr_identifier: str
+    constexpr_value: VlTypeABC
+
+
+@dataclasses.dataclass
+class VlImportedFunctionProfile:
+    fr_identifier: str
+    builtin_fn_id: int
+    parameters: list[VlFnParamTypeProfile]
+    return_type: VlType
+
+
+@dataclasses.dataclass
+class VlUserdefFunctionProfile:
+    identifier: str
+    userdef_fn_idx: int
+    parameters: list[VlFnParamTypeProfile]
+    return_type: VlType
+    attribute_tags: dict[str, int]
+
+
+@dataclasses.dataclass
 class Scope:
     fn_name: str | None
     fn_return_type: VlType

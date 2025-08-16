@@ -17,6 +17,7 @@ from veclang.frontend.parser.vl_ast import (
     ProgramNode,
     StmtsNode,
     IdentifierNode,
+    ScopedIdentifierNode,
     TypeNode,
     FunctionDeclParameterNode,
     FunctionDeclParametersNode,
@@ -122,7 +123,8 @@ using_decl_identifiers : using_decl_identifiers COMMA identifier
                        | identifier
 using_decl : USING using_decl_identifiers SEMICOLON
            | USING identifier SCOPE_RESOLUTION identifier SEMICOLON
-           | USING identifier SCOPE_RESOLUTION LEFT_PARENTHESIS using_decl_identifiers RIGHT_PARENTHESIS SEMICOLON
+           | USING identifier SCOPE_RESOLUTION TIMES SEMICOLON
+           | USING identifier SCOPE_RESOLUTION LEFT_CURLY_BRACKET using_decl_identifiers RIGHT_CURLY_BRACKET SEMICOLON
 
 assignment_stmt : identifier ASSIGNMENT expr SEMICOLON
 augmented_assignment_stmt : identifier augmented_assignment_operator expr SEMICOLON
@@ -228,11 +230,14 @@ array_literal_elements : expr
 array_literal : LEFT_SQUARE_BRACKET array_literal_elements RIGHT_SQUARE_BRACKET
 
 identifier : IDENTIFIER
+scoped_identifier : scoped_identifier SCOPE_RESOLUTION identifier
+                  | identifier
 
 atomic_expr : simple_literal
             | imaginary_literal
             | array_literal
             | identifier
+            | scoped_identifier
 
 
 function_call_arguments : expr
@@ -367,6 +372,9 @@ def p_using_decl(p):
         p[0] = UsingDeclNode(p[2], None, get_ast_pos_info(p))
     elif len(p) == 6:
         # using a::b;
+        if p[4] == "*":
+            p[4] = IdentifierNode("*", get_ast_pos_info(p))
+
         p[0] = UsingDeclNode(
             None,
             (p[2], UsingDeclIdentifiersNode(None, p[4], get_ast_pos_info(p))),
@@ -629,6 +637,17 @@ def p_identifier(p):
     p[0] = IdentifierNode(p[1], get_ast_pos_info(p))
 
 
+def p_scoped_identifier(p):
+    if len(p) == 4:
+        # Multi-element: a::b...
+        p[0] = ScopedIdentifierNode(p[1], p[3], get_ast_pos_info(p))
+    elif len(p) == 2:
+        # One element: a
+        p[0] = ScopedIdentifierNode(None, p[1], get_ast_pos_info(p))
+    else:
+        raise ValueError("Scoped identifier must have at least one identifier")
+
+
 def p_function_call_arguments(p):
     if len(p) == 4:
         # Multi-element: a, b...
@@ -738,6 +757,7 @@ PARSER_FUNCTION_SPEC = {
     "array_literal_elements": p_array_literal_elements,
     "array_literal": p_array_literal,
     "identifier": p_identifier,
+    "scoped_identifier": p_scoped_identifier,
     "atomic_expr": p_passthrough,
     "function_call_arguments": p_function_call_arguments,
     "function_call_expr": p_function_call_expr,

@@ -242,6 +242,9 @@ class ScopedIdentifierNode(ExprNode):
         if identifier:
             self.identifiers.append(identifier)
 
+    def fully_resolve(self) -> str:
+        return "::".join([x.name for x in self.identifiers])
+
     @staticmethod
     def get_node_type_str() -> str:
         return "ScopedIdentifierNode"

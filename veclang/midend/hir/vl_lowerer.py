@@ -54,13 +54,7 @@ from veclang.midend.vl_core import (
     VlVec4,
 )
 
-from veclang.midend.vl_stdlib import (
-    StdlibConstexpr,
-    StdlibFnParam,
-    StdlibFunction,
-    StdlibNamespace,
-    VlStdlib,
-)
+from veclang.midend.vl_stdlib import VlStdlib
 
 from veclang.midend.hir.vl_lowerer_utils import (
     Scope,
@@ -183,7 +177,7 @@ class Lowerer:
         )
 
     def scope_out_fn(self) -> None:
-        if len(self.scopes) == 1:
+        if self.in_global_scope():
             raise ValueError("IE: Cannot scope out of global scope!")
         if not self.scopes[-1].fn_name:
             raise ValueError(
@@ -198,7 +192,7 @@ class Lowerer:
         )
 
     def scope_out_loop(self) -> None:
-        if len(self.scopes) == 1:
+        if self.in_global_scope():
             raise ValueError("IE: Cannot scope out of global scope!")
         if not self.scopes[-1].loop_name:
             raise ValueError("IE: Mismatched scope: current scope is not a loop scope")
@@ -213,7 +207,7 @@ class Lowerer:
         )
 
     def scope_out_selection(self) -> None:
-        if len(self.scopes) == 1:
+        if self.in_global_scope():
             raise ValueError("IE: Cannot scope out of global scope!")
         if not self.scopes[-1].selection_name:
             raise ValueError(
@@ -221,6 +215,9 @@ class Lowerer:
             )
         self.check_unused_identifiers()
         self.scopes.pop()
+
+    def in_global_scope(self) -> bool:
+        return len(self.scopes) == 1
 
     def check_in_loop_scope(self) -> bool:
         """Returns a bool of whether the current scope is in a loop"""
@@ -488,9 +485,9 @@ class Lowerer:
     def lower_scoped_identifier_expr(
         self, expr: vl_ast.ScopedIdentifierNode
     ) -> ConstantExprNode:
-        """Only to be called for"""
+        """Only to be called for scoped identifiers"""
         # TODO
-        fr_identifier = "::".join(expr.identifiers)
+        fr_identifier = "::".join([x.name for x in expr.identifiers])
         if fr_identifier not in self.imported_constexprs:
             # FIXME
             raise ValueError
@@ -631,7 +628,10 @@ class Lowerer:
     def lower_function_call_expr(self, expr: vl_ast.FunctionCallExprNode) -> ExprNode:
         # two different things
         if isinstance(expr.callee, vl_ast.IdentifierNode):
-            pass
+            identifier = expr.callee.name
+
+        elif isinstance(expr.callee, vl_ast.ScopedIdentifierNode):
+            identifier = expr.callee.fully_resolve()
 
         elif isinstance(expr, vl_ast.MemberAccessExprNode):
             # TODO!
@@ -645,12 +645,11 @@ class Lowerer:
             )
             raise FatalCompileError()
 
-        identifier = expr.callee.name
         function_data: VlImportedFunctionProfile | VlUserdefFunctionProfile
         if identifier in self.imported_functions:
-            function_data = self.imported_functions[expr.callee.name]
+            function_data = self.imported_functions[identifier]
         elif identifier in self.userdef_functions:
-            function_data = self.userdef_functions[expr.callee.name]
+            function_data = self.userdef_functions[identifier]
         else:
             self.add_diagnostic(
                 "E200",
@@ -986,6 +985,11 @@ class Lowerer:
         )
 
     def lower_function_decl(self, decl: vl_ast.FunctionDeclNode) -> FunctionDeclNode:
+        if not self.in_global_scope():
+            self.add_diagnostic(
+                "E300", "Nested function declarations", decl.position_info
+            )
+
         if decl.identifier.name not in self.userdef_functions:
             raise FatalCompileError(
                 "IE: decl.identifier.name not in self.userdef_functions"
@@ -1099,6 +1103,11 @@ class Lowerer:
         )
 
     def lower_using_decl(self, decl: vl_ast.UsingDeclNode) -> None:
+        if not self.in_global_scope():
+            self.add_diagnostic(
+                "E300", "Nested function declarations", decl.position_info
+            )
+
         # namespace_identifiers: a list of namespaces that have been imported
         # scoped_identifiers: a list of tuples of (namespace, identifier) that have been imported
         namespace_identifiers: list[str]
@@ -1117,11 +1126,11 @@ class Lowerer:
                 for x in decl.namespace_and_identifiers[1].identifiers
             ]
         else:
-            raise ValueError("IE: TODO")
+            raise ValueError("IE: empty using decl created by parser")
 
         if decl.namespace_identifiers and decl.namespace_and_identifiers:
             raise ValueError(
-                "TODO: Expected exactly one non-None argument for initializing UsingDeclNode from AST UsingDeclNode"
+                "IE: malformed using decl created by parser with both attrs"
             )
 
         # logic for importing whole namespaces

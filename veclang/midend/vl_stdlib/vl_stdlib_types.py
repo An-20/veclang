@@ -80,3 +80,37 @@ class Stdlib:
             if fn_id in used_fn_ids:
                 raise ValueError(f"IE: fn id '{fn_id}' used multiple times in stdlib")
             used_fn_ids.add(fn_id)
+
+    def generate_docs(self) -> str:
+        out_lines = []
+        for ns, namespace in self.namespaces.items():
+            out_lines.append(f"## {ns}")
+            out_lines.append(f"{namespace.description}")
+
+            if namespace.constexprs:
+                out_lines.append(f"#### Constants")
+                for constexpr in namespace.constexprs:
+                    out_lines.append(
+                        f"###### `{constexpr.constexpr_name}` (`{ns}::{constexpr.constexpr_name}`)"
+                    )
+                    out_lines.append(
+                        f"`{constexpr.constexpr_name}: {constexpr.constexpr_value.to_vl_type_str()}`"
+                    )
+                    out_lines.append(f"`value: {constexpr.constexpr_value.underlying}`")
+                    out_lines.append(f"{constexpr.constexpr_doc}\n")
+
+            if namespace.functions:
+                out_lines.append(f"#### Functions")
+                for function in namespace.functions:
+                    out_lines.append(
+                        f"###### `{function.fn_name}` (`{ns}::{function.fn_name}`)"
+                    )
+                    # form function signature
+                    out_lines.append(
+                        f"`{function.fn_name}({', '.join([f'{x.name}: {x.vl_type}' for x in function.fn_params])})"
+                        f" -> {function.fn_return_type}`"
+                    )
+                    out_lines.append(f"`builtin_idx: 0x{function.fn_id:02x}`")
+                    out_lines.append(f"{function.fn_doc}\n")
+
+        return "\n".join(out_lines)

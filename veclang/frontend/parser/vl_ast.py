@@ -947,13 +947,13 @@ class DataDeclNode(DeclNode, abc.ABC):
     ) -> None:
         super().__init__(ast_position_info)
         self.target = target
-        self._type = vl_type
+        self.vl_type = vl_type
         self.value = value
 
     def _to_dict(self) -> dict:
         return {
             "target": self.target.to_dict(),
-            "vl_type": self._type.to_dict(),
+            "vl_type": self.vl_type.to_dict(),
             "value": self.value.to_dict(),
         }
 

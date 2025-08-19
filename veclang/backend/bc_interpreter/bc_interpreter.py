@@ -6,6 +6,7 @@ sys.path.insert(0, os.path.dirname(__file__))
 import typing
 import dataclasses
 
+# noinspection PyUnresolvedReferences
 import _bc_interpreter_core
 from veclang.backend.bc_common.py.vl_sedf import VlProgram, VlSEDF
 

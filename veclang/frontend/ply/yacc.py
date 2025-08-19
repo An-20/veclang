@@ -2228,7 +2228,6 @@ class ParserReflect:
     def validate_start(self):
         """Validate the start symbol"""
         if self.start in self.function_spec:
-            return
             raise ValueError("Start rule cannot have an associated function")
 
     def get_error_func(self):

@@ -1,4 +1,8 @@
-"""High-level intermediate representation lowerer"""
+"""
+High-level intermediate representation lowerer
+
+This is where most Veclang features are actually implemented.
+"""
 
 import traceback
 import collections
@@ -54,14 +58,13 @@ from veclang.midend.vl_core import (
     VlVec4,
 )
 
-from veclang.midend.vl_stdlib import VlStdlib
+from veclang.midend.vl_stdlib import VlStdlib, StdlibFunction, StdlibConstexpr
 
 from veclang.midend.hir.vl_lowerer_utils import (
     Scope,
     IdentifierData,
     VlFnParamTypeProfile,
     VlImportedFunctionProfile,
-    VlImportedConstexprProfile,
     VlUserdefFunctionProfile,
     VlQualifier,
     VlQualifierValues,
@@ -81,10 +84,7 @@ class Lowerer:
     def __init__(self, compiler_flags: CompilerFlags):
         self.compiler_flags: CompilerFlags = compiler_flags
 
-        self.imported_constexprs: dict[str, VlImportedConstexprProfile] = {}
-        self.imported_functions: dict[str, VlImportedFunctionProfile] = {}
         self.userdef_functions: dict[str, VlUserdefFunctionProfile] = {}
-
         self.scopes: list[Scope] = [
             self.create_scope(GLOBAL_FN_NAME, None, None, None, ASTPositionInfo(0, 0))
         ]
@@ -103,7 +103,7 @@ class Lowerer:
                 ast_position_info.line_character_number,
                 code,
                 self.get_stack_trace_hr(),
-                message,
+                message.strip(),
             )
         )
 
@@ -121,7 +121,13 @@ class Lowerer:
         ast_position_info: ASTPositionInfo,
     ) -> Scope:
         return Scope(
-            fn_name, fn_return_type, loop_name, selection_name, ast_position_info, {}
+            fn_name,
+            fn_return_type,
+            loop_name,
+            selection_name,
+            ast_position_info,
+            {},
+            {},
         )
 
     def get_stack_trace_hr(self) -> str:
@@ -138,13 +144,19 @@ class Lowerer:
             elif scope.selection_name:
                 line = f"Selection '{scope.selection_name}' at {ast_position_info_to_hr(scope.ast_position_info)}"
             else:
-                raise ValueError(f"IE: Unknown scope: {scope}")
+                raise FatalCompileError(f"IE: Unknown scope: {scope}")
             out_lines.append(line)
         return "\n".join(out_lines)
 
     def check_unused_identifiers(self):
         for identifier, data in self.scopes[-1].data.items():
-            if data.ref_read_count == 0 and identifier[0] != "_":
+            if data.ref_read_count == 0 and data.is_import:
+                self.add_diagnostic(
+                    "W001",
+                    f"Unused imported identifier '{identifier}'",
+                    data.ast_position_info,
+                )
+            elif data.ref_read_count == 0 and identifier[0] != "_":
                 self.add_diagnostic(
                     "W001",
                     f"Unused identifier '{identifier}' - prefix with '_' to suppress",
@@ -169,6 +181,14 @@ class Lowerer:
                     data.ast_position_info,
                 )
 
+        for fr_identifier, data in self.scopes[-1].imported_functions.items():
+            if data.ref_read_count == 0:
+                self.add_diagnostic(
+                    "W001",
+                    f"Unused imported function '{fr_identifier}'",
+                    self.scopes[-1].ast_position_info,
+                )
+
     def scope_in_fn(
         self, fn_name: str, fn_return_type: VlType, ast_position_info: ASTPositionInfo
     ) -> None:
@@ -178,9 +198,9 @@ class Lowerer:
 
     def scope_out_fn(self) -> None:
         if self.in_global_scope():
-            raise ValueError("IE: Cannot scope out of global scope!")
+            raise FatalCompileError("IE: Cannot scope out of global scope!")
         if not self.scopes[-1].fn_name:
-            raise ValueError(
+            raise FatalCompileError(
                 "IE: Mismatched scope: current scope is not a function scope"
             )
         self.check_unused_identifiers()
@@ -193,9 +213,11 @@ class Lowerer:
 
     def scope_out_loop(self) -> None:
         if self.in_global_scope():
-            raise ValueError("IE: Cannot scope out of global scope!")
+            raise FatalCompileError("IE: Cannot scope out of global scope!")
         if not self.scopes[-1].loop_name:
-            raise ValueError("IE: Mismatched scope: current scope is not a loop scope")
+            raise FatalCompileError(
+                "IE: Mismatched scope: current scope is not a loop scope"
+            )
         self.check_unused_identifiers()
         self.scopes.pop()
 
@@ -208,9 +230,9 @@ class Lowerer:
 
     def scope_out_selection(self) -> None:
         if self.in_global_scope():
-            raise ValueError("IE: Cannot scope out of global scope!")
+            raise FatalCompileError("IE: Cannot scope out of global scope!")
         if not self.scopes[-1].selection_name:
-            raise ValueError(
+            raise FatalCompileError(
                 "IE: Mismatched scope: current scope is not a selection scope"
             )
         self.check_unused_identifiers()
@@ -225,7 +247,7 @@ class Lowerer:
             if scope.loop_name:
                 return True
             if scope.fn_name:
-                raise ValueError(
+                raise FatalCompileError(
                     "IE: Illegal construction: function declaration inside loop"
                 )
         return False
@@ -235,7 +257,9 @@ class Lowerer:
         for scope in reversed(self.scopes):
             if scope.fn_name and scope.fn_name != GLOBAL_FN_NAME:
                 if not scope.fn_return_type:
-                    raise ValueError("IE: Scope with fn_name without fn_return_type")
+                    raise FatalCompileError(
+                        "IE: Scope with fn_name without fn_return_type"
+                    )
                 return scope.fn_return_type
         return None
 
@@ -265,30 +289,34 @@ class Lowerer:
         self, identifier: str, ast_position_info: ASTPositionInfo
     ) -> IdentifierData:
         for scope in reversed(self.scopes):
-            if identifier not in scope.data:
-                continue
-            scope.data[identifier].ref_read_count += 1
-            return scope.data[identifier]
-
-        if identifier in self.imported_constexprs:
-            constexpr = self.imported_constexprs[identifier]
-            return IdentifierData(
-                ASTPositionInfo(0, 0),
-                "constexpr",
-                type(constexpr.constexpr_value),
-                constexpr.constexpr_value,
-                0,
-                0,
-                False,
-                False,
-            )
+            if identifier in scope.data:
+                scope.data[identifier].ref_read_count += 1
+                return scope.data[identifier]
 
         self.add_diagnostic(
             "E200", f"Unresolved identifier '{identifier}'", ast_position_info
         )
         raise FatalCompileError()
 
-    def _check_if_identifier_declared(
+    def resolve_function_identifier(
+        self, fr_identifier: str, ast_position_info: ASTPositionInfo
+    ) -> VlImportedFunctionProfile | VlUserdefFunctionProfile:
+        if fr_identifier in self.userdef_functions:
+            return self.userdef_functions[fr_identifier]
+
+        for scope in reversed(self.scopes):
+            if fr_identifier in scope.imported_functions:
+                scope.imported_functions[fr_identifier].ref_read_count += 1
+                return scope.imported_functions[fr_identifier]
+
+        self.add_diagnostic(
+            "E200",
+            f"Unresolved function identifier '{fr_identifier}'",
+            ast_position_info,
+        )
+        raise FatalCompileError()
+
+    def _check_if_data_identifier_declared(
         self, identifier: str, ast_position_info: ASTPositionInfo
     ) -> None:
         for scope_idx, parent_scope in enumerate(reversed(self.scopes)):
@@ -297,12 +325,46 @@ class Lowerer:
 
                 if scope_idx == 0:
                     scope_hr = "this scope"
+                elif scope_idx == len(self.scopes) - 1:
+                    scope_hr = "global scope"
                 else:
                     scope_hr = f"parent scope with ASTPositionInfo {parent_scope.ast_position_info}"
+
+                additional_details = ""
+                if identifier_data.is_loop_var:
+                    additional_details = "(as a loop variable)"
+                if identifier_data.is_parameter:
+                    additional_details = "(as a parameter)"
+                if identifier_data.is_import:
+                    additional_details = "(as an import)"
                 self.add_diagnostic(
                     "E201",
                     f"{vl_qualifier_to_hr(identifier_data.vl_qualifier).capitalize()} '{identifier}' "
-                    f"already declared in {scope_hr}",
+                    f"already declared in {scope_hr} {additional_details}",
+                    ast_position_info,
+                )
+
+    def _check_if_function_identifier_declared(
+        self, fr_identifier: str, ast_position_info: ASTPositionInfo
+    ) -> None:
+        if fr_identifier in self.userdef_functions:
+            self.add_diagnostic(
+                "E202",
+                f"User-defined function '{fr_identifier}' already declared in global scope",
+                ast_position_info,
+            )
+
+        for scope_idx, parent_scope in enumerate(reversed(self.scopes)):
+            if fr_identifier in parent_scope.imported_functions:
+                if scope_idx == 0:
+                    scope_hr = "this scope"
+                elif scope_idx == len(self.scopes) - 1:
+                    scope_hr = "global scope"
+                else:
+                    scope_hr = f"parent scope with ASTPositionInfo {parent_scope.ast_position_info}"
+                self.add_diagnostic(
+                    "E202",
+                    f"Imported function '{fr_identifier}' already declared in {scope_hr}",
                     ast_position_info,
                 )
 
@@ -315,9 +377,10 @@ class Lowerer:
         ast_position_info: ASTPositionInfo,
         is_loop_var: bool = False,
         is_parameter: bool = False,
+        is_import: bool = False,
     ):
         if vl_qualifier not in VlQualifierValues:
-            raise ValueError(f"IE: Unknown VlQualifier {vl_qualifier}")
+            raise FatalCompileError(f"IE: Unknown VlQualifier {vl_qualifier}")
         if vl_qualifier == "var" and not check_snake_case(identifier):
             self.add_diagnostic(
                 "X001",
@@ -328,17 +391,18 @@ class Lowerer:
             (vl_qualifier == "const" or vl_qualifier == "constexpr")
             and not check_constant_case(identifier)
             and not is_parameter
+            and not is_import
         ):
             self.add_diagnostic(
                 "X001",
                 f"Constant identifier '{identifier}' should be uppercase SNAKE_CASE",
                 ast_position_info,
             )
-        self._check_if_identifier_declared(identifier, ast_position_info)
+        self._check_if_data_identifier_declared(identifier, ast_position_info)
         scope = self.scopes[-1]
 
         if vl_qualifier == "constexpr" and vl_value is None:
-            raise ValueError("IE: constexpr data must have a vl_value")
+            raise FatalCompileError("IE: constexpr data must have a vl_value")
         scope.data[identifier] = IdentifierData(
             ast_position_info,
             vl_qualifier,
@@ -348,6 +412,7 @@ class Lowerer:
             0,
             is_loop_var,
             is_parameter,
+            is_import,
         )
 
     def init_variable(
@@ -361,10 +426,10 @@ class Lowerer:
         self._init_data(identifier, "const", vl_type, None, ast_position_info)
 
     def init_constexpr(
-        self, identifier: str, vl_val: VlTypeABC, ast_position_info: ASTPositionInfo
+        self, identifier: str, vl_value: VlTypeABC, ast_position_info: ASTPositionInfo
     ) -> None:
         self._init_data(
-            identifier, "constexpr", type(vl_val), vl_val, ast_position_info
+            identifier, "constexpr", type(vl_value), vl_value, ast_position_info
         )
 
     def init_parameter(
@@ -381,16 +446,39 @@ class Lowerer:
             identifier, "var", vl_type, None, ast_position_info, is_loop_var=True
         )
 
-    # def add_userdef_function(self, identifier: str) -> None:
-    #     if identifier in self.userdef_function_idxs:
-    #         raise ValueError("")
-    #
-    # def get_userdef_function_idx(self, identifier: str) -> int:
-    #     if identifier not in self.userdef_function_idxs:
-    #         raise FatalCompileError(
-    #             f"IE: could not find function with identifier '{identifier}'"
-    #         )
-    #     return self.userdef_function_idxs[identifier]
+    def init_imported_constexpr(
+        self,
+        fr_identifier: str,
+        constexpr_data: StdlibConstexpr,
+        ast_position_info: ASTPositionInfo,
+    ) -> None:
+        self._init_data(
+            fr_identifier,
+            "constexpr",
+            type(constexpr_data.constexpr_value),
+            constexpr_data.constexpr_value,
+            ast_position_info,
+            is_import=True,
+        )
+
+    def add_imported_function(
+        self,
+        fr_identifier: str,
+        stdlib_fn: StdlibFunction,
+        ast_position_info: ASTPositionInfo,
+    ) -> None:
+        self._check_if_function_identifier_declared(fr_identifier, ast_position_info)
+        scope = self.scopes[-1]
+        scope.imported_functions[fr_identifier] = VlImportedFunctionProfile(
+            fr_identifier,
+            stdlib_fn.fn_id,
+            [
+                VlFnParamTypeProfile(x.name, self.lower_vl_type(x.vl_type))
+                for x in stdlib_fn.fn_params
+            ],
+            self.lower_vl_type(stdlib_fn.fn_return_type),
+            0,
+        )
 
     # Lowering
     # ====================
@@ -408,20 +496,26 @@ class Lowerer:
 
         stmts_lowered = None
         try:
-            # emit all functions first
-            using_decls = []
-            function_decls = []
-            other_stmts = []
+            # lookahead all functions
             for stmt in ast_node.stmts.stmts:
-                if isinstance(stmt, vl_ast.UsingDeclNode):
-                    using_decls.append(stmt)
-                elif isinstance(stmt, vl_ast.FunctionDeclNode):
-                    function_decls.append(stmt)
+                if isinstance(stmt, vl_ast.FunctionDeclNode):
                     self.lookahead_function_decl(stmt)
-                else:
-                    other_stmts.append(stmt)
 
-            stmts_lowered = self.lower_stmts(using_decls + function_decls + other_stmts)
+            # add `using core::*;`
+            api = ASTPositionInfo(0, 0)
+            stmts = [
+                vl_ast.UsingDeclNode(
+                    None,
+                    (
+                        vl_ast.IdentifierNode("core", api),
+                        vl_ast.UsingDeclIdentifiersNode(
+                            None, vl_ast.IdentifierNode("*", api), api
+                        ),
+                    ),
+                    api,
+                )
+            ] + ast_node.stmts.stmts
+            stmts_lowered = self.lower_stmts(stmts)
 
         except Exception as e:
             if isinstance(e, FatalCompileError):
@@ -451,7 +545,7 @@ class Lowerer:
     @staticmethod
     def lower_vl_type(vl_type_str: str) -> VlType:
         if vl_type_str not in VlTypeStrs:
-            raise ValueError(f"IE: Unknown type '{vl_type_str}'")
+            raise FatalCompileError(f"IE: Unknown type '{vl_type_str}'")
         return {
             "int": VlInt,
             "real": VlReal,
@@ -473,7 +567,7 @@ class Lowerer:
         identifier = expr.name
         identifier_data = self.resolve_rvalue_identifier(identifier, expr.position_info)
         if identifier_data.vl_qualifier == "constexpr" and not identifier_data.vl_value:
-            raise ValueError("IE: Constexpr without vl_value")
+            raise FatalCompileError("IE: Constexpr without vl_value")
 
         return RvalueIdentifierExprNode(
             identifier,
@@ -486,16 +580,16 @@ class Lowerer:
         self, expr: vl_ast.ScopedIdentifierNode
     ) -> ConstantExprNode:
         """Only to be called for scoped identifiers"""
-        # TODO
         fr_identifier = "::".join([x.name for x in expr.identifiers])
-        if fr_identifier not in self.imported_constexprs:
-            # FIXME
-            raise ValueError
-        constexpr = self.imported_constexprs[fr_identifier]
+        identifier_data = self.resolve_rvalue_identifier(
+            fr_identifier, expr.position_info
+        )
+        if identifier_data.vl_qualifier != "constexpr":
+            raise FatalCompileError("IE: expected scoped identifier to be constexpr")
+        if not identifier_data.vl_value:
+            raise FatalCompileError("IE: expected scoped identifier to have vl_value")
         return ConstantExprNode(
-            type(constexpr.constexpr_value),
-            constexpr.constexpr_value,
-            expr.position_info,
+            identifier_data.vl_type, identifier_data.vl_value, expr.position_info
         )
 
     @classmethod
@@ -526,7 +620,7 @@ class Lowerer:
         if len(expr.elements.exprs) in [2, 3, 4]:
             vl_type_str = f"vec{len(expr.elements.exprs)}"
         else:
-            raise ValueError(
+            raise FatalCompileError(
                 f"Unsupported array literal with length {len(expr.elements.exprs)}"
             )
 
@@ -606,7 +700,7 @@ class Lowerer:
                 is_property=True,
             )
         else:
-            raise ValueError(
+            raise FatalCompileError(
                 f"Member access on resolved type '{target.vl_type.to_vl_type_str()}' "
                 f"which does not have identifier '{identifier}'"
             )
@@ -626,16 +720,56 @@ class Lowerer:
         # TODO
 
     def lower_function_call_expr(self, expr: vl_ast.FunctionCallExprNode) -> ExprNode:
-        # two different things
-        if isinstance(expr.callee, vl_ast.IdentifierNode):
-            identifier = expr.callee.name
+        if isinstance(expr.callee, vl_ast.MemberAccessExprNode):
+            # special pathway just for method calls
+            # this avoids us needing an internal compiler type for 'function'
+            # because Veclang doesn't have first class functions
+            callee = expr.callee
+            target_lowered = self.lower_expr(callee.target)
+            vl_type = target_lowered.vl_type
+            for method in vl_type.get_methods():
+                if method.name != callee.name.name:
+                    continue
+                arguments: list[ExprNode] = [
+                    self.lower_expr(x) for x in expr.arguments.arguments
+                ]
+                if len(arguments) != len(method.arg_types):
+                    self.add_diagnostic(
+                        "E110",
+                        f"Function {expr.callee.name} expected {len(method.arg_types)} arguments, got {len(arguments)}",
+                        expr.position_info,
+                    )
+                for idx, (argument, parameter_type_str) in enumerate(
+                    zip(arguments, method.arg_types)
+                ):
+                    if argument.vl_type.to_vl_type_str() != parameter_type_str:
+                        self.add_diagnostic(
+                            "E111",
+                            f"Function '{expr.callee.name}' expects argument #{idx} "
+                            f"to be type {parameter_type_str}, got {argument.vl_type.to_vl_type_str()}",
+                            expr.position_info,
+                        )
+
+                return BuiltinFunctionCallExprNode(
+                    method.fn_id,
+                    [target_lowered],
+                    self.lower_vl_type(method.return_type),
+                    None,
+                    expr.position_info,
+                    is_method=True,
+                )
+            self.add_diagnostic(
+                "E200",
+                f"Unresolved identifier: {vl_type.to_vl_type_str()} has no method '{callee.name.name}'",
+                expr.position_info,
+            )
+            raise FatalCompileError()
+
+        elif isinstance(expr.callee, vl_ast.IdentifierNode):
+            fr_identifier = expr.callee.name
 
         elif isinstance(expr.callee, vl_ast.ScopedIdentifierNode):
-            identifier = expr.callee.fully_resolve()
-
-        elif isinstance(expr, vl_ast.MemberAccessExprNode):
-            # TODO!
-            raise ValueError("Unimplemented!")
+            fr_identifier = expr.callee.fully_resolve()
 
         else:
             self.add_diagnostic(
@@ -645,19 +779,9 @@ class Lowerer:
             )
             raise FatalCompileError()
 
-        function_data: VlImportedFunctionProfile | VlUserdefFunctionProfile
-        if identifier in self.imported_functions:
-            function_data = self.imported_functions[identifier]
-        elif identifier in self.userdef_functions:
-            function_data = self.userdef_functions[identifier]
-        else:
-            self.add_diagnostic(
-                "E200",
-                f"Unresolved identifier '{expr.callee.name}'",
-                expr.position_info,
-            )
-            raise FatalCompileError()
-
+        function_data = self.resolve_function_identifier(
+            fr_identifier, expr.position_info
+        )
         arguments: list[ExprNode] = [
             self.lower_expr(x) for x in expr.arguments.arguments
         ]
@@ -675,7 +799,7 @@ class Lowerer:
                 self.add_diagnostic(
                     "E111",
                     f"Function '{expr.callee.name}' expects argument #{idx} "
-                    f"to be type {parameter.vl_type}, got {argument.vl_type}",
+                    f"to be type {parameter.vl_type.to_vl_type_str()}, got {argument.vl_type.to_vl_type_str()}",
                     expr.position_info,
                 )
 
@@ -751,7 +875,7 @@ class Lowerer:
             and x.operand_types == [right.vl_type.to_vl_type_str()]
         ]
         if len(operation) > 1:
-            raise ValueError(
+            raise FatalCompileError(
                 f"IE: Multiple operations found for '{operator}' with left "
                 f"'{left.vl_type.to_vl_type_str()}', right '{right.vl_type.to_vl_type_str()}'"
             )
@@ -837,7 +961,7 @@ class Lowerer:
                 expr.position_info,
             )
         elif len(operation) > 1:
-            raise ValueError(
+            raise FatalCompileError(
                 f"IE: Multiple operations found for '{operator}' with operand {operand.vl_type.to_vl_type_str()}"
             )
         operation = operation[0]
@@ -867,7 +991,7 @@ class Lowerer:
         elif isinstance(expr.value.value, complex):
             value = VlComplex(expr.value.value)
         else:
-            raise ValueError(
+            raise FatalCompileError(
                 f"IE: Unknown constant expr value type {type(expr.value.value)}"
             )
 
@@ -933,10 +1057,7 @@ class Lowerer:
         Lookahead to get information on builtin functions before they are actually lowered.
         """
         identifier = decl.identifier.name
-        if (
-            identifier in self.imported_functions
-            or identifier in self.userdef_functions
-        ):
+        if identifier in self.userdef_functions:
             self.add_diagnostic(
                 "E202",
                 f"Function '{decl.identifier.name}' has already been declared",
@@ -981,7 +1102,7 @@ class Lowerer:
         )
 
         self.userdef_functions[identifier] = VlUserdefFunctionProfile(
-            identifier, userdef_fn_idx, parameters, return_type, attribute_tags
+            identifier, userdef_fn_idx, parameters, return_type, attribute_tags, 0
         )
 
     def lower_function_decl(self, decl: vl_ast.FunctionDeclNode) -> FunctionDeclNode:
@@ -1037,7 +1158,7 @@ class Lowerer:
         ),
     ) -> DataDeclNode | None:
         identifier = decl.target.name
-        vl_type = self.lower_vl_type(decl._type.name)
+        vl_type = self.lower_vl_type(decl.vl_type.name)
         value_lowered = self.lower_expr(decl.value)
         if value_lowered.vl_type != vl_type:
             # Attempt a type widening cast
@@ -1088,7 +1209,7 @@ class Lowerer:
                 raise FatalCompileError()
 
         else:
-            raise ValueError(f"IE: Unknown data decl type {type(decl)}")
+            raise FatalCompileError(f"IE: Unknown data decl type {type(decl)}")
 
         if vl_qualifier == "constexpr":
             # we have nothing to do with a constexpr
@@ -1097,17 +1218,12 @@ class Lowerer:
         return DataDeclNode(
             isinstance(decl, vl_ast.ConstantDeclNode),
             decl.target.name,
-            self.lower_vl_type(decl._type.name),
+            self.lower_vl_type(decl.vl_type.name),
             value_lowered,
             decl.position_info,
         )
 
     def lower_using_decl(self, decl: vl_ast.UsingDeclNode) -> None:
-        if not self.in_global_scope():
-            self.add_diagnostic(
-                "E300", "Nested function declarations", decl.position_info
-            )
-
         # namespace_identifiers: a list of namespaces that have been imported
         # scoped_identifiers: a list of tuples of (namespace, identifier) that have been imported
         namespace_identifiers: list[str]
@@ -1126,80 +1242,58 @@ class Lowerer:
                 for x in decl.namespace_and_identifiers[1].identifiers
             ]
         else:
-            raise ValueError("IE: empty using decl created by parser")
+            raise FatalCompileError("IE: empty using decl created by parser")
 
         if decl.namespace_identifiers and decl.namespace_and_identifiers:
-            raise ValueError(
+            raise FatalCompileError(
                 "IE: malformed using decl created by parser with both attrs"
             )
 
-        # logic for importing whole namespaces
+        # importing whole namespaces
         for namespace in namespace_identifiers:
             if namespace not in VlStdlib.namespaces:
-                # TODO: graceful
-                raise ValueError
+                self.add_diagnostic(
+                    "E400", f"Unresolved namespace '{namespace}'", decl.position_info
+                )
+                raise FatalCompileError()
+
             for fn in VlStdlib.namespaces[namespace].functions:
                 fr_identifier = f"{namespace}::{fn.fn_name}"
-                if fr_identifier in self.imported_functions:
-                    # TODO: graceful
-                    raise ValueError
-                self.imported_functions[fr_identifier] = VlImportedFunctionProfile(
-                    fr_identifier,
-                    fn.fn_id,
-                    [
-                        VlFnParamTypeProfile(x.name, self.lower_vl_type(x.vl_type))
-                        for x in fn.fn_params
-                    ],
-                    self.lower_vl_type(fn.fn_return_type),
-                )
+                self.add_imported_function(fr_identifier, fn, decl.position_info)
+
             for ce in VlStdlib.namespaces[namespace].constexprs:
                 fr_identifier = f"{namespace}::{ce.constexpr_name}"
-                if fr_identifier in self.imported_constexprs:
-                    # TODO: graceful
-                    raise ValueError
-                self.imported_constexprs[fr_identifier] = VlImportedConstexprProfile(
-                    ce.constexpr_name, ce.constexpr_value
-                )
+                self.init_imported_constexpr(fr_identifier, ce, decl.position_info)
 
-        # logic for importing specific identifiers from namespaces
+        # importing specific identifiers from namespaces
         is_wildcard = any(x[1] == "*" for x in scoped_identifiers)
         for namespace, identifier in scoped_identifiers:
             if namespace not in VlStdlib.namespaces:
-                # TODO: graceful
-                raise ValueError
+                self.add_diagnostic(
+                    "E400", f"Unresolved namespace '{namespace}'", decl.position_info
+                )
+                raise FatalCompileError()
 
-            found = False
+            found = is_wildcard
             for fn in VlStdlib.namespaces[namespace].functions:
                 if fn.fn_name != identifier and not is_wildcard:
                     continue
-                if fn.fn_name in self.imported_functions:
-                    # TODO: graceful
-                    raise ValueError
-                self.imported_functions[fn.fn_name] = VlImportedFunctionProfile(
-                    fn.fn_name,
-                    fn.fn_id,
-                    [
-                        VlFnParamTypeProfile(x.name, self.lower_vl_type(x.vl_type))
-                        for x in fn.fn_params
-                    ],
-                    self.lower_vl_type(fn.fn_return_type),
-                )
+                self.add_imported_function(fn.fn_name, fn, decl.position_info)
                 found = True
 
             for ce in VlStdlib.namespaces[namespace].constexprs:
                 if ce.constexpr_name != identifier and not is_wildcard:
                     continue
-                if ce.constexpr_name in self.imported_constexprs:
-                    # TODO: graceful
-                    raise ValueError
-                self.imported_constexprs[ce.constexpr_name] = (
-                    VlImportedConstexprProfile(ce.constexpr_name, ce.constexpr_value)
-                )
+                self.init_imported_constexpr(ce.constexpr_name, ce, decl.position_info)
                 found = True
 
             if not found:
-                # TODO: graceful
-                raise ValueError
+                self.add_diagnostic(
+                    "E401",
+                    f"Unresolved identifier '{identifier}' in namespace '{namespace}'",
+                    decl.position_info,
+                )
+                raise FatalCompileError()
 
     def lower_assignment_stmt(self, stmt: vl_ast.AssignmentStmtNode) -> StmtNode | None:
         if isinstance(stmt.target, vl_ast.IdentifierNode):
@@ -1283,17 +1377,17 @@ class Lowerer:
         self, stmts: list[vl_ast.StmtNode]
     ) -> SelectionStackStmt:
         if not stmts:
-            raise ValueError("Selection stack must not be empty")
+            raise FatalCompileError("Selection stack must not be empty")
         if not isinstance(stmts[0], vl_ast.IfStmtNode):
-            raise ValueError("Selection stack must stack with an if statement.")
+            raise FatalCompileError("Selection stack must stack with an if statement.")
         if not all(isinstance(x, vl_ast.ElseifStmtNode) for x in stmts[1:-1]):
-            raise ValueError(
+            raise FatalCompileError(
                 "Selection stack can only have elif statements in the middle."
             )
         if not isinstance(
             stmts[-1], (vl_ast.IfStmtNode, vl_ast.ElseifStmtNode, vl_ast.ElseStmtNode)
         ):
-            raise ValueError(
+            raise FatalCompileError(
                 "Selection stack must only consist of if, else if, or else statements."
             )
 
@@ -1324,7 +1418,7 @@ class Lowerer:
         if has_else:
             else_stmt = stmts[-1]
             if not isinstance(else_stmt, vl_ast.ElseStmtNode):
-                raise ValueError(
+                raise FatalCompileError(
                     "IE: Unreachable, already checked else_stmt was a ElseStmtNode"
                 )
             self.scope_in_selection("else", else_stmt.position_info)
@@ -1341,11 +1435,13 @@ class Lowerer:
         vl_type_str = stmt.init_stmt.init_type.name
         range_node = stmt.init_stmt.value
         if not isinstance(range_node, vl_ast.RangeLiteralExprNode):
-            raise ValueError(
+            raise FatalCompileError(
                 "IE: For loops only work when iterating through a range literal"
             )
         if vl_type_str != "int":
-            raise ValueError("IE: For loops only work for integer indices FIXME!")
+            raise FatalCompileError(
+                "IE: For loops only work for integer indices FIXME!"
+            )
 
         # lower stmts with updated loop context
         self.scope_in_loop("for", stmt.position_info)
@@ -1542,7 +1638,7 @@ class Lowerer:
                 stmt_lowered = None
 
             else:
-                raise ValueError(f"IE: Unknown stmt type '{type(stmt)}'")
+                raise FatalCompileError(f"IE: Unknown stmt type '{type(stmt)}'")
 
             if stmt_lowered:
                 out_stmts.append(stmt_lowered)
@@ -1567,7 +1663,7 @@ class Lowerer:
         ):
             return self.lower_data_decl(decl)
         else:
-            raise ValueError(f"IE: Unknown decl type '{type(decl)}'")
+            raise FatalCompileError(f"IE: Unknown decl type '{type(decl)}'")
 
     def lower_expr(self, expr: vl_ast.ExprNode) -> ExprNode:
         """Only to be called on rvalue exprs"""
@@ -1592,7 +1688,7 @@ class Lowerer:
         elif isinstance(expr, vl_ast.ConstantExprNode):
             expr_lowered = self.lower_constant_expr(expr)
         else:
-            raise ValueError(f"IE: Unknown expr type '{type(expr)}'")
+            raise FatalCompileError(f"IE: Unknown expr type '{type(expr)}'")
 
         # apply constant folding
         if expr_lowered.constexpr_value:

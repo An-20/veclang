@@ -6,10 +6,10 @@ def test_basic():
     PROGRAM_STR = """
         using core::*;
         // using math::{sin, PI};
-        using math;
         
         fn main() -> real {
-            // printr(42.0 + 3.0);
+            using math;
+            printr(42.0 + 3.0);
             // return 42;
             return math::sin(math::PI/4);
         }

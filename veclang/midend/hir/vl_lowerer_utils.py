@@ -39,6 +39,7 @@ class IdentifierData:
 
     is_loop_var: bool
     is_parameter: bool
+    is_import: bool
 
 
 @dataclasses.dataclass
@@ -48,17 +49,13 @@ class VlFnParamTypeProfile:
 
 
 @dataclasses.dataclass
-class VlImportedConstexprProfile:
-    fr_identifier: str
-    constexpr_value: VlTypeABC
-
-
-@dataclasses.dataclass
 class VlImportedFunctionProfile:
     fr_identifier: str
     builtin_fn_id: int
     parameters: list[VlFnParamTypeProfile]
     return_type: VlType
+
+    ref_read_count: int
 
 
 @dataclasses.dataclass
@@ -68,6 +65,8 @@ class VlUserdefFunctionProfile:
     parameters: list[VlFnParamTypeProfile]
     return_type: VlType
     attribute_tags: dict[str, int]
+
+    ref_read_count: int
 
 
 @dataclasses.dataclass
@@ -80,6 +79,7 @@ class Scope:
 
     # Tuple of [type_or_value, is_variable
     data: dict[str, IdentifierData]
+    imported_functions: dict[str, VlImportedFunctionProfile]
 
 
 def format_operator(operator: VlOperatorType) -> str:

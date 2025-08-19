@@ -668,7 +668,7 @@ def eval_vl(node: ASTNode, state: InterpreterState) -> VlTypeABC | None:
     elif isinstance(node, VariableDeclNode):
         expr = eval_vl(node.value, state)
         expr_t = expr.get_type_name()
-        expected_t = node._type.name
+        expected_t = node.vl_type.name
 
         if expected_t != expr_t:
             if expected_t in expr.get_type_into():
@@ -684,7 +684,7 @@ def eval_vl(node: ASTNode, state: InterpreterState) -> VlTypeABC | None:
     elif isinstance(node, ConstantDeclNode):
         expr = eval_vl(node.value, state)
         expr_t = expr.get_type_name()
-        expected_t = node._type.name
+        expected_t = node.vl_type.name
 
         if expected_t != expr_t:
             if expected_t in expr.get_type_into():

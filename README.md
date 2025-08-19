@@ -1,5 +1,5 @@
 # Veclang Language
-**Veclang** is an interpreted scripting language designed for high-performance numerical calculations. Veclang was originally developed for Aureus, but VKSL LAB shows how Veclang can be used as a scripting language in other contexts, e.g. for image generation.
+**Veclang** is an interpreted scripting language designed for high-performance numerical calculations. Veclang was originally developed for Aureus, but [VKSL LAB](https://lab.vksl.uk) shows how Veclang can be used as a scripting language in other contexts, e.g. for image generation.
 
 Veclang code is compiled to Veclang bytecode by the compiler. Veclang bytecode is then run by the Veclang interpreter. There are different interpreters for different platforms:
 - **Veclang for x86**, or `bc_interpreter` is the 'standard' Veclang interpreter implementation in C++, for running on desktop x86 platforms.
@@ -26,7 +26,7 @@ All types in Veclang are values or objects.
 - A **value** is an `int`, `real`, `bool`, or `null`. A value takes up 4 or 8 bytes, depending on runtime precision.
 - An **object** is a `complex`, `matN`, or `vecN`, where $n \in \{2,3,4\}$. An object takes up 64 or 128 bytes, depending on runtime precision, when stored on the intermediate-value stack. An object only takes up as much memory as necessary when stored in stack memory, with no padding.
 
-All Veclang types have an associated **type code**, which are used in some object instructions for dynamic dispatch (especially as the vector and matrix instructions are shared across all `vecN` and `matN`s):
+Veclang types have an associated **type code**, which are used in some object instructions for dynamic dispatch (especially as the vector and matrix instructions are shared across all `vecN` and `matN`s):
 - VlInt=0x00
 - VlBool=0x01
 - VlReal=0x02
@@ -37,6 +37,7 @@ All Veclang types have an associated **type code**, which are used in some objec
 - VlMat2=0x07
 - VlMat3=0x08
 - VlMat4=0x09 
+VlNull does not have a type code as it is an internal compiler-only value. VlNull represents the return value of a function that does not have a useful return output. `null` cannot be assigned to a variable or 
 
 The **canonical size** of a Veclang type is the least number of bytes needed to represent it (like a struct with zero padding). When data is stored in a constant table or in stack memory, it is always arranged contiguously.
 
@@ -73,6 +74,15 @@ When a Veclang function is called:
 - The instruction pointer is set to the return instruction pointer value, and the top stack frame is popped.
 - The result of the value is now at the top of the object or value stacks. If the function was called as a bare function (a `ExprStmt`), e.g. `print(42);`, then `OP_POP_VAL` or `OP_POP_OBJ` will be emitted by the compiler to ensure the return value is dealt with.
 
+#### Attribute Tags
+Functions in Veclang can be prefixed with attribute tags, and individual parameters can also be prefixed with attribute tags.
+
+The values of attribute tags can only be 'simple literal' expressions. These are:
+- Integer literals e.g. 0, 1, 2, 3, etc. Note that negative numbers are not integer literals, as they are actually unary operations.
+- Boolean literals e.g. `true`, `false`
+- String literals e.g. `"string"`
+- Null literals e.g. `null`
+
 #### Builtin Functions
 Various elements of Veclang functionality are implemented by calling **builtin functions** (functions implemented in the interpreter's native language), either explicitly or implicitly:
 - Builtin functions, e.g. `print`, `math::sin`
@@ -90,7 +100,7 @@ When a Veclang program is loaded into the interpreter, the interpreter creates a
 When a user-defined function is called, the `userdef_fn_idx` is looked up and the instruction offset and stack size are used to create a stack frame and jump to the necessary instructions.
 
 ## Veclang Grammar
-Veclang has the tradition separation between expressions and statements:
+Veclang has separation between expressions and statements:
 - An **expression** evaluates to a value, including operations, function calls, type casts, etc. An expression is a **constexpr** expression if it can be evaluated at compile time; compound expressions are **constexpr** if all their children are also constexpr.
 - A **statement** forms part of the program structure and does not evaluate to a value, including selection, loops, and declarations. Declarations are treated in Veclang as a subclass of statements that only belong in certain places.
 
@@ -103,6 +113,12 @@ When a Veclang program is compiled to bytecode, function bytecode is placed at t
 - A JMP instruction to the end of all the function bytecode.
 - For each function, the bytecode is emitted with all function bytecode placed contiguously.
 - After all the function bytecode, the global bytecode.
+
+Hoisting is where the order of statements in a Veclang program is reorganised during the HIR lowering stage. Statements are considered in the following order:
+- 'Lookahead' on `using` and function declarations, in order of declaration. Lookahead on the `using` declarations is where the lowerer runs all imports ahead of actual lowering. Lookahead on function declaration is where the lowerer builds up an internal table of the declared functions and signatures, meaning when actual lowering takes place, functions can refer to other functions defined later in their own body (or refer to themselves). 
+- All `using` declarations throughout the program are actually lowered. This results in no effect as all import resolution is done in lookahead.
+- All global `constexpr` declarations are actually lowered.
+- All function declarations throughout the program are actually lowered.
 
 #### Lvalues and rvalues
 In Veclang, all **expressions** can be treated as **rvalues**, which can be on the right-hand side of an assignment statement. However, only specific expressions can be treated as **lvalues**, which are expressions on the left-hand side of an assignment statement that can actually be assigned to:
@@ -144,7 +160,7 @@ Almost all non-syntax errors are typically emitted when the AST is lowered to a 
 - **Weak warnings**, which are code-style issues that do not affect the program's functionality in any way.
 
 #### Compiler backend
-The backend compiles the HIR to bytecode, a linear instruction-based representation of a Veclang program that is run by the Veclang Interpreter.
+The backend compiles the HIR to bytecode, a linear instruction-based representation of a Veclang program that is run by the Veclang Interpreter. A Python VlProgram object is output, which contains a header, binary constants data, and binary instructions data. More information is below in the bytecode section.
 
 ## Bytecode
 ### Overview
@@ -154,7 +170,41 @@ There are three main types of instructions, classified by how they take operands
 - 2 operand instructions e.g. `OP_VECTOR_ADD`, that take 1 8-bit operand and 1 16-bit operand.
 Each instruction consisting of opcode and operand(s) is stored as 4 bytes. The operands are interpreted as unsigned 8 bit and 16 bit integers in little-endian order.
 
-## Instruction reference
+### Binary Representation
+A VlProgram object contains:
+- A JSON header with information about the program, including the functions, their instruction offsets, stack sizes, the global stack size, runtime flags, and attribute tags.
+- Binary data representing the constants table.
+- Binary data representing the bytecode instructions.
+
+A VlProgram is serialised and deserialised to binary across language boundaries (e.g. when passed from Python compiler to C++ interpreter) by using the CEDF utility library (part of the Aureus project, found in `veclang/utils`). The CEDF ID for Veclang is `0x0001_0000 = 65536`. A outline of the JSON header is below.
+
+###### VlHeader
+- **magic** (`string`, must be `"VECL"`)
+  Should always equal `"VECL"`.
+- **version** (`integer`)
+  Version number, typically `0x0002_0000 = 131072` for Veclang v2.
+- **flags** (`object<string, integer>`)
+  Dictionary of string keys to integer values.
+- **functions** (`array<VlFunction>`)
+  List of functions defined in this header.
+- **globals_stack_size** (`integer`)
+  Size of the global stack.
+
+###### VlFunction
+- **name** (`string`)  
+  Function name.
+- **stack_size** (`integer`)  
+  Maximum stack size for this function.
+- **instruction_offset** (`integer`)  
+  Offset into the bytecode where the function starts.
+- **arg_types** (`array<integer>`)  
+  List of argument type identifiers.
+- **return_type** (`integer`)  
+  Return type identifier.
+- **attribute_tags** (`object<string, integer>`)  
+  Dictionary of string keys to integer values representing tags/attributes for the function.
+
+# Bytecode Reference
 ### 0x00 - 0x2F - Basic variable and constant manipulations
 #### Constant loading
 ##### `0x00: OP_CONSTANT_VAL_DIRECT`
@@ -422,7 +472,7 @@ E120: `if` statement condition should be type `bool`, got type `<>`
 E121: `elseif` statement condition should be type `bool`, got type `<>` 
 ###### E122
 E122: `while` statement condition should be type `bool`, got type `<>`
-##### E123
+###### E123
 E123: `for` statement range literal must either be `start:stop:constexpr_step` or `constexpr_start:constexpr_stop:step`
 
 #### E2xx errors - Identifier errors
@@ -434,10 +484,14 @@ E201: Identifier `<>` has already been initialized
 E202: Function `<>` has already been declared
 ###### E210
 E210: Duplicate parameter `<>` in declaration for function `<>`
+###### E211
+E211: Attribute tag parsing error: `<>`
 
 #### E3xx errors - Structure errors
 ###### E300
 E300: Nested function declarations
+###### E301
+E301: `using` declaration inside function declaration
 ###### E310
 E310: Use of `break` statement outside of loop
 ###### E311
@@ -471,6 +525,8 @@ W012: Unreachable code after `continue` statement
 W013: Expression statement has no effect
 ###### W014
 W014: Statement has no effect
+###### W020
+W020: Unknown attribute tag key `<>`
 
 ## Weak warnings
 ###### X000

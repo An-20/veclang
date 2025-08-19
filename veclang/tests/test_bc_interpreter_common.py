@@ -20,8 +20,10 @@ def compile_vl(program_str: str) -> VlProgram:
     print_ast(parsed)
 
     hir, diagnostics = lower(parsed, COMPILER_FLAGS)
-    if diagnostics:
+    if not hir:
         raise ValueError(f"Error when lowering: {diagnostics}")
+    elif diagnostics:
+        print(f"Diagnostics emitted when lowering: {diagnostics}")
     print_hir(hir)
 
     bytecode, diagnostics = emit(hir, COMPILER_FLAGS)

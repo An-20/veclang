@@ -45,6 +45,8 @@ endif()
 
 
 target_compile_options(veclang PRIVATE -Wall -O3 -g)
+target_compile_definitions(veclang PRIVATE $<$<CONFIG:Debug>:DEBUG>)
+
 if (EMSCRIPTEN)
     target_link_options(veclang PRIVATE --bind -lembind)
 endif()
@@ -56,6 +58,7 @@ if (NOT EMSCRIPTEN)
         LIBRARY_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/veclang/backend/bc_interpreter"
     )
     target_compile_options(_bc_interpreter_core PRIVATE -Wall -O3 -g)
+    target_compile_definitions(_bc_interpreter_core PRIVATE $<$<CONFIG:Debug>:DEBUG>)
     target_link_libraries(_bc_interpreter_core PRIVATE -static -lpthread -static-libgcc -static-libstdc++)
 endif()
 

@@ -29,6 +29,34 @@ std::pair<uint8_t, uint16_t> get_2_operands(const uint8_t *instruction)
 
 namespace vl_interpreter
 {
+#ifdef DEBUG
+#define CHECK_BOUNDS(offset, container)                               \
+    do                                                                \
+    {                                                                 \
+        if ((offset) >= (container).size())                           \
+        {                                                             \
+            std::cerr << "Index out of bounds: " << (offset) << "\n"; \
+            return;                                                   \
+        }                                                             \
+    } while (0)
+
+#define CHECK_STACK_NOT_EMPTY(stack)          \
+    do                                        \
+    {                                         \
+        if ((stack).empty())                  \
+        {                                     \
+            std::cerr << "Stack underflow\n"; \
+            return;                           \
+        }                                     \
+    } while (0)
+
+#else
+
+#define CHECK_BOUNDS(offset, container) ((void)0)
+#define CHECK_STACK_NOT_EMPTY(stack) ((void)0)
+
+#endif
+
     void Interpreter::op_constant_val_direct(const uint8_t *instruction)
     {
         int16_t value_16b = static_cast<int16_t>(get_1_operand(instruction));
@@ -45,24 +73,16 @@ namespace vl_interpreter
     void Interpreter::op_constant_val_table(const uint8_t *instruction)
     {
         uint16_t offset_16b = get_1_operand(instruction);
-        if (offset_16b >= constants.size())
-        {
-            std::cerr << "Index out of bounds: " << offset_16b << "\n";
-            return;
-        }
+        CHECK_BOUNDS(offset_16b, constants);
         vl_types::RawValue value;
-        std::memcpy(&value.bits, constants.data() + offset_16b, 8); // todo: fix for variable runtime precision
+        std::memcpy(&value.bits, constants.data() + offset_16b, 8);
         value_stack.push(value);
     }
 
     void Interpreter::op_constant_obj_table(const uint8_t *instruction)
     {
         auto [type_8b, offset_16b] = get_2_operands(instruction);
-        if (offset_16b >= constants.size())
-        {
-            std::cerr << "Index out of bounds: " << offset_16b << "\n";
-            return;
-        }
+        CHECK_BOUNDS(offset_16b, constants);
         size_t type_size = vl_program::get_type_canonical_size(static_cast<vl_program::type_code>(type_8b));
         vl_types::RawObject object;
         std::memcpy(&object.bits, constants.data() + offset_16b, type_size);
@@ -71,21 +91,13 @@ namespace vl_interpreter
 
     void Interpreter::op_pop_val(const uint8_t *instruction)
     {
-        if (value_stack.empty())
-        {
-            std::cerr << "Value stack underflow\n";
-            return;
-        }
+        CHECK_STACK_NOT_EMPTY(value_stack);
         value_stack.pop();
     }
 
     void Interpreter::op_pop_obj(const uint8_t *instruction)
     {
-        if (object_stack.empty())
-        {
-            std::cerr << "Object stack underflow\n";
-            return;
-        }
+        CHECK_STACK_NOT_EMPTY(object_stack);
         object_stack.pop();
     }
 
@@ -118,11 +130,7 @@ namespace vl_interpreter
 
     void Interpreter::op_return(const uint8_t *instruction)
     {
-        if (call_stack.empty())
-        {
-            std::cerr << "Call stack underflow\n";
-            return;
-        }
+        CHECK_STACK_NOT_EMPTY(call_stack);
         instruction_pointer = call_stack.top().return_address;
         call_stack.pop();
     }
@@ -206,11 +214,7 @@ namespace vl_interpreter
     void Interpreter::op_jmp_if_true(const uint8_t *instruction)
     {
         uint16_t offset = get_1_operand(instruction);
-        if (value_stack.empty())
-        {
-            std::cerr << "Value stack underflow\n";
-            return;
-        }
+        CHECK_STACK_NOT_EMPTY(value_stack);
         vl_types::RawValue condition = value_stack.top();
         value_stack.pop();
 
@@ -221,11 +225,7 @@ namespace vl_interpreter
     void Interpreter::op_jmp_if_false(const uint8_t *instruction)
     {
         uint16_t offset = get_1_operand(instruction);
-        if (value_stack.empty())
-        {
-            std::cerr << "Value stack underflow\n";
-            return;
-        }
+        CHECK_STACK_NOT_EMPTY(value_stack);
         vl_types::RawValue condition = value_stack.top();
         value_stack.pop();
 
@@ -296,11 +296,6 @@ namespace vl_interpreter
     void Interpreter::op_fast_int_cmp_and_jmp(const uint8_t *instruction)
     {
         auto [cmp_type_8b, offset_16b] = get_2_operands(instruction);
-        if (value_stack.size() < 2)
-        {
-            std::cerr << "Value stack underflow\n";
-            return;
-        }
         int64_t a = vl_types::rv_to_int(value_stack.top());
         value_stack.pop();
         int64_t b = vl_types::rv_to_int(value_stack.top());

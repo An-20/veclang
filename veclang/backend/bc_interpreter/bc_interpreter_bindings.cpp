@@ -27,9 +27,22 @@ public:
         interpreter = vl_interpreter::Interpreter(program);
     }
 
+    void update_program(py::bytes program_bytes)
+    {
+        std::string program_bytes_str = program_bytes.cast<std::string>();
+        vl_sedf::VlProgram program = vl_sedf::loadb(
+            std::vector<uint8_t>(program_bytes_str.begin(), program_bytes_str.end()));
+        interpreter.update_bytecode(program);
+    }
+
     void interpret_program()
     {
         interpreter.interpret_program();
+    }
+
+    void interpret_program_continue()
+    {
+        interpreter.interpret_program_continue();
     }
 
     py::object interpret_fn(py::int_ fn_idx, py::list arguments, py::int_ return_type_code)
@@ -113,6 +126,8 @@ PYBIND11_MODULE(_bc_interpreter_core, m)
 
     py::class_<InterpreterWrapper>(m, "Interpreter")
         .def(py::init<py::bytes>())
+        .def("update_program", &InterpreterWrapper::update_program)
         .def("interpret_fn", &InterpreterWrapper::interpret_fn)
-        .def("interpret_program", &InterpreterWrapper::interpret_program);
+        .def("interpret_program", &InterpreterWrapper::interpret_program)
+        .def("interpret_program_continue", &InterpreterWrapper::interpret_program_continue);
 }

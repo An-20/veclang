@@ -484,7 +484,7 @@ class Lowerer:
     # ====================
 
     def lower(
-        self, ast_node: vl_ast.ProgramNode
+        self, ast_node: vl_ast.ProgramNode, import_core: bool = True
     ) -> tuple[ProgramNode | None, list[Diagnostic]]:
         """
         Lowers an AST to a HIR, returning a tuple of:
@@ -502,19 +502,21 @@ class Lowerer:
                     self.lookahead_function_decl(stmt)
 
             # add `using core::*;`
-            api = ASTPositionInfo(0, 0)
-            stmts = [
-                vl_ast.UsingDeclNode(
-                    None,
-                    (
-                        vl_ast.IdentifierNode("core", api),
-                        vl_ast.UsingDeclIdentifiersNode(
-                            None, vl_ast.IdentifierNode("*", api), api
+            stmts = ast_node.stmts.stmts
+            if import_core:
+                api = ASTPositionInfo(0, 0)
+                stmts = [
+                    vl_ast.UsingDeclNode(
+                        None,
+                        (
+                            vl_ast.IdentifierNode("core", api),
+                            vl_ast.UsingDeclIdentifiersNode(
+                                None, vl_ast.IdentifierNode("*", api), api
+                            ),
                         ),
-                    ),
-                    api,
-                )
-            ] + ast_node.stmts.stmts
+                        api,
+                    )
+                ] + ast_node.stmts.stmts
             stmts_lowered = self.lower_stmts(stmts)
 
         except Exception as e:

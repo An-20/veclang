@@ -15,7 +15,6 @@
 #include "vl_program.h"
 #include "../bc_common/cpp/vl_sedf.h"
 
-// Helper to write a 32-bit int into a byte buffer in little-endian format
 void writeIntLE(std::vector<uint8_t> &buffer, size_t offset, uint32_t value)
 {
     buffer[offset + 0] = value & 0xFF;
@@ -24,13 +23,11 @@ void writeIntLE(std::vector<uint8_t> &buffer, size_t offset, uint32_t value)
     buffer[offset + 3] = (value >> 24) & 0xFF;
 }
 
-// Clamp a float value to [0, 255] and cast to uint8
 uint8_t clamp255(double v)
 {
     return static_cast<uint8_t>(std::max(0.0, std::min(255.0, v)));
 }
 
-// Build BMP data in memory
 std::vector<uint8_t> buildBMP(const std::vector<vl_types::VlVec3> &pixels, int width, int height)
 {
     const int padSize = (4 - (width * 3) % 4) % 4;

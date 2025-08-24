@@ -775,12 +775,16 @@ class BytecodeEmitter:
             self.emit_stmt(stmt)
 
     def emit(
-        self, hir_node: ProgramNode
+        self, hir_node: ProgramNode, force_start_with_jmp: bool = False
     ) -> tuple[bc.VlProgram | None, list[Diagnostic]]:
         """
         Emits bytecode from a HIR, returning a tuple of:
         - a VlProgram or None
         - a list[Diagnostic]
+
+        If the program contains functions, these are placed at the top of the bytecode
+        with a JMP to the start of global code. This JMP is only present if there are
+        actually function declarations or if force_start_with_jmp is set to True.
         """
         try:
             function_decls = [
@@ -790,7 +794,7 @@ class BytecodeEmitter:
                 x for x in hir_node.stmts if not isinstance(x, FunctionDeclNode)
             ]
 
-            if function_decls:
+            if function_decls or force_start_with_jmp:
                 # add a JMP at the start to skip all the function code
                 self.add_instruction("OP_JMP", int_to_2_bytes(0x0000))
                 self.emit_stmts(function_decls)

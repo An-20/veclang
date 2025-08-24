@@ -55,6 +55,22 @@ namespace vl_interpreter
             object_stack = std::stack<vl_types::RawObject>();
         }
 
+        void update_bytecode(const vl_sedf::VlProgram &program)
+        {
+            constants = program.constants;
+            instructions = program.instructions;
+            header = program.header;
+            instruction_pointer = 0;
+
+            userdef_functions = std::vector<std::pair<uint32_t, uint32_t>>();
+            for (vl_sedf::VlFunction fn : program.header.functions)
+            {
+                userdef_functions.push_back(std::make_pair(fn.instruction_offset, fn.stack_size));
+            }
+
+            global_stack.resize(program.header.globals_stack_size);
+        }
+
         std::pair<vl_types::RawValue, vl_types::RawObject> interpret_fn(
             uint32_t fn_idx,
             std::vector<vl_types::RawValue> value_params,
@@ -108,6 +124,23 @@ namespace vl_interpreter
             uint32_t num_instructions = instructions.size() / 4;
 
             global_stack = std::vector<uint8_t>(header.globals_stack_size);
+            local_stack = std::vector<uint8_t>();
+            call_stack = std::stack<StackFrame>();
+            value_stack = std::stack<vl_types::RawValue>();
+            object_stack = std::stack<vl_types::RawObject>();
+
+            while (instruction_pointer < num_instructions)
+            {
+                const uint8_t *instruction = &instructions[instruction_pointer * 4];
+                instruction_pointer += 1;
+                interpret_instruction(instruction);
+            }
+        }
+
+        void interpret_program_continue()
+        {
+            instruction_pointer = 0;
+            uint32_t num_instructions = instructions.size() / 4;
             local_stack = std::vector<uint8_t>();
             call_stack = std::stack<StackFrame>();
             value_stack = std::stack<vl_types::RawValue>();

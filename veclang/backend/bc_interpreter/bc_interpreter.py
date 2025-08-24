@@ -24,6 +24,11 @@ class Interpreter:
         self.program: VlProgram = program
         self.interpreter = _bc_interpreter_core.Interpreter(program_as_bytes)
 
+    def update_program(self, program: VlProgram):
+        program_as_bytes = VlSEDF.dumpb(program)
+        self.program: VlProgram = program
+        self.interpreter.update_program(program_as_bytes)
+
     def interpret_fn(self, fn_idx: int, args: list[typing.Any]):
         if fn_idx not in range(len(self.program["header"]["functions"])):
             raise ValueError("too high fn_idx!")
@@ -34,3 +39,6 @@ class Interpreter:
 
     def interpret_program(self):
         self.interpreter.interpret_program()
+
+    def interpret_program_continue(self):
+        self.interpreter.interpret_program_continue()

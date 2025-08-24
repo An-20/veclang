@@ -58,3 +58,15 @@ def int_to_2_bytes(x: int) -> bytes:
     if x not in range(0x10000):
         raise ValueError("IE: int must be in range(0x10000) to pack to 2 bytes")
     return bytes(struct.pack("<H", x))
+
+
+def one_byte_to_int(b: bytes) -> int:
+    if len(b) != 1:
+        raise ValueError("Input must be exactly 1 byte")
+    return struct.unpack("<B", b)[0]
+
+
+def two_bytes_to_int(b: bytes) -> int:
+    if len(b) != 2:
+        raise ValueError("Input must be exactly 2 bytes")
+    return struct.unpack("<H", b)[0]

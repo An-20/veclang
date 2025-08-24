@@ -24,7 +24,7 @@ from veclang.midend.hir.vl_hir import (
     BreakStmtNode,
     ContinueStmtNode,
 )
-from veclang.midend.vl_core import VlType, VlTypeABC, VlInt, VlNull, VlBool, VlReal
+from veclang.midend.vl_core import VlType, VlTypeABC, VlInt, VlNull, VlReal
 from veclang.midend.hir.vl_lowerer import GLOBAL_FN_NAME, VlQualifier
 
 from veclang.backend.bc_compiler.vl_emitter_utils import (
@@ -43,6 +43,14 @@ from veclang.common import (
 
 
 class BytecodeEmitter:
+
+    JMP_INSTRUCTIONS = [
+        "OP_JMP",
+        "OP_JMP_IF_TRUE",
+        "OP_JMP_IF_FALSE",
+        "OP_FAST_INT_CMP_AND_JMP",
+        "OP_FAST_REAL_CMP_AND_JMP",
+    ]
 
     def __init__(self, compiler_flags: CompilerFlags):
         self.compiler_flags: CompilerFlags = compiler_flags
@@ -175,12 +183,7 @@ class BytecodeEmitter:
 
     def modify_instruction_16b(self, instruction_offset: int, arg_16b: int):
         current_instruction = self.instructions[instruction_offset]
-        if OPCODE_MAP[current_instruction[0]].opcode_hr not in [
-            "OP_JMP",
-            "OP_JMP_IF_TRUE",
-            "OP_JMP_IF_FALSE",
-            "OP_FAST_INT_CMP_AND_JMP",
-        ]:
+        if OPCODE_MAP[current_instruction[0]].opcode_hr not in self.JMP_INSTRUCTIONS:
             raise FatalCompileError(
                 "IE: modification of arg_16b for a non-JMP instruction"
             )
@@ -195,7 +198,8 @@ class BytecodeEmitter:
         """
         for instruction in self.instructions:
             opcode = instruction[0]
-            if opcode in [0x20, 0x21, 0x22]:
+            opcode_hr = OPCODE_MAP[opcode].opcode_hr
+            if opcode_hr in self.JMP_INSTRUCTIONS:
                 if instruction[2] == 0xFF and instruction[3] == 0xFF:
                     raise FatalCompileError("IE: instruction with unset offset")
 
@@ -569,8 +573,19 @@ class BytecodeEmitter:
                     [],
                 )
             )
-            self.emit_expr(block.condition)
-            self.add_instruction("OP_JMP_IF_FALSE", int_to_2_bytes(0xFFFF))
+
+            emitted = False
+            if isinstance(block.condition, BinaryOperationExprNode):
+                emitted = self.try_emit_fast_cmp_and_jmp(
+                    block.condition.left,
+                    block.condition.right,
+                    block.condition.operation,
+                    jmp_if=False,
+                )
+            if not emitted:
+                self.emit_expr(block.condition)
+                self.add_instruction("OP_JMP_IF_FALSE", int_to_2_bytes(0xFFFF))
+
             self.subscope_add_stack_end_update(self.last_instruction_offset())
             self.emit_stmts(block.stmts)
 

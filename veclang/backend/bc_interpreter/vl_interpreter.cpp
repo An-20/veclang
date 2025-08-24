@@ -331,6 +331,44 @@ namespace vl_interpreter
             instruction_pointer = offset_16b;
     }
 
+    void Interpreter::op_fast_real_cmp_and_jmp(const uint8_t *instruction)
+    {
+        auto [cmp_type_8b, offset_16b] = get_2_operands(instruction);
+        double a = vl_types::rv_to_double(value_stack.top());
+        value_stack.pop();
+        double b = vl_types::rv_to_double(value_stack.top());
+        value_stack.pop();
+
+        bool jump = false;
+        switch (cmp_type_8b)
+        {
+        case 0:
+            jump = (a == b);
+            break;
+        case 1:
+            jump = (a != b);
+            break;
+        case 2:
+            jump = (a > b);
+            break;
+        case 3:
+            jump = (a >= b);
+            break;
+        case 4:
+            jump = (a < b);
+            break;
+        case 5:
+            jump = (a <= b);
+            break;
+        default:
+            std::cerr << "Unknown cmp_type: " << static_cast<int>(cmp_type_8b) << "\n";
+            return;
+        }
+
+        if (jump)
+            instruction_pointer = offset_16b;
+    }
+
 // Macro to define binary value operations using vl_types functions
 #define DEFINE_BINARY_VAL_OP(opname)                          \
     void Interpreter::op_##opname(const uint8_t *instruction) \

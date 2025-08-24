@@ -278,6 +278,9 @@ namespace vl_interpreter
             case vl_program::OP_FAST_INT_CMP_AND_JMP:
                 op_fast_int_cmp_and_jmp(instruction);
                 break;
+            case vl_program::OP_FAST_REAL_CMP_AND_JMP:
+                op_fast_real_cmp_and_jmp(instruction);
+                break;
 
             case vl_program::OP_INT_EQUAL:
                 op_int_equal(instruction);
@@ -483,6 +486,7 @@ namespace vl_interpreter
         void op_fast_global_int_inplace_sub(const uint8_t *instruction);
 
         void op_fast_int_cmp_and_jmp(const uint8_t *instruction);
+        void op_fast_real_cmp_and_jmp(const uint8_t *instruction);
 
         void op_int_equal(const uint8_t *instruction);
         void op_int_not_equal(const uint8_t *instruction);

@@ -83,6 +83,7 @@ OPCODE_MAP: dict[int, Instruction] = {
     0x28: Instruction(0x28, "OP_FAST_LOCAL_INT_INPLACE_SUB", 1),
     0x29: Instruction(0x29, "OP_FAST_GLOBAL_INT_INPLACE_SUB", 1),
     0x2A: Instruction(0x2A, "OP_FAST_INT_CMP_AND_JMP", 2),
+    0x2B: Instruction(0x2B, "OP_FAST_REAL_CMP_AND_JMP", 2),
     # ========================================
     # 0x80 - 0xDF - OPERATIONS
     # ========================================

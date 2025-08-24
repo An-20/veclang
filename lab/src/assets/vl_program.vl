@@ -1,0 +1,21 @@
+<generate_img>
+fn mandelbrot(
+    x: int,
+    y: int,
+    res_x: int,
+    res_y: int
+) -> vec3 {
+    constexpr ITERATIONS: int = 25;
+    constexpr THRESHOLD: real = 16;
+    let c: complex = (x / res_x - 0.7) + (y / res_y - 0.5) * 1i;
+    c = c * 3;
+    let z: complex = 0;
+    for (idx: int in 0:ITERATIONS) {
+        if (z.re * z.re + z.im * z.im > THRESHOLD) {
+            const v: real = (ITERATIONS - idx) / ITERATIONS * 255;
+            return [v+x, v, v-y];
+        }
+        z = z * z + c;
+    }
+    return [0+x, 0, 0-y];
+}

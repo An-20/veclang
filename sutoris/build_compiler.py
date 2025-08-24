@@ -25,7 +25,6 @@ def zip_only_py_files(
 
     with zipfile.ZipFile(zip_filename, "w", zipfile.ZIP_DEFLATED) as zipf:
         for root, dirs, files in os.walk(source_folder):
-            # Skip excluded directories
             dirs[:] = [d for d in dirs if d not in exclude_dirs]
 
             for file in files:
@@ -42,7 +41,7 @@ def zip_only_py_files(
 
 zip_only_py_files(
     f"{BASE_REPO_DIR}/",
-    f"{BASE_REPO_DIR}/veclang.zip",
-    exclude_dirs=["sutoris"],
+    f"{BASE_REPO_DIR}/lab/public/veclang.zip",
+    exclude_dirs=["sutoris", "lab"],
     exclude_filenames=["main.py"],
 )

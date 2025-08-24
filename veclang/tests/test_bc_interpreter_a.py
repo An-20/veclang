@@ -4,7 +4,7 @@ from veclang.tests.test_bc_interpreter_common import compile_vl
 
 def test_basic():
     PROGRAM_STR = """
-        using core::*;
+        // using core::*;
         // using math::{sin, PI};
         
         fn main() -> real {

@@ -214,3 +214,8 @@ parsetab.py
 
 .idea
 .vscode
+
+# 'built' code for web
+/lab/public/veclang.js
+/lab/public/veclang.wasm
+/lab/public/veclang.zip

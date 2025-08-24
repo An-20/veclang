@@ -12,10 +12,12 @@ file(GLOB_RECURSE ALL_SOURCES
     veclang/utils/*.cpp
 )
 
-set(pybind11_DIR C:/Users/xiada/AppData/Local/Programs/Python/Python311/Lib/site-packages/pybind11/share/cmake/pybind11)
-set(PYBIND11_FINDPYTHON ON)
-set(PYBIND11_PYTHON_VERSION 3.11)
-find_package(pybind11 REQUIRED)
+if (NOT EMSCRIPTEN)
+    set(pybind11_DIR C:/Users/xiada/AppData/Local/Programs/Python/Python311/Lib/site-packages/pybind11/share/cmake/pybind11)
+    set(PYBIND11_FINDPYTHON ON)
+    set(PYBIND11_PYTHON_VERSION 3.11)
+    find_package(pybind11 REQUIRED)
+endif()
 
 # Filter out those starting with "test_"
 set(SOURCES "")
@@ -48,12 +50,14 @@ if (EMSCRIPTEN)
 endif()
 
 # set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
-pybind11_add_module(_bc_interpreter_core ${SOURCES} veclang/backend/bc_interpreter/bc_interpreter_bindings.cpp)
-set_target_properties(_bc_interpreter_core PROPERTIES
-    LIBRARY_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/veclang/backend/bc_interpreter"
-)
-target_compile_options(_bc_interpreter_core PRIVATE -Wall -O3 -g)
-target_link_libraries(_bc_interpreter_core PRIVATE -static -lpthread -static-libgcc -static-libstdc++)
+if (NOT EMSCRIPTEN)
+    pybind11_add_module(_bc_interpreter_core ${SOURCES} veclang/backend/bc_interpreter/bc_interpreter_bindings.cpp)
+    set_target_properties(_bc_interpreter_core PROPERTIES
+        LIBRARY_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/veclang/backend/bc_interpreter"
+    )
+    target_compile_options(_bc_interpreter_core PRIVATE -Wall -O3 -g)
+    target_link_libraries(_bc_interpreter_core PRIVATE -static -lpthread -static-libgcc -static-libstdc++)
+endif()
 
 # if(EMSCRIPTEN)
 #   add_executable(veclang_wasm veclang/backend/bc_interpreter/bindings.cpp ${SOURCES})

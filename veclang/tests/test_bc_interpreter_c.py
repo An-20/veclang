@@ -28,7 +28,21 @@ def sum_python(n: int):
     return s
 
 
-print(sum_veclang(100000))
-print(sum_python(100000))
-print("Veclang: ", timeit.timeit("sum_veclang(1000000)", globals=globals(), number=10))
-print("Python: ", timeit.timeit("sum_python(1000000)", globals=globals(), number=10))
+def test_bc_interpreter_c():
+    for x in range(10):
+        assert sum_veclang(x) == sum_python(x)
+
+
+def main():
+    print(sum_veclang(100000))
+    print(sum_python(100000))
+    print(
+        "Veclang: ", timeit.timeit("sum_veclang(1000000)", globals=globals(), number=10)
+    )
+    print(
+        "Python: ", timeit.timeit("sum_python(1000000)", globals=globals(), number=10)
+    )
+
+
+if __name__ == "__main__":
+    main()

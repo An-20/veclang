@@ -212,11 +212,10 @@ namespace vl_interpreter
             return;
         }
         vl_types::RawValue condition = value_stack.top();
-        if (condition.bits != 0)
-        {
-            instruction_pointer = offset;
-        }
         value_stack.pop();
+
+        if (condition.bits != 0)
+            instruction_pointer = offset;
     }
 
     void Interpreter::op_jmp_if_false(const uint8_t *instruction)
@@ -228,11 +227,10 @@ namespace vl_interpreter
             return;
         }
         vl_types::RawValue condition = value_stack.top();
-        if (condition.bits == 0)
-        {
-            instruction_pointer = offset;
-        }
         value_stack.pop();
+
+        if (condition.bits == 0)
+            instruction_pointer = offset;
     }
 
     void Interpreter::op_fast_local_int_inplace_add(const uint8_t *instruction)
@@ -293,6 +291,49 @@ namespace vl_interpreter
         value -= vl_types::rv_to_int(value_stack.top());
         value_stack.pop();
         memcpy(global_stack.data() + offset, &value, sizeof(vl_types::RawValue));
+    }
+
+    void Interpreter::op_fast_int_cmp_and_jmp(const uint8_t *instruction)
+    {
+        auto [cmp_type_8b, offset_16b] = get_2_operands(instruction);
+        if (value_stack.size() < 2)
+        {
+            std::cerr << "Value stack underflow\n";
+            return;
+        }
+        int64_t a = vl_types::rv_to_int(value_stack.top());
+        value_stack.pop();
+        int64_t b = vl_types::rv_to_int(value_stack.top());
+        value_stack.pop();
+
+        bool jump = false;
+        switch (cmp_type_8b)
+        {
+        case 0:
+            jump = (a == b);
+            break;
+        case 1:
+            jump = (a != b);
+            break;
+        case 2:
+            jump = (a > b);
+            break;
+        case 3:
+            jump = (a >= b);
+            break;
+        case 4:
+            jump = (a < b);
+            break;
+        case 5:
+            jump = (a <= b);
+            break;
+        default:
+            std::cerr << "Unknown cmp_type: " << static_cast<int>(cmp_type_8b) << "\n";
+            return;
+        }
+
+        if (jump)
+            instruction_pointer = offset_16b;
     }
 
 // Macro to define binary value operations using vl_types functions

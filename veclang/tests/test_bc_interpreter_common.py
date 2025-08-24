@@ -13,21 +13,24 @@ from veclang.common import CompilerFlags
 COMPILER_FLAGS: CompilerFlags = CompilerFlags(64)
 
 
-def compile_vl(program_str: str) -> VlProgram:
+def compile_vl(program_str: str, verbose: bool = False) -> VlProgram:
     parsed, diagnostics = parse(program_str, COMPILER_FLAGS)
     if diagnostics:
         raise ValueError(f"Error when parsing: {diagnostics}")
-    print_ast(parsed)
+    if verbose:
+        print_ast(parsed)
 
     hir, diagnostics = lower(parsed, COMPILER_FLAGS)
     if not hir:
         raise ValueError(f"Error when lowering: {diagnostics}")
-    elif diagnostics:
+    elif diagnostics and verbose:
         print(f"Diagnostics emitted when lowering: {diagnostics}")
-    print_hir(hir)
+    if verbose:
+        print_hir(hir)
 
     bytecode, diagnostics = emit(hir, COMPILER_FLAGS)
     if diagnostics:
         raise ValueError(f"Error when emitting: {diagnostics}")
-    print(disassemble_vl_program(bytecode))
+    if verbose:
+        print(disassemble_vl_program(bytecode))
     return bytecode

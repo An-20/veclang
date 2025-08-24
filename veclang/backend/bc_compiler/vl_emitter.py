@@ -1,7 +1,7 @@
 import veclang.backend.bc_common.py as bc
-from veclang.backend.bc_compiler.vl_instruction import OpcodeHRMap
+from veclang.backend.bc_compiler.vl_instruction import OPCODE_HR_MAP, OPCODE_MAP
 
-from veclang.frontend.parser.vl_ast import ASTPositionInfo
+from veclang.frontend.parser.vl_ast import ASTPositionInfo, VlOperatorType
 from veclang.midend.hir.vl_hir import (
     ExprNode,
     StmtNode,
@@ -24,12 +24,7 @@ from veclang.midend.hir.vl_hir import (
     BreakStmtNode,
     ContinueStmtNode,
 )
-from veclang.midend.vl_core import (
-    VlType,
-    VlTypeABC,
-    VlInt,
-    VlNull,
-)
+from veclang.midend.vl_core import VlType, VlTypeABC, VlInt, VlNull, VlBool, VlReal
 from veclang.midend.hir.vl_lowerer import GLOBAL_FN_NAME, VlQualifier
 
 from veclang.backend.bc_compiler.vl_emitter_utils import (
@@ -156,9 +151,9 @@ class BytecodeEmitter:
         return len(self.instructions)
 
     def add_instruction(self, opcode_hr: str, *operands: bytes) -> int:
-        if opcode_hr not in OpcodeHRMap:
+        if opcode_hr not in OPCODE_HR_MAP:
             raise FatalCompileError(f"IE: unknown opcode '{opcode_hr}'")
-        self.instructions.append(OpcodeHRMap[opcode_hr].pack(operands))
+        self.instructions.append(OPCODE_HR_MAP[opcode_hr].pack(operands))
         return len(self.instructions) - 1
 
     def add_constant(self, constant_as_bytes: bytes) -> int:
@@ -180,7 +175,12 @@ class BytecodeEmitter:
 
     def modify_instruction_16b(self, instruction_offset: int, arg_16b: int):
         current_instruction = self.instructions[instruction_offset]
-        if current_instruction[0] not in [0x20, 0x21, 0x22]:
+        if OPCODE_MAP[current_instruction[0]].opcode_hr not in [
+            "OP_JMP",
+            "OP_JMP_IF_TRUE",
+            "OP_JMP_IF_FALSE",
+            "OP_FAST_INT_CMP_AND_JMP",
+        ]:
             raise FatalCompileError(
                 "IE: modification of arg_16b for a non-JMP instruction"
             )
@@ -390,11 +390,83 @@ class BytecodeEmitter:
                 int_to_2_bytes(data_offset),
             )
 
+    def try_emit_fast_cmp_and_jmp(
+        self,
+        left: ExprNode,
+        right: ExprNode,
+        op_type: VlOperatorType,
+        jmp_if: bool = True,
+    ) -> bool:
+        """
+        Tries to emit a fast compare and jump instruction for statements like:
+        - if (a < b) { ... }
+        - for (n: int in 0:10) { ... }
+        where there is branching based on a binary comparison.
+
+        A fast compare and jump effectively fuses this common sequence of two instructions:
+        OP_{INT/REAL}_{CMP} then OP_JMP_IF_{TRUE/FALSE}
+
+        If a fast cmp jmp instruction is emitted, it will be set with an instruction offset of
+        0xFFFF and the calling code will be responsible for updating it later.
+
+        :param left: The left side of the binary expression
+        :param right: The right side of the binary expression
+        :param op_type: The VlOperatorType for the comparison
+        :param jmp_if: Jump if condition is jmp_if (boolean, default True)
+
+        Returns a bool of whether a fast instruction was emitted.
+        """
+        cmp_types = {
+            "EQUAL_TO": 0x00,
+            "NOT_EQUAL_TO": 0x01,
+            "GREATER_THAN": 0x02,
+            "GREATER_THAN_OR_EQUAL": 0x03,
+            "LESS_THAN": 0x04,
+            "LESS_THAN_OR_EQUAL": 0x05,
+        }
+
+        if op_type not in cmp_types:
+            return False
+        if left.vl_type != right.vl_type:
+            return False
+        if left.vl_type.to_vl_type_str() not in {"int", "real"}:
+            return False
+
+        if not jmp_if:
+            # invert the condition
+            op_type = {
+                "EQUAL_TO": "NOT_EQUAL_TO",
+                "NOT_EQUAL_TO": "EQUAL_TO",
+                "GREATER_THAN": "LESS_THAN_OR_EQUAL",
+                "GREATER_THAN_OR_EQUAL": "LESS_THAN",
+                "LESS_THAN": "GREATER_THAN_OR_EQUAL",
+                "LESS_THAN_OR_EQUAL": "LESS_THAN",
+            }[op_type]
+
+        cmp_type_8b = cmp_types[op_type]
+        if left.vl_type == VlInt:
+            opcode_hr = "OP_FAST_INT_CMP_AND_JMP"
+        elif left.vl_type == VlReal:
+            opcode_hr = "OP_FAST_REAL_CMP_AND_JMP"
+        else:
+            raise FatalCompileError("IE: unreachable!")
+
+        # post-order traversal
+        self.emit_expr(right)
+        self.emit_expr(left)
+
+        self.add_instruction(
+            opcode_hr, int_to_1_byte(cmp_type_8b), int_to_2_bytes(0xFFFF)
+        )
+        return True
+
     def try_emit_fast_inplace(self, node: AssignmentStmtNode) -> bool:
         """
-        Emits a fast inplace instructions for statements like:
+        Tries to emit a fast inplace instructions for statements like:
         - z = z + 1;
         - c = c - 1;
+
+        Returns a bool of whether a fast instruction was emitted.
         """
         if not isinstance(node.value, BinaryOperationExprNode):
             return False
@@ -553,18 +625,30 @@ class BytecodeEmitter:
         )
         loop_start_offset = self.next_instruction_offset()
 
-        self.emit_expr(node.loop_var_end)
-        self.add_instruction(
-            get_val_instruction,
-            int_to_2_bytes(self.scopes[-1].data[node.loop_var_identifier].data_offset),
-        )
-
         if node.loop_var_is_ascending:
-            self.add_instruction("OP_INT_LESS")
+            op_type = "LESS_THAN"
         else:
-            self.add_instruction("OP_INT_GREATER")
+            op_type = "GREATER_THAN"
 
-        self.add_instruction("OP_JMP_IF_FALSE", int_to_2_bytes(0xFFFF))
+        # yeah, this is a bit of a mess
+        # maybe we should turn this into a while (true) loop or something when lowering to HIR
+        # kinda like Rust (and loads of other languages) and only have one looping construct at HIR
+
+        emitted = self.try_emit_fast_cmp_and_jmp(
+            RvalueIdentifierExprNode(
+                node.loop_var_identifier,
+                VlInt,
+                None,
+                node.ast_position_info,
+            ),
+            node.loop_var_end,
+            op_type,
+            jmp_if=False,
+        )
+        if not emitted:
+            raise FatalCompileError(
+                "IE: expected to be able to emit fast cmp and jmp for ranged for loop"
+            )
         block_end_updates.append(self.last_instruction_offset())
 
         self.scopes[-1].sub_scopes.append(

@@ -275,6 +275,10 @@ namespace vl_interpreter
                 op_fast_global_int_inplace_sub(instruction);
                 break;
 
+            case vl_program::OP_FAST_INT_CMP_AND_JMP:
+                op_fast_int_cmp_and_jmp(instruction);
+                break;
+
             case vl_program::OP_INT_EQUAL:
                 op_int_equal(instruction);
                 break;
@@ -477,6 +481,8 @@ namespace vl_interpreter
         void op_fast_global_int_inplace_add_direct(const uint8_t *instruction);
         void op_fast_local_int_inplace_sub(const uint8_t *instruction);
         void op_fast_global_int_inplace_sub(const uint8_t *instruction);
+
+        void op_fast_int_cmp_and_jmp(const uint8_t *instruction);
 
         void op_int_equal(const uint8_t *instruction);
         void op_int_not_equal(const uint8_t *instruction);

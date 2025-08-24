@@ -11,7 +11,7 @@ def test_basic_ffi_int():
     compiled = compile_vl(program_str)
     interpreter = Interpreter(compiled)
     a = interpreter.interpret_fn(0, [1, 2])
-    print(a)
+    assert a == 3
 
 
 def test_basic_ffi_real():
@@ -23,4 +23,16 @@ def test_basic_ffi_real():
     compiled = compile_vl(program_str)
     interpreter = Interpreter(compiled)
     a = interpreter.interpret_fn(0, [1.0, 2.0])
-    print(a)
+    assert a == 3.0
+
+
+def test_basic_ops_real():
+    program_str = """
+    fn main(a: real, b: real) -> real {
+        return a - b;
+    }
+    """
+    compiled = compile_vl(program_str)
+    interpreter = Interpreter(compiled)
+    a = interpreter.interpret_fn(0, [15.0, 2.0])
+    assert a == 13.0

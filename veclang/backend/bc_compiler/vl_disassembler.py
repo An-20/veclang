@@ -1,11 +1,11 @@
 from veclang.backend.bc_common.py import VlProgram
-from veclang.backend.bc_compiler.vl_instruction import OpcodeMap
+from veclang.backend.bc_compiler.vl_instruction import OPCODE_MAP
 
 
 def disassemble(bytecode: list[bytes]) -> str:
     out_str = ""
     max_opcode_len = max(
-        len(OpcodeMap[x[0]].opcode_hr) if x[0] in OpcodeMap else 10 for x in bytecode
+        len(OPCODE_MAP[x[0]].opcode_hr) if x[0] in OPCODE_MAP else 10 for x in bytecode
     )
     pad_len = max_opcode_len + 4
 
@@ -13,10 +13,10 @@ def disassemble(bytecode: list[bytes]) -> str:
         if len(operation) != 4:
             raise ValueError
         opcode = operation[0]
-        if opcode not in OpcodeMap:
+        if opcode not in OPCODE_MAP:
             out_str += "UNKNOWN_OPCODE\n"
 
-        info = OpcodeMap[opcode]
+        info = OPCODE_MAP[opcode]
         if info.num_operands == 0:
             out_str += (
                 f"{idx:04} {idx:04X} 0x{opcode:02X} {info.opcode_hr.ljust(pad_len)}\n"

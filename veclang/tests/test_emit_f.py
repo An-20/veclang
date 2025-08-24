@@ -17,7 +17,7 @@ fn sum(n: int) -> int {
     }
     return s;
 }
-print(sum(100000));
+printi(sum(100000));
 """
 parsed, diagnostics = parse(PROGRAM_STR, COMPILER_FLAGS)
 if diagnostics:

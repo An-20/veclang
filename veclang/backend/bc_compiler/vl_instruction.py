@@ -52,7 +52,7 @@ class MatVecInstruction(Instruction):
             )
 
 
-OpcodeMap: dict[int, Instruction] = {
+OPCODE_MAP: dict[int, Instruction] = {
     0x00: Instruction(0x00, "OP_CONSTANT_VAL_DIRECT", 1),
     0x01: Instruction(0x01, "OP_CONSTANT_OBJ_DIRECT", 2),
     0x02: Instruction(0x02, "OP_CONSTANT_VAL_TABLE", 1),
@@ -82,6 +82,7 @@ OpcodeMap: dict[int, Instruction] = {
     0x27: Instruction(0x27, "OP_FAST_GLOBAL_INT_INPLACE_ADD_DIRECT", 2),
     0x28: Instruction(0x28, "OP_FAST_LOCAL_INT_INPLACE_SUB", 1),
     0x29: Instruction(0x29, "OP_FAST_GLOBAL_INT_INPLACE_SUB", 1),
+    0x2A: Instruction(0x2A, "OP_FAST_INT_CMP_AND_JMP", 2),
     # ========================================
     # 0x80 - 0xDF - OPERATIONS
     # ========================================
@@ -149,4 +150,4 @@ OpcodeMap: dict[int, Instruction] = {
     # 0xD0 - 0xFF - RESERVED
     # ========================================
 }
-OpcodeHRMap: dict[str, Instruction] = {v.opcode_hr: v for k, v in OpcodeMap.items()}
+OPCODE_HR_MAP: dict[str, Instruction] = {v.opcode_hr: v for k, v in OPCODE_MAP.items()}

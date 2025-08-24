@@ -39,6 +39,8 @@ namespace vl_program
         OP_FAST_LOCAL_INT_INPLACE_SUB = 0x28,
         OP_FAST_GLOBAL_INT_INPLACE_SUB = 0x29,
 
+        OP_FAST_INT_CMP_AND_JMP = 0x2A,
+
         OP_INT_EQUAL = 0x80,
         OP_INT_NOT_EQUAL = 0x81,
         OP_INT_GREATER = 0x82,

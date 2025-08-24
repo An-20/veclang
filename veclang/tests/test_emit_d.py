@@ -11,7 +11,7 @@ from veclang.common import CompilerFlags
 COMPILER_FLAGS: CompilerFlags = CompilerFlags(64)
 PROGRAM_STR = """
 for (x: int in 0:10) {
-    print(x);
+    printi(x);
 }
 """
 parsed, diagnostics = parse(PROGRAM_STR, COMPILER_FLAGS)

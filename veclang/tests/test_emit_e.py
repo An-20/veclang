@@ -22,8 +22,8 @@ fn fib(n: int) -> int {
     return fib(n - 1) + fib(n - 2);
 }
 
-print(fac(10));
-print(fib(10));
+printi(fac(10));
+printi(fib(10));
 """
 parsed, diagnostics = parse(PROGRAM_STR, COMPILER_FLAGS)
 if diagnostics:

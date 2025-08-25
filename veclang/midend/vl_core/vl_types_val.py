@@ -10,7 +10,7 @@ from veclang.midend.vl_core.vl_type import (
     VlCast,
     VlConstexprCast,
 )
-from veclang.midend.vl_core.vl_types_obj import VlComplex
+import veclang.midend.vl_core.vl_types_obj as vl_types_obj
 
 
 class VlNull(VlTypeABC):
@@ -274,7 +274,9 @@ class VlInt(VlTypeABC):
     def get_casts() -> list[VlCast]:
         return [
             VlConstexprCast("real", 0x1000, True, lambda x: VlReal(float(x))),
-            VlConstexprCast("complex", 0x1001, True, lambda x: VlComplex(complex(x))),
+            VlConstexprCast(
+                "complex", 0x1001, True, lambda x: vl_types_obj.VlComplex(complex(x))
+            ),
         ]
 
 
@@ -502,5 +504,7 @@ class VlReal(VlTypeABC):
     @staticmethod
     def get_casts() -> list[VlCast]:
         return [
-            VlConstexprCast("complex", 0x1100, True, lambda x: VlComplex(complex(x)))
+            VlConstexprCast(
+                "complex", 0x1100, True, lambda x: vl_types_obj.VlComplex(complex(x))
+            )
         ]

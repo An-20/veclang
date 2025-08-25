@@ -1,4 +1,5 @@
 import struct
+import veclang.midend.vl_core.vl_types_val as vl_types_val
 from veclang.midend.vl_core.vl_type import (
     VlTypeABC,
     VlTypeStr,
@@ -47,7 +48,7 @@ class VlComplex(VlTypeABC):
                 "EQUAL_TO",
                 ["complex"],
                 "bool",
-                lambda x, y: x == y,
+                lambda x, y: vl_types_val.VlBool(x == y),
                 "OP_COMPLEX_EQUAL",
             ),
             VlConstexprOperation(
@@ -55,7 +56,7 @@ class VlComplex(VlTypeABC):
                 "NOT_EQUAL_TO",
                 ["complex"],
                 "bool",
-                lambda x, y: x != y,
+                lambda x, y: vl_types_val.VlBool(x != y),
                 "OP_COMPLEX_NOT_EQUAL",
             ),
             VlConstexprOperation(
@@ -63,7 +64,7 @@ class VlComplex(VlTypeABC):
                 "PLUS",
                 ["complex"],
                 "complex",
-                lambda x, y: x + y,
+                lambda x, y: VlComplex(x + y),
                 "OP_COMPLEX_ADD",
             ),
             VlConstexprOperation(
@@ -71,7 +72,7 @@ class VlComplex(VlTypeABC):
                 "MINUS",
                 ["complex"],
                 "complex",
-                lambda x, y: x - y,
+                lambda x, y: VlComplex(x - y),
                 "OP_COMPLEX_SUB",
             ),
             VlConstexprOperation(
@@ -79,7 +80,7 @@ class VlComplex(VlTypeABC):
                 "TIMES",
                 ["complex"],
                 "complex",
-                lambda x, y: x * y,
+                lambda x, y: VlComplex(x * y),
                 "OP_COMPLEX_MUL",
             ),
             VlConstexprOperation(
@@ -87,7 +88,7 @@ class VlComplex(VlTypeABC):
                 "DIVIDE",
                 ["complex"],
                 "complex",
-                lambda x, y: x / y,
+                lambda x, y: VlComplex(x / y),
                 "OP_COMPLEX_DIV",
             ),
             VlConstexprOperation(
@@ -95,7 +96,7 @@ class VlComplex(VlTypeABC):
                 "EXPONENTIATION",
                 ["complex"],
                 "complex",
-                lambda x, y: x**y,
+                lambda x, y: VlComplex(x**y),
                 "OP_COMPLEX_EXP",
             ),
             VlConstexprOperation(
@@ -103,7 +104,7 @@ class VlComplex(VlTypeABC):
                 "UNARY_MINUS",
                 ["complex"],
                 "complex",
-                lambda x: -x,
+                lambda x: VlComplex(-x),
                 "OP_COMPLEX_NEG",
             ),
         ]

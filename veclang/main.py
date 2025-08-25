@@ -13,7 +13,9 @@ from veclang.backend.bc_compiler.vl_emitter import emit
 from veclang.backend.bc_compiler.vl_disassembler import disassemble_vl_program
 from veclang.backend.bc_common.py.vl_sedf import VlSEDF
 
-from veclang.common import CompilerFlags
+from veclang.repl import ReplCompiler
+
+from veclang.common import CompilerFlags, LANGUAGE_VERSION_STR, COMPILER_VERSION_STR
 
 
 def dump_output(label, content, color, file_path=None):
@@ -31,9 +33,18 @@ def main():
     parser = argparse.ArgumentParser(
         prog="veclang", description="Veclang bytecode compiler and interpreter"
     )
+
+    parser.add_argument(
+        "-v",
+        "--version",
+        action="version",
+        version=f"Veclang {LANGUAGE_VERSION_STR}, compiler {COMPILER_VERSION_STR}",
+        help="Show version information",
+    )
+
     subparsers = parser.add_subparsers(dest="command", required=True)
 
-    # --- compile command ---
+    # compile command
     compile_cmd = subparsers.add_parser(
         "compile", help="Compile a Veclang source file to bytecode"
     )
@@ -62,18 +73,10 @@ def main():
         help="Target runtime precision (32 or 64 bits, default 64)",
     )
 
-    # --- run command ---
-    run_cmd = subparsers.add_parser("run", help="Run a Veclang bytecode file")
-    run_cmd.add_argument("input", help="Bytecode file (.vlb)")
-    run_cmd.add_argument("--debug", action="store_true", help="Enable debug output")
-
-    # --- repl command ---
+    # repl command
     repl_cmd = subparsers.add_parser("repl", help="Start interactive Veclang REPL")
-    repl_cmd.add_argument("--debug", action="store_true", help="Enable debug output")
 
     args = parser.parse_args()
-
-    # ------------------ COMMAND HANDLING ------------------
 
     if args.command == "compile":
         if args.runtime_precision not in {32, 64}:
@@ -185,36 +188,41 @@ def main():
             colored(f"Compilation successful: {args.output}", "green", attrs=["bold"])
         )
 
-    # elif args.command == "run":
-    #     with open(args.input, "rb") as f:
-    #         bytecode = f.read()
-    #
-    #     if args.debug:
-    #         print(colored(f"Running bytecode file: {args.input}", "green"))
-    #
-    #     run_bytecode(bytecode)
-    #
-    # elif args.command == "repl":
-    #     print(colored("Veclang REPL — type 'exit' to quit", "magenta", attrs=["bold"]))
-    #     while True:
-    #         try:
-    #             line = input(">>> ")
-    #             if line.strip() == "exit":
-    #                 break
-    #             if not line.strip():
-    #                 continue
-    #
-    #             if args.debug:
-    #                 print(colored("Compiling line in debug mode", "blue"))
-    #
-    #             bytecode = compile_source(line)
-    #             run_bytecode(bytecode)
-    #
-    #         except KeyboardInterrupt:
-    #             print(colored("\nInterrupted", "red"))
-    #             break
-    #         except Exception as e:
-    #             print(colored(f"Error: {e}", "red", attrs=["bold"]))
+    elif args.command == "repl":
+        print(
+            f"Veclang {LANGUAGE_VERSION_STR} (compiler {COMPILER_VERSION_STR}, interpreter bc_interpreter)"
+        )
+        print(colored("Veclang REPL - 'exit' to quit", "magenta", attrs=["bold"]))
+        repl_compiler = ReplCompiler(CompilerFlags(64))
+        while True:
+            try:
+                line = input(">>> ")
+                if line.strip() == "exit":
+                    break
+                if not line.strip():
+                    continue
+
+                if args.debug:
+                    print(colored("Compiling line in debug mode", "blue"))
+
+                repl_out = repl_compiler.run(line)
+                if not repl_out:
+                    continue
+
+                out_lines = repl_out.splitlines()
+                for idx, line in enumerate(out_lines):
+                    if line.startswith("Error") and idx:
+                        print(colored("Error", "red") + line[5:])
+                    elif line.startswith("Warning") and idx:
+                        print(colored("Warning", "yellow") + line[7:])
+                    else:
+                        print(line)
+
+            except KeyboardInterrupt:
+                print(colored("\nInterrupted", "red"))
+                break
+            except Exception as e:
+                print(colored(f"Error: {e}", "red", attrs=["bold"]))
 
 
 if __name__ == "__main__":

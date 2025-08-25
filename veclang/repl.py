@@ -22,6 +22,10 @@ class ReplCompiler:
         self.fn_instructions: list[bytes] = []
         self.first_lowerer_run = True
 
+    @staticmethod
+    def format_diagnostics(diagnostics) -> str:
+        return "\n".join(str(x) for x in diagnostics)
+
     def run(self, input_str: str) -> str:
         is_expr = False
         parsed, diagnostics = parse(input_str, self.compiler_flags)
@@ -29,7 +33,7 @@ class ReplCompiler:
             # user could have inputted an expression
             parsed, new_diagnostics = parse(input_str + ";", self.compiler_flags)
             if new_diagnostics:
-                return f"Error when parsing:\n{diagnostics}"
+                return f"Error(s) when parsing:\n{self.format_diagnostics(diagnostics)}"
             is_expr = True
 
         if self.first_lowerer_run:
@@ -38,7 +42,7 @@ class ReplCompiler:
             hir, diagnostics = self.lowerer.lower(parsed, import_core=False)
         self.first_lowerer_run = False
         if not hir:
-            return f"Error when lowering:\n{diagnostics}"
+            return f"Error(s) when lowering:\n{self.format_diagnostics(diagnostics)}"
 
         if is_expr:
             # wrap statement in the repl_printx function call
@@ -79,7 +83,7 @@ class ReplCompiler:
         ]
         self.fn_instructions = instructions[:fn_instructions_len]
         if diagnostics:
-            return f"Error when emitting:\n{diagnostics}"
+            return f"Error(s) when emitting:\n{self.format_diagnostics(diagnostics)}"
 
         # print(disassemble_vl_program(bytecode))
 
@@ -91,9 +95,10 @@ class ReplCompiler:
         self.interpreter.interpret_program_continue()
 
 
-repl = ReplCompiler(CompilerFlags(64))
-while True:
-    input_str = input(">>> ")
-    repl_out = repl.run(input_str)
-    if repl_out:
-        print(repl_out)
+if __name__ == "__main__":
+    repl = ReplCompiler(CompilerFlags(64))
+    while True:
+        input_str = input(">>> ")
+        repl_out = repl.run(input_str)
+        if repl_out:
+            print(repl_out)

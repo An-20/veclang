@@ -12,6 +12,7 @@ from veclang.midend.hir.vl_hlr_io import format_hir
 from veclang.backend.bc_compiler.vl_emitter import emit
 from veclang.backend.bc_compiler.vl_disassembler import disassemble_vl_program
 from veclang.backend.bc_common.py.vl_sedf import VlSEDF
+from veclang.backend.bc_interpreter.bc_interpreter import Interpreter
 
 from veclang.repl import ReplCompiler
 
@@ -193,7 +194,10 @@ def main():
             f"Veclang {LANGUAGE_VERSION_STR} (compiler {COMPILER_VERSION_STR}, interpreter bc_interpreter)"
         )
         print(colored("Veclang REPL - 'exit' to quit", "magenta", attrs=["bold"]))
+
         repl_compiler = ReplCompiler(CompilerFlags(64))
+        interpreter: Interpreter | None = None
+
         while True:
             try:
                 line = input(">>> ")
@@ -202,24 +206,27 @@ def main():
                 if not line.strip():
                     continue
 
-                if args.debug:
-                    print(colored("Compiling line in debug mode", "blue"))
+                compiled = repl_compiler.compile(line)
+                if isinstance(compiled, str):
+                    out_lines = compiled.splitlines()
+                    for idx, line in enumerate(out_lines):
+                        if line.startswith("Error") and idx:
+                            print(colored("Error", "red") + line[5:])
+                        elif line.startswith("Warning") and idx:
+                            print(colored("Warning", "yellow") + line[7:])
+                        else:
+                            print(line)
 
-                repl_out = repl_compiler.run(line)
-                if not repl_out:
-                    continue
-
-                out_lines = repl_out.splitlines()
-                for idx, line in enumerate(out_lines):
-                    if line.startswith("Error") and idx:
-                        print(colored("Error", "red") + line[5:])
-                    elif line.startswith("Warning") and idx:
-                        print(colored("Warning", "yellow") + line[7:])
+                else:
+                    if interpreter:
+                        interpreter.update_program(compiled)
                     else:
-                        print(line)
+                        interpreter = Interpreter(compiled)
+
+                    interpreter.interpret_program_continue()
 
             except KeyboardInterrupt:
-                print(colored("\nInterrupted", "red"))
+                print(colored("\nInterrupted by KeyboardInterrupt", "red"))
                 break
             except Exception as e:
                 print(colored(f"Error: {e}", "red", attrs=["bold"]))

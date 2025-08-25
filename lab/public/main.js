@@ -42,6 +42,13 @@ function runProgram(imageResolution) {
   reader.readAsDataURL(blob);
 }
 
+function handleReplProgramBytes(jsArray) {
+  programBytes = new Uint8Array(jsArray);
+  programBytes = vectorFromUint8Array(programBytes);
+  y = moduleInstance.repl_interpret(programBytes);
+  window.replOutput.writeStdout(y);
+}
+
 var config = {
   settings: {
     showPopoutIcon: false,
@@ -59,7 +66,7 @@ var config = {
           content: [
             {
               type: "stack",
-              height: 85,
+              height: 60,
 
               content: [
                 {
@@ -78,6 +85,12 @@ var config = {
               type: "component",
               componentName: "optionsMenu",
               title: "Options",
+              height: 15,
+            },
+            {
+              type: "component",
+              componentName: "repl",
+              title: "REPL",
             },
           ],
         },
@@ -133,6 +146,9 @@ layout.registerComponent("codeEditor", function (container, _componentState) {
   container
     .getElement()
     .html("<div id='codeEditorRoot' class='componentDiv'></div>");
+});
+layout.registerComponent("repl", function (container, _componentState) {
+  container.getElement().html("<div id='replRoot' class='componentDiv'></div>");
 });
 layout.registerComponent("veclangGuide", function (container, _componentState) {
   container

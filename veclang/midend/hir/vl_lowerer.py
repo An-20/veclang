@@ -748,7 +748,7 @@ class Lowerer:
                 if len(arguments) != len(method.arg_types):
                     self.add_diagnostic(
                         "E110",
-                        f"Function {expr.callee.name} expected {len(method.arg_types)} arguments, got {len(arguments)}",
+                        f"Function '{expr.callee.name}' expected {len(method.arg_types)} arguments, got {len(arguments)}",
                         expr.position_info,
                     )
                 for idx, (argument, parameter_type_str) in enumerate(

@@ -46,5 +46,15 @@ def compile_and_run_program(code: str, image_resolution: int):
     js.window.txtOutput.appendLines(f"Ran in {run_end_time-run_start_time:.4}s.\n")
 
 
+def compile_program_repl(code: str):
+    diagnostics, bytecode = embedded.vl_repl_compile(code)
+    if diagnostics:
+        js.window.replOutput.writeStderr(diagnostics)
+    else:
+        js.window.handleReplProgramBytes(bytecode)
+
+
 js.window.compile_program = pyscript.ffi.create_proxy(compile_program)
 js.window.compile_and_run_program = pyscript.ffi.create_proxy(compile_and_run_program)
+
+js.window.compile_program_repl = pyscript.ffi.create_proxy(compile_program_repl)

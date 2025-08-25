@@ -5,7 +5,7 @@ import veclang.midend.hir.vl_hir as vl_hir
 import veclang.midend.vl_core as vl_core
 from veclang.backend.bc_compiler.vl_emitter import BytecodeEmitter
 from veclang.backend.bc_compiler.vl_emitter_utils import two_bytes_to_int
-from veclang.backend.bc_interpreter.bc_interpreter import Interpreter
+from veclang.backend.bc_common.py.vl_sedf import VlProgram
 
 from veclang.common import CompilerFlags
 
@@ -17,7 +17,6 @@ class ReplCompiler:
 
         self.lowerer: Lowerer = Lowerer(compiler_flags)
         self.emitter: BytecodeEmitter = BytecodeEmitter(compiler_flags)
-        self.interpreter: Interpreter | None = None
 
         self.fn_instructions: list[bytes] = []
         self.first_lowerer_run = True
@@ -26,7 +25,7 @@ class ReplCompiler:
     def format_diagnostics(diagnostics) -> str:
         return "\n".join(str(x) for x in diagnostics)
 
-    def run(self, input_str: str) -> str:
+    def compile(self, input_str: str) -> VlProgram | str:
         is_expr = False
         parsed, diagnostics = parse(input_str, self.compiler_flags)
         if diagnostics:
@@ -85,20 +84,4 @@ class ReplCompiler:
         if diagnostics:
             return f"Error(s) when emitting:\n{self.format_diagnostics(diagnostics)}"
 
-        # print(disassemble_vl_program(bytecode))
-
-        if self.interpreter:
-            self.interpreter.update_program(bytecode)
-        else:
-            self.interpreter = Interpreter(bytecode)
-
-        self.interpreter.interpret_program_continue()
-
-
-if __name__ == "__main__":
-    repl = ReplCompiler(CompilerFlags(64))
-    while True:
-        input_str = input(">>> ")
-        repl_out = repl.run(input_str)
-        if repl_out:
-            print(repl_out)
+        return bytecode

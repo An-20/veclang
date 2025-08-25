@@ -13,7 +13,7 @@ There are three type qualifiers in Veclang:
 - `constexpr`: a constant value that can be evaluated at compile time.
 Collectively, `var`s, `const`s, and `constexpr`s are referred to throughout Veclang documentation as 'data'.
 
-**Variables** (`var`) are defined with the `let` keyword, which defines a new variable in the current local or global scope. Variables can only be accessed (read or written to) in the same local scope as their definition; i.e. global variables cannot be read or written to inside a function.
+**Variables** (`var`) are defined with the `let` keyword (or in ranged for loops with the `in` keyword), which defines a new variable in the current local or global scope. Variables can only be accessed (read or written to) in the same local scope as their definition; i.e. global variables cannot be read or written to inside a function.
 
 **Constants** (`const`) are defined with the `const` keyword, which creates a new constant in the current local or global scope. Constants cannot be written to after initialisation. When compiling with the `--strict` flag, reading global constants from within a function will raise an error (as constants can't necessarily be evaluated at compile time, only constexprs).
 
@@ -163,11 +163,11 @@ Almost all non-syntax errors are typically emitted when the AST is lowered to a 
 The backend compiles the HIR to bytecode, a linear instruction-based representation of a Veclang program that is run by the Veclang Interpreter. A Python VlProgram object is output, which contains a header, binary constants data, and binary instructions data. More information is below in the bytecode section.
 
 ## Bytecode
-### Overview
 There are three main types of instructions, classified by how they take operands:
 - 0 operand instructions e.g. `OP_POP_VAL`.
 - 1 operand instructions e.g. `OP_CONSTANT_VAL_TABLE`, that take 1 16-bit operand.
 - 2 operand instructions e.g. `OP_VECTOR_ADD`, that take 1 8-bit operand and 1 16-bit operand.
+
 Each instruction consisting of opcode and operand(s) is stored as 4 bytes. The operands are interpreted as unsigned 8 bit and 16 bit integers in little-endian order.
 
 ### Binary Representation
@@ -236,15 +236,15 @@ Pops a value off the top of the object stack.
 #### Function calls
 ##### `0x06: OP_CALL_BUILTIN`
 `OP_CALL_BUILTIN builtin_id_16b`
-Calls a builtin function.
+Calls a builtin function with `builtin_id`.
 
 ##### `0x07: OP_CALL_USERDEF`
 `OP_CALL_USERDEF function_idx_16b`
-Calls a user-defined function. This instruction causes a new stack frame to be pushed and the instruction pointer to be set to the beginning of the function.
+Calls a user-defined function at `function_idx` in the lookup table. This instruction causes a new stack frame to be pushed and the instruction pointer to be set to the beginning of the function (see [[#Function calls|function calls]] for information on the Veclang 'calling convention').
 
 ##### `0x08: OP_RETURN`
 `OP_RETURN`
-Returns from a function. Before this instruction is executed, the return value should be at the top of the object or value stacks. This instruction causes the instruction pointer to be set to the return address, and 
+Returns from a function. Before this instruction is executed, the return value should be at the top of the object or value stacks. This instruction causes the instruction pointer to be set to the return address, and the top stack frame to be popped.
 
 #### Getting and setting values
 ##### `0x10: OP_GET_LOCAL_VAL`
@@ -317,6 +317,19 @@ Performs an inplace subtraction operation on the int at `offset` in the local st
 `OP_FAST_GLOBAL_INT_INPLACE_SUB offset_16b`
 Performs an inplace subtraction operation on the int at `offset` in the global stack, popping the top value off the value stack, and subtracting it from the int at `offset`.
 
+##### `0x2A: OP_FAST_INT_CMP_AND_JMP`
+`OP_FAST_INT_CMP_AND_JMP cmp_type_8b offset_16b`
+Performs a comparison on the top two values on the value stack, popping them off and treating them as integers. Jumps to the value at `offset` if the comparison is true. The comparison depends on `cmp_type`:
+- `0: a == b`
+- `1: a != b`
+- `2: a > b`
+- `3: a >= b`
+- `4: a < b`
+- `5: a <= b`
+
+##### `0x2B: OP_FAST_REAL_CMP_AND_JMP`
+`OP_FAST_REAL_CMP_AND_JMP cmp_type_8b offset_16b`
+Performs a comparison on the top two values on the value stack, popping them off and treating them as reals. Jumps to the value at `offset` if the comparison is true. `cmp_type` is interpreted in the same way as in `OP_FAST_INT_CMP_AND_JMP`.
 
 ### 0x80 - 0x9F - Integer and Boolean Operations
 
@@ -424,6 +437,17 @@ enum VlOpcode : uint8 {
 ###### 0x0000 - 0x00FF: Basic builtins
 `0x0000`: Prints an integer
 `0x0001`: Prints a float
+
+`0x0010`: Print an int in REPL mode
+`0x0011`: Print a bool in REPL mode
+`0x0012`: Print a real in REPL mode
+`0x0013`: Print a complex in REPL mode
+`0x0014`: Print a vec2 in REPL mode
+`0x0015`: Print a vec3 in REPL mode
+`0x0016`: Print a vec4 in REPL mode
+`0x0017`: Print a mat2 in REPL mode
+`0x0018`: Print a mat3 in REPL mode
+`0x0019`: Print a mat4 in REPL mode
 #### 0x1000 - 0x10FF: int methods and properties
 `0x1000`: Cast an int to a real
 `0x1001`: Cast an int to a complex
@@ -506,6 +530,11 @@ E330: Use of `elseif` statement not in an `if-elseif-else` stack
 E331: Use of `else` statement not in an `if-elseif-else` stack
 
 #### E4xx errors - Import errors
+###### E400
+E400: Unresolved namespace ``
+###### E401
+E401: Unresolved identifier `<>` in namespace `<>`
+
 
 #### E9xx errors - Internal errors
 E900: Internal error: `<>`

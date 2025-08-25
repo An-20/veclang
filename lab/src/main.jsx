@@ -7,6 +7,7 @@ import "./index.css";
 import CodeEditor from "./components/CodeEditor";
 import VeclangGuide from "./components/VeclangGuide";
 import OptionsMenu from "./components/OptionsMenu";
+import Repl from "./components/Repl";
 import TextOutput from "./components/TextOutput";
 import ImageOutput from "./components/ImageOutput";
 import ImageGallery from "./components/ImageGallery";
@@ -26,6 +27,12 @@ window.startReactApp = function () {
   createRoot(document.getElementById("codeEditorRoot")).render(
     <StrictMode>
       <CodeEditor />
+    </StrictMode>
+  );
+
+  createRoot(document.getElementById("replRoot")).render(
+    <StrictMode>
+      <Repl />
     </StrictMode>
   );
 

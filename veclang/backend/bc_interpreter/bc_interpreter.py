@@ -7,7 +7,13 @@ import typing
 import dataclasses
 
 # noinspection PyUnresolvedReferences
-import _bc_interpreter_core
+try:
+    import _bc_interpreter_core
+
+    _HAVE_BC_INTERPRETER_CORE = True
+except ImportError:
+    _HAVE_BC_INTERPRETER_CORE = False
+
 from veclang.backend.bc_common.py.vl_sedf import VlProgram, VlSEDF
 
 
@@ -20,6 +26,9 @@ class ProgramOutput:
 class Interpreter:
 
     def __init__(self, program: VlProgram):
+        if not _HAVE_BC_INTERPRETER_CORE:
+            raise ValueError("Could not import _bc_interpreter_core extension!")
+
         program_as_bytes = VlSEDF.dumpb(program)
         self.program: VlProgram = program
         self.interpreter = _bc_interpreter_core.Interpreter(program_as_bytes)

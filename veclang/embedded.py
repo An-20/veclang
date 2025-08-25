@@ -9,6 +9,7 @@ from veclang.backend.bc_compiler.vl_disassembler import (
 )
 from veclang.backend.bc_common.py.vl_sedf import VlSEDF
 
+import veclang.repl as repl
 from veclang.common import CompilerFlags
 
 
@@ -54,3 +55,18 @@ def vl_compile(input_str: str) -> tuple[str, str, str, bytes]:
             diagnostics_formatted,
             as_bytes,
         )
+
+
+repl_compiler = repl.ReplCompiler(CompilerFlags(64))
+
+
+def vl_repl_compile(input_str: str) -> tuple[str, bytes]:
+    """
+    Compiles a program for REPL, returning a tuple of:
+    - str of diagnostics HR-formatted (if diagnostics are returned, then compilation has FAILED)
+    - bytes of raw VlSEDF data
+    """
+    out = repl_compiler.compile(input_str)
+    if isinstance(out, str):
+        return out, b""
+    return "", VlSEDF.dumpb(out)

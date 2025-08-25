@@ -15,6 +15,8 @@
 #include "vl_program.h"
 #include "../bc_common/cpp/vl_sedf.h"
 
+static vl_interpreter::Interpreter repl_interpreter;
+
 void writeIntLE(std::vector<uint8_t> &buffer, size_t offset, uint32_t value)
 {
     buffer[offset + 0] = value & 0xFF;
@@ -70,6 +72,25 @@ std::vector<uint8_t> buildBMP(const std::vector<vl_types::VlVec3> &pixels, int w
 
 using namespace emscripten;
 
+void reset_interpreter()
+{
+    repl_interpreter = vl_interpreter::Interpreter();
+}
+
+std::string repl_interpret(std::vector<uint8_t> program_data)
+{
+    vl_sedf::VlProgram program = vl_sedf::loadb(program_data);
+    repl_interpreter.update_bytecode(program);
+
+    // capture stdout
+    std::streambuf *oldBuf = std::cout.rdbuf();
+    std::ostringstream oss;
+    std::cout.rdbuf(oss.rdbuf());
+    repl_interpreter.interpret_program_continue();
+    std::cout.rdbuf(oldBuf);
+    return oss.str();
+}
+
 std::vector<uint8_t> generate_img(std::vector<uint8_t> program_data, uint32_t dim)
 {
     const uint32_t HEIGHT = dim;
@@ -84,6 +105,8 @@ std::vector<uint8_t> generate_img(std::vector<uint8_t> program_data, uint32_t di
 
 EMSCRIPTEN_BINDINGS(module)
 {
+    function("reset_interpreter", &reset_interpreter);
+    function("repl_interpret", &repl_interpret);
     function("generate_img", &generate_img);
     register_vector<uint8_t>("vector_uint8");
 }

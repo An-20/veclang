@@ -14,12 +14,7 @@ namespace vl_types
         RawValue() : bits(0) {}
     };
 
-    inline RawValue null()
-    {
-        RawValue value;
-        value.bits = 0;
-        return value;
-    }
+    inline RawValue null_value;
 
     inline RawValue int_to_rv(int64_t value)
     {

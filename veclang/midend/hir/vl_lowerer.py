@@ -484,13 +484,19 @@ class Lowerer:
     # ====================
 
     def lower(
-        self, ast_node: vl_ast.ProgramNode, import_core: bool = True
+        self,
+        ast_node: vl_ast.ProgramNode,
+        import_core: bool = True,
+        additional_imports: list[str] | None = None,
     ) -> tuple[ProgramNode | None, list[Diagnostic]]:
         """
         Lowers an AST to a HIR, returning a tuple of:
         - a HIR ProgramNode or None
         - a list[Diagnostic]
         """
+        if additional_imports is None:
+            additional_imports = []
+
         self.error = False
         self.diagnostics = []
 
@@ -504,20 +510,24 @@ class Lowerer:
             # add `using core::*;`
             stmts = ast_node.stmts.stmts
             if import_core:
+                additional_imports.append("core")
+            new_stmts = []
+            for namespace in additional_imports:
                 api = ASTPositionInfo(0, 0)
-                stmts = [
+                new_stmts.append(
                     vl_ast.UsingDeclNode(
                         None,
                         (
-                            vl_ast.IdentifierNode("core", api),
+                            vl_ast.IdentifierNode(namespace, api),
                             vl_ast.UsingDeclIdentifiersNode(
                                 None, vl_ast.IdentifierNode("*", api), api
                             ),
                         ),
                         api,
                     )
-                ] + ast_node.stmts.stmts
-            stmts_lowered = self.lower_stmts(stmts)
+                )
+            new_stmts += stmts
+            stmts_lowered = self.lower_stmts(new_stmts)
 
         except Exception as e:
             if isinstance(e, FatalCompileError):

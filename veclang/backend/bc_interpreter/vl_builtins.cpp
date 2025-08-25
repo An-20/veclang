@@ -11,7 +11,7 @@ namespace vl_builtins
         // builtin for printing an int
         vl_types::RawValue value = delegate.get_val_argument();
         std::cout << vl_types::rv_to_int(value) << "\n";
-        delegate.return_val(value);
+        delegate.return_val(vl_types::null_value);
     }
 
     void bi_0x0001(BuiltinsDelegate &delegate)
@@ -19,7 +19,76 @@ namespace vl_builtins
         // builtin for printing a real
         vl_types::RawValue value = delegate.get_val_argument();
         std::cout << vl_types::rv_to_double(value) << "\n";
-        delegate.return_val(value);
+        delegate.return_val(vl_types::null_value);
+    }
+
+    void bi_0x0002(BuiltinsDelegate &delegate)
+    {
+        // builtin for printing a complex
+        vl_types::RawObject object = delegate.get_obj_argument();
+        vl_types::VlComplex complex = vl_types::ro_to_complex(object);
+        std::cout << complex.real << " + " << complex.imag << "i\n";
+        delegate.return_val(vl_types::null_value);
+    }
+
+    void bi_0x0010(BuiltinsDelegate &delegate)
+    {
+        // repl::repl_printi
+        vl_types::RawValue value = delegate.get_val_argument();
+        std::cout << vl_types::rv_to_int(value) << ": int\n";
+        delegate.return_val(vl_types::null_value);
+    }
+
+    void bi_0x0011(BuiltinsDelegate &delegate)
+    {
+        // repl::repl_printb
+        vl_types::RawValue value = delegate.get_val_argument();
+        std::cout << (vl_types::rv_to_bool(value) ? "true" : "false") << ": bool\n";
+        delegate.return_val(vl_types::null_value);
+    }
+
+    void bi_0x0012(BuiltinsDelegate &delegate)
+    {
+        // repl::repl_printr
+        vl_types::RawValue value = delegate.get_val_argument();
+        std::cout << vl_types::rv_to_double(value) << ": real\n";
+        delegate.return_val(vl_types::null_value);
+    }
+
+    void bi_0x0013(BuiltinsDelegate &delegate)
+    {
+        // repl::repl_printc
+        vl_types::RawObject object = delegate.get_obj_argument();
+        vl_types::VlComplex complex = vl_types::ro_to_complex(object);
+        std::cout << complex.real << "+" << complex.imag << "i: complex\n";
+        delegate.return_val(vl_types::null_value);
+    }
+
+    void bi_0x0014(BuiltinsDelegate &delegate)
+    {
+        // repl::repl_printv2
+        vl_types::RawObject object = delegate.get_obj_argument();
+        vl_types::VlVec2 vec2 = vl_types::ro_to_vec2(object);
+        std::cout << "[" << vec2.x << "," << vec2.y << "]: vec2\n";
+        delegate.return_val(vl_types::null_value);
+    }
+
+    void bi_0x0015(BuiltinsDelegate &delegate)
+    {
+        // repl::repl_printv3
+        vl_types::RawObject object = delegate.get_obj_argument();
+        vl_types::VlVec3 vec3 = vl_types::ro_to_vec3(object);
+        std::cout << "[" << vec3.x << "," << vec3.y << "," << vec3.z << "]: vec3\n";
+        delegate.return_val(vl_types::null_value);
+    }
+
+    void bi_0x0016(BuiltinsDelegate &delegate)
+    {
+        // repl::repl_printv4
+        vl_types::RawObject object = delegate.get_obj_argument();
+        vl_types::VlVec4 vec4 = vl_types::ro_to_vec4(object);
+        std::cout << "[" << vec4.x << "," << vec4.y << "," << vec4.z << "," << vec4.w << "]: vec4\n";
+        delegate.return_val(vl_types::null_value);
     }
 
     void bi_0x1000(BuiltinsDelegate &delegate)
@@ -127,6 +196,30 @@ namespace vl_builtins
             break;
         case 0x0001:
             bi_0x0001(delegate);
+            break;
+        case 0x0002:
+            bi_0x0002(delegate);
+            break;
+        case 0x0010:
+            bi_0x0010(delegate);
+            break;
+        case 0x0011:
+            bi_0x0011(delegate);
+            break;
+        case 0x0012:
+            bi_0x0012(delegate);
+            break;
+        case 0x0013:
+            bi_0x0013(delegate);
+            break;
+        case 0x0014:
+            bi_0x0014(delegate);
+            break;
+        case 0x0015:
+            bi_0x0015(delegate);
+            break;
+        case 0x0016:
+            bi_0x0016(delegate);
             break;
         case 0x1000:
             bi_0x1000(delegate);

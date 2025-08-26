@@ -48,6 +48,7 @@ Veclang types have an associated **type code**, which are used in some object in
 - VlMat2=0x07
 - VlMat3=0x08
 - VlMat4=0x09 
+- VlStr=0x0F
 VlNull does not have a type code as it is an internal compiler-only value. VlNull represents the return value of a function that does not have a useful return output. `null` cannot be assigned to a variable or 
 
 The **canonical size** of a Veclang type is the least number of bytes needed to represent it (like a struct with zero padding). When data is stored in a constant table or in stack memory, it is always arranged contiguously.
@@ -214,6 +215,11 @@ A VlProgram is serialised and deserialised to binary across language boundaries 
   Return type identifier.
 - **attribute_tags** (`object<string, integer>`)  
   Dictionary of string keys to integer values representing tags/attributes for the function.
+
+#### Constants table
+The constants table stores constant values loaded with the `OP_CONSTANT_VAL_TABLE` and `OP_CONSTANT_OBJ_TABLE` instructions. When the emitter emits bytecode, if the same constant (down to the same literal bytes) is in the constant table already, it will emit the same offset. 
+
+When the constant table is loaded into memory in the interpreter, 128 zeroed bytes should be appended to the table data. This is because the emitter does not pad strings when placing them in the table, but when the `OP_CONSTANT_OBJ_TABLE` instruction is called for a string, it will load 128 bytes from the constant table offset, so the additional padding in the table is necessary to prevent undefined behaviour.
 
 # Bytecode Reference
 ### 0x00 - 0x2F - Basic variable and constant manipulations

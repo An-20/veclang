@@ -38,6 +38,9 @@ namespace vl_interpreter
         Interpreter(const vl_sedf::VlProgram &program)
         {
             constants = program.constants;
+            // add 128 empty bytes to end of constants
+            constants.resize(constants.size() + 128);
+
             instructions = program.instructions;
             header = program.header;
             instruction_pointer = 0;
@@ -58,6 +61,9 @@ namespace vl_interpreter
         void update_bytecode(const vl_sedf::VlProgram &program)
         {
             constants = program.constants;
+            // add 128 empty bytes to end of constants
+            constants.resize(constants.size() + 128);
+
             instructions = program.instructions;
             header = program.header;
             instruction_pointer = 0;

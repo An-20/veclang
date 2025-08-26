@@ -31,6 +31,15 @@ namespace vl_builtins
         delegate.return_val(vl_types::null_value);
     }
 
+    void bi_0x0003(BuiltinsDelegate &delegate)
+    {
+        // builtin for printing a string
+        vl_types::RawObject object = delegate.get_obj_argument();
+        std::string str = vl_types::ro_to_string(object);
+        std::cout << str << "\n";
+        delegate.return_val(vl_types::null_value);
+    }
+
     void bi_0x0010(BuiltinsDelegate &delegate)
     {
         // repl::repl_printi
@@ -88,6 +97,15 @@ namespace vl_builtins
         vl_types::RawObject object = delegate.get_obj_argument();
         vl_types::VlVec4 vec4 = vl_types::ro_to_vec4(object);
         std::cout << "[" << vec4.x << "," << vec4.y << "," << vec4.z << "," << vec4.w << "]: vec4\n";
+        delegate.return_val(vl_types::null_value);
+    }
+
+    void bi_0x001F(BuiltinsDelegate &delegate)
+    {
+        // builtin for printing a string
+        vl_types::RawObject object = delegate.get_obj_argument();
+        std::string str = vl_types::ro_to_string(object);
+        std::cout << "\"" << str << "\": str\n";
         delegate.return_val(vl_types::null_value);
     }
 
@@ -200,6 +218,9 @@ namespace vl_builtins
         case 0x0002:
             bi_0x0002(delegate);
             break;
+        case 0x0003:
+            bi_0x0003(delegate);
+            break;
         case 0x0010:
             bi_0x0010(delegate);
             break;
@@ -220,6 +241,9 @@ namespace vl_builtins
             break;
         case 0x0016:
             bi_0x0016(delegate);
+            break;
+        case 0x001F:
+            bi_0x001F(delegate);
             break;
         case 0x1000:
             bi_0x1000(delegate);

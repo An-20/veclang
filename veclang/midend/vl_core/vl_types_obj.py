@@ -97,7 +97,7 @@ class VlComplex(VlTypeABC):
                 ["complex"],
                 "complex",
                 lambda x, y: VlComplex(x**y),
-                "OP_COMPLEX_EXP",
+                "OP_COMPLEX_POW",
             ),
             VlConstexprOperation(
                 "UNARY",
@@ -131,6 +131,105 @@ class VlComplex(VlTypeABC):
                 "Returns a `real` representing the real component of a `complex`.",
             ),
         ]
+
+    @staticmethod
+    def get_casts() -> list[VlCast]:
+        return []
+
+
+class VlVec2(VlTypeABC):
+
+    def to_bytes_32(self) -> bytes:
+        pass  # TODO: FIXME
+
+    def to_bytes_64(self) -> bytes:
+        pass  # TODO: FIXME
+
+    @staticmethod
+    def get_info() -> tuple[VlTypeStr, VlTypeCode, VlTypeType, tuple[int, int]]:
+        return "vec2", 0x04, "OBJ", (8, 16)
+
+    @staticmethod
+    def get_operations() -> list[VlOperation]:
+        pass
+
+    @staticmethod
+    def get_methods() -> list[VlMethod]:
+        return []
+
+    @staticmethod
+    def get_properties() -> list[VlMethod]:
+        return []
+
+    @staticmethod
+    def get_casts() -> list[VlCast]:
+        return []
+
+
+class VlVec3(VlTypeABC):
+
+    def __init__(self, underlying: list[float]) -> None:
+        if (
+            not isinstance(underlying, list)
+            or not (all(isinstance(x, float) for x in underlying))
+            or len(underlying) != 3
+        ):
+            raise ValueError(
+                f"Underlying value of VlVec3 must be a Python list float of length 3, not '{underlying}'"
+            )
+        self.underlying: list[float]
+        super().__init__(underlying)
+
+    def to_bytes_32(self) -> bytes:
+        return obj_to_bytes_32(self.underlying)
+
+    def to_bytes_64(self) -> bytes:
+        return obj_to_bytes_64(self.underlying)
+
+    @staticmethod
+    def get_info() -> tuple[VlTypeStr, VlTypeCode, VlTypeType, tuple[int, int]]:
+        return "vec3", 0x05, "OBJ", (12, 24)
+
+    @staticmethod
+    def get_operations() -> list[VlOperation]:
+        pass
+
+    @staticmethod
+    def get_methods() -> list[VlMethod]:
+        return []
+
+    @staticmethod
+    def get_properties() -> list[VlMethod]:
+        return []
+
+    @staticmethod
+    def get_casts() -> list[VlCast]:
+        return []
+
+
+class VlVec4(VlTypeABC):
+
+    def to_bytes_32(self) -> bytes:
+        pass  # TODO: FIXME
+
+    def to_bytes_64(self) -> bytes:
+        pass  # TODO: FIXME
+
+    @staticmethod
+    def get_info() -> tuple[VlTypeStr, VlTypeCode, VlTypeType, tuple[int, int]]:
+        return "vec4", 0x06, "OBJ", (16, 32)
+
+    @staticmethod
+    def get_operations() -> list[VlOperation]:
+        pass
+
+    @staticmethod
+    def get_methods() -> list[VlMethod]:
+        return []
+
+    @staticmethod
+    def get_properties() -> list[VlMethod]:
+        return []
 
     @staticmethod
     def get_casts() -> list[VlCast]:
@@ -224,87 +323,32 @@ class VlMat4(VlTypeABC):
         return []
 
 
-class VlVec2(VlTypeABC):
+class VlStr(VlTypeABC):
+
+    def _encode(self) -> bytes:
+        if not self.underlying.isascii():
+            raise ValueError("Underlying string is not ASCII")
+        return self.underlying.encode("ascii")
 
     def to_bytes_32(self) -> bytes:
-        pass  # TODO: FIXME
-
-    def to_bytes_64(self) -> bytes:
-        pass  # TODO: FIXME
-
-    @staticmethod
-    def get_info() -> tuple[VlTypeStr, VlTypeCode, VlTypeType, tuple[int, int]]:
-        return "vec2", 0x04, "OBJ", (8, 16)
-
-    @staticmethod
-    def get_operations() -> list[VlOperation]:
-        pass
-
-    @staticmethod
-    def get_methods() -> list[VlMethod]:
-        return []
-
-    @staticmethod
-    def get_properties() -> list[VlMethod]:
-        return []
-
-    @staticmethod
-    def get_casts() -> list[VlCast]:
-        return []
-
-
-class VlVec3(VlTypeABC):
-
-    def __init__(self, underlying: list[float]) -> None:
-        if (
-            not isinstance(underlying, list)
-            or not (all(isinstance(x, float) for x in underlying))
-            or len(underlying) != 3
-        ):
+        if len(self.underlying) > 63:
             raise ValueError(
-                f"Underlying value of VlVec3 must be a Python list float of length 3, not '{underlying}'"
+                "IE: Length of string must be <63 char in 32-bit runtime precision"
             )
-        self.underlying: list[float]
-        super().__init__(underlying)
-
-    def to_bytes_32(self) -> bytes:
-        return obj_to_bytes_32(self.underlying)
+        length_byte = struct.pack("<B", len(self.underlying))
+        return length_byte + self._encode()
 
     def to_bytes_64(self) -> bytes:
-        return obj_to_bytes_64(self.underlying)
+        if len(self.underlying) > 127:
+            raise ValueError(
+                "IE: Length of string must be <127 char in 64-bit runtime precision"
+            )
+        length_byte = struct.pack("<B", len(self.underlying))
+        return length_byte + self._encode()
 
     @staticmethod
     def get_info() -> tuple[VlTypeStr, VlTypeCode, VlTypeType, tuple[int, int]]:
-        return "vec3", 0x05, "OBJ", (12, 24)
-
-    @staticmethod
-    def get_operations() -> list[VlOperation]:
-        pass
-
-    @staticmethod
-    def get_methods() -> list[VlMethod]:
-        return []
-
-    @staticmethod
-    def get_properties() -> list[VlMethod]:
-        return []
-
-    @staticmethod
-    def get_casts() -> list[VlCast]:
-        return []
-
-
-class VlVec4(VlTypeABC):
-
-    def to_bytes_32(self) -> bytes:
-        pass  # TODO: FIXME
-
-    def to_bytes_64(self) -> bytes:
-        pass  # TODO: FIXME
-
-    @staticmethod
-    def get_info() -> tuple[VlTypeStr, VlTypeCode, VlTypeType, tuple[int, int]]:
-        return "vec4", 0x06, "OBJ", (16, 32)
+        return "str", 0x0F, "OBJ", (64, 128)
 
     @staticmethod
     def get_operations() -> list[VlOperation]:

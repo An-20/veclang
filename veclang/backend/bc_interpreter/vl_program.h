@@ -115,7 +115,8 @@ namespace vl_program
         VL_VEC4 = 0x06,
         VL_MAT2 = 0x07,
         VL_MAT3 = 0x08,
-        VL_MAT4 = 0x09
+        VL_MAT4 = 0x09,
+        VL_STR = 0x0F
     };
 
     size_t get_type_canonical_size(type_code type);

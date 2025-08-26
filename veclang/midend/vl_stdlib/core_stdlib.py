@@ -30,6 +30,13 @@ VlCoreStdlib = StdlibNamespace(
             "null",
             0x0002,
         ),
+        StdlibFunction(
+            "prints",
+            "Prints a str",
+            [StdlibFnParam("x", "str")],
+            "null",
+            0x0003,
+        ),
     ],
     [],
 )

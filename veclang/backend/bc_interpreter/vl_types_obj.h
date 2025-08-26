@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <cstring>
 #include <complex>
+#include <algorithm>
 #include "vl_types_val.h"
 
 namespace vl_types
@@ -104,6 +105,17 @@ namespace vl_types
         return obj;
     }
 
+    inline RawObject string_to_ro(const std::string &str)
+    {
+        RawObject obj;
+        char *data = reinterpret_cast<char *>(&obj.bits[0]);
+        uint8_t len = static_cast<uint8_t>(std::min<size_t>(str.size(), 127));
+        data[0] = len;
+        std::copy_n(str.data(), len, data + 1);
+        std::fill(data + 1 + len, data + 128, 0);
+        return obj;
+    }
+
     inline VlComplex ro_to_complex(const RawObject &ro)
     {
         double real, imag;
@@ -161,6 +173,13 @@ namespace vl_types
         VlMat4 mat;
         std::memcpy(&mat.data[0], &ro.bits[0], sizeof(double) * 16);
         return mat;
+    }
+
+    inline std::string ro_to_string(const RawObject &ro)
+    {
+        const char *data = reinterpret_cast<const char *>(&ro.bits[0]);
+        uint8_t len = static_cast<uint8_t>(data[0]);
+        return std::string(data + 1, len);
     }
 
     RawValue complex_equal(const RawObject &a, const RawObject &b);

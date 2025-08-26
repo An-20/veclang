@@ -34,6 +34,8 @@ namespace vl_program
             return 64;
         case VL_MAT4:
             return 128;
+        case VL_STR:
+            return 128;
         default:
             throw std::runtime_error("Unknown type code");
         }

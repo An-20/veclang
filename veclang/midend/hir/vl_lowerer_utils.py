@@ -83,7 +83,7 @@ class Scope:
 
 
 def format_operator(operator: VlOperatorType) -> str:
-    return {
+    operator_hr_map = {
         "PLUS_ASSIGNMENT": "+=",
         "MINUS_ASSIGNMENT": "-=",
         "TIMES_ASSIGNMENT": "*=",
@@ -113,7 +113,10 @@ def format_operator(operator: VlOperatorType) -> str:
         "BITWISE_NOT": "~",
         "UNARY_PLUS": "+",
         "UNARY_MINUS": "-",
-    }.get(operator, __default=operator)
+    }
+    if operator not in operator_hr_map:
+        raise ValueError(f"IE: unknown operator '{operator}'")
+    return operator_hr_map[operator]
 
 
 def check_constant_case(input_str: str) -> bool:

@@ -51,7 +51,7 @@ def main():
     )
     compile_cmd.add_argument("input", help="Source file (.vl)")
     compile_cmd.add_argument(
-        "-o", "--output", help="Output bytecode file", default="out.vlb"
+        "-o", "--output", help="Output bytecode file", default="out.vl_sedf"
     )
     compile_cmd.add_argument("--debug", action="store_true", help="Enable debug output")
     compile_cmd.add_argument(

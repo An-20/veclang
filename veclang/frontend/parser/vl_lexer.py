@@ -19,7 +19,7 @@ TIMES_ASSIGNMENT: "\\*="
 DIVIDE_ASSIGNMENT: "/="
 MODULUS_ASSIGNMENT: "%="
 
-TYPE: "(int|uint|long|ulong|real|complex|vec2|vec3|vec4|mat2|mat3|mat4)"
+TYPE: "(int|bool|real|complex|vec2|vec3|vec4|mat2|mat3|mat4|str)"
 IMAGINARY_UNIT: "i"
 
 RIGHT_ARROW: "-\\>"
@@ -153,9 +153,10 @@ def t_STR_LITERAL(t):
     t.value = t.value[1:-1]
     if t.value and t.value[0] == '"':
         # triple quoted
-        t.value = ConstantValue(t.value[2:-2], "str")
+        t.value = t.value[2:-2]
     if '"' in t.value:
         raise ValueError("String cannot contain '\"' character.")
+    t.value = ConstantValue(t.value, "str")
     return t
 
 

@@ -12,7 +12,7 @@ TIMES_ASSIGNMENT: "\*="
 DIVIDE_ASSIGNMENT: "/="
 MODULUS_ASSIGNMENT: "%="
 
-TYPE: "(int|uint|long|ulong|real|complex|vec2|vec3|vec4|mat2|mat3|mat4)"
+TYPE: "(int|bool|real|complex|vec2|vec3|vec4|mat2|mat3|mat4)"
 IMAGINARY_UNIT: "i"
 
 RIGHT_ARROW: "-\>"

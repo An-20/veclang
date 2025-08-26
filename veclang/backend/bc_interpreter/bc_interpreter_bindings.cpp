@@ -102,15 +102,32 @@ public:
 
         // std::cout << ms_double.count() << "ms for actual fn call\n";
 
-        switch (return_type_code.cast<uint8_t>())
+        uint8_t type_code = return_type_code.cast<uint8_t>();
+        if (type_code == 0x00)
         {
-        case 0:
             return py::int_(vl_types::rv_to_int(rv));
-        case 1:
+        }
+        else if (type_code == 0x01)
+        {
             return py::bool_(vl_types::rv_to_bool(rv));
-        case 2:
+        }
+        else if (type_code == 0x02)
+        {
             return py::float_(vl_types::rv_to_double(rv));
-        default:
+        }
+        else if (type_code == 0x03)
+        {
+            vl_types::VlComplex v = vl_types::ro_to_complex(ro);
+            std::complex<double> std_complex(v.real, v.imag);
+            return py::cast(std_complex);
+        }
+        else if (type_code == 0x0F)
+        {
+            std::string s = vl_types::ro_to_string(ro);
+            return py::cast(s);
+        }
+        else
+        {
             return py::none();
         }
         return py::none();

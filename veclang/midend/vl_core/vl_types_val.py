@@ -202,7 +202,7 @@ class VlInt(VlTypeABC):
                 ["int"],
                 "int",
                 lambda x, y: VlInt(x**y),
-                "OP_INT_EXP",
+                "OP_INT_POW",
             ),
             VlConstexprOperation(
                 "UNARY",
@@ -481,7 +481,7 @@ class VlReal(VlTypeABC):
                 ["real"],
                 "real",
                 lambda x, y: VlReal(x**y),
-                "OP_REAL_EXP",
+                "OP_REAL_POW",
             ),
             VlConstexprOperation(
                 "UNARY",

@@ -56,6 +56,7 @@ from veclang.midend.vl_core import (
     VlVec2,
     VlVec3,
     VlVec4,
+    VlStr,
 )
 
 from veclang.midend.vl_stdlib import VlStdlib, StdlibFunction, StdlibConstexpr
@@ -570,6 +571,7 @@ class Lowerer:
             "vec3": VlVec3,
             "vec4": VlVec4,
             "null": VlNull,
+            "str": VlStr,
         }[vl_type_str]
 
     def lower_identifier_expr(
@@ -953,6 +955,7 @@ class Lowerer:
             f"and {right.vl_type.to_vl_type_str()} (after attempted widening)",
             expr.position_info,
         )
+        raise FatalCompileError
 
     def lower_unary_operation_expr(
         self, expr: vl_ast.UnaryOperatorExprNode
@@ -1002,6 +1005,8 @@ class Lowerer:
             value = VlReal(expr.value.value)
         elif isinstance(expr.value.value, complex):
             value = VlComplex(expr.value.value)
+        elif isinstance(expr.value.value, str):
+            value = VlStr(expr.value.value)
         else:
             raise FatalCompileError(
                 f"IE: Unknown constant expr value type {type(expr.value.value)}"

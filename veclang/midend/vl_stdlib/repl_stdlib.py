@@ -79,6 +79,13 @@ VlReplStdlib = StdlibNamespace(
             "null",
             0x0019,
         ),
+        StdlibFunction(
+            "repl_prints",
+            "Prints a str, in the format 'value: str'",
+            [StdlibFnParam("x", "str")],
+            "null",
+            0x001F,
+        ),
     ],
     [],
 )

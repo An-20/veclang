@@ -19,6 +19,7 @@ VlTypeStr = typing.Literal[
     "mat2",
     "mat3",
     "mat4",
+    "str",
 ]
 VlTypeStrs: list[VlTypeStr] = [
     "null",
@@ -32,10 +33,11 @@ VlTypeStrs: list[VlTypeStr] = [
     "mat2",
     "mat3",
     "mat4",
+    "str",
 ]
 
 VlTypeCode = typing.Literal[
-    0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x06, 0x07, 0x08, 0x09
+    0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x06, 0x07, 0x08, 0x09, 0x15
 ]
 VlTypeCodes: list[VlTypeCode] = [
     0x00,
@@ -49,6 +51,7 @@ VlTypeCodes: list[VlTypeCode] = [
     0x07,
     0x08,
     0x09,
+    0x15,
 ]
 
 VlTypeType = typing.Literal["VAL", "OBJ"]

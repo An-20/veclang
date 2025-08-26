@@ -63,6 +63,7 @@ class ReplCompiler:
                     # "mat2": 0x0000,  # TODO!
                     # "mat3": 0x0000,
                     # "mat4": 0x0000,
+                    "str": 0x001F,
                 }[expr.vl_type.to_vl_type_str()]
                 api = ASTPositionInfo(1, 1)
                 hir.stmts[0] = vl_hir.ExprStmtNode(

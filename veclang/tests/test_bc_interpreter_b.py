@@ -106,8 +106,8 @@ def test_basic_ops_complex_4():
     """
     compiled = compile_vl(program_str)
     interpreter = Interpreter(compiled)
-    a = interpreter.interpret_fn(0, [4j, 2j])
-    assert a == 2.0
+    a = interpreter.interpret_fn(0, [4j, 2])
+    assert a == 2j
 
 
 def test_basic_ops_complex_5():

@@ -39,7 +39,9 @@ fn main(
     return real(0);
 }
 """
-parsed, diagnostics = parse(PROGRAM_STR, COMPILER_FLAGS)
-if diagnostics:
-    raise ValueError(f"Error when parsing: {diagnostics}")
-print_ast(parsed)
+
+
+def test_parser():
+    parsed, diagnostics = parse(PROGRAM_STR, COMPILER_FLAGS)
+    if diagnostics:
+        raise ValueError(f"Error when parsing: {diagnostics}")

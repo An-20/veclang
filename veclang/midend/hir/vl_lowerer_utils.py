@@ -54,6 +54,7 @@ class VlImportedFunctionProfile:
     builtin_fn_id: int
     parameters: list[VlFnParamTypeProfile]
     return_type: VlType
+    overload_profile: tuple  # a tuple of (fn_name, *param_vl_type_strs)
 
     ref_read_count: int
 
@@ -79,7 +80,7 @@ class Scope:
 
     # Tuple of [type_or_value, is_variable
     data: dict[str, IdentifierData]
-    imported_functions: dict[str, VlImportedFunctionProfile]
+    imported_functions: list[VlImportedFunctionProfile]
 
 
 def format_operator(operator: VlOperatorType) -> str:

@@ -31,21 +31,21 @@ fn main(
     <key: "value">
     asdas: mat4
 ) -> int {
+    a::b::c();
     return real(0);
 }
 """
 
 
-lexer.line_no = 0
-lexer_tokens = []
-# Give the lexer some input
-lexer.input(VL_PROGRAM)
+def test_lexer():
+    lexer.line_no = 0
+    lexer_tokens = []
+    # Give the lexer some input
+    lexer.input(VL_PROGRAM)
 
-# Tokenize
-while True:
-    tok = lexer.token()
-    if not tok:
-        break  # No more input
-    lexer_tokens.append(tok)
-
-print(lexer_tokens)
+    # Tokenize
+    while True:
+        tok = lexer.token()
+        if not tok:
+            break  # No more input
+        lexer_tokens.append(tok)

@@ -128,7 +128,7 @@ class Lowerer:
             selection_name,
             ast_position_info,
             {},
-            {},
+            [],
         )
 
     def get_stack_trace_hr(self) -> str:
@@ -182,11 +182,11 @@ class Lowerer:
                     data.ast_position_info,
                 )
 
-        for fr_identifier, data in self.scopes[-1].imported_functions.items():
-            if data.ref_read_count == 0:
+        for function in self.scopes[-1].imported_functions:
+            if function.ref_read_count == 0:
                 self.add_diagnostic(
                     "W001",
-                    f"Unused imported function '{fr_identifier}'",
+                    f"Unused imported function '{function.fr_identifier}'",
                     self.scopes[-1].ast_position_info,
                 )
 
@@ -299,24 +299,6 @@ class Lowerer:
         )
         raise FatalCompileError()
 
-    def resolve_function_identifier(
-        self, fr_identifier: str, ast_position_info: ASTPositionInfo
-    ) -> VlImportedFunctionProfile | VlUserdefFunctionProfile:
-        if fr_identifier in self.userdef_functions:
-            return self.userdef_functions[fr_identifier]
-
-        for scope in reversed(self.scopes):
-            if fr_identifier in scope.imported_functions:
-                scope.imported_functions[fr_identifier].ref_read_count += 1
-                return scope.imported_functions[fr_identifier]
-
-        self.add_diagnostic(
-            "E200",
-            f"Unresolved function identifier '{fr_identifier}'",
-            ast_position_info,
-        )
-        raise FatalCompileError()
-
     def _check_if_data_identifier_declared(
         self, identifier: str, ast_position_info: ASTPositionInfo
     ) -> None:
@@ -346,7 +328,10 @@ class Lowerer:
                 )
 
     def _check_if_function_identifier_declared(
-        self, fr_identifier: str, ast_position_info: ASTPositionInfo
+        self,
+        fr_identifier: str,
+        ast_position_info: ASTPositionInfo,
+        overload_profile: tuple | None = None,
     ) -> None:
         if fr_identifier in self.userdef_functions:
             self.add_diagnostic(
@@ -356,7 +341,15 @@ class Lowerer:
             )
 
         for scope_idx, parent_scope in enumerate(reversed(self.scopes)):
-            if fr_identifier in parent_scope.imported_functions:
+            for imported_fn in parent_scope.imported_functions:
+                if imported_fn.fr_identifier != fr_identifier:
+                    continue
+                if (
+                    overload_profile
+                    and overload_profile != imported_fn.overload_profile
+                ):
+                    continue
+
                 if scope_idx == 0:
                     scope_hr = "this scope"
                 elif scope_idx == len(self.scopes) - 1:
@@ -468,17 +461,22 @@ class Lowerer:
         stdlib_fn: StdlibFunction,
         ast_position_info: ASTPositionInfo,
     ) -> None:
-        self._check_if_function_identifier_declared(fr_identifier, ast_position_info)
+        self._check_if_function_identifier_declared(
+            fr_identifier, ast_position_info, stdlib_fn.overload_profile()
+        )
         scope = self.scopes[-1]
-        scope.imported_functions[fr_identifier] = VlImportedFunctionProfile(
-            fr_identifier,
-            stdlib_fn.fn_id,
-            [
-                VlFnParamTypeProfile(x.name, self.lower_vl_type(x.vl_type))
-                for x in stdlib_fn.fn_params
-            ],
-            self.lower_vl_type(stdlib_fn.fn_return_type),
-            0,
+        scope.imported_functions.append(
+            VlImportedFunctionProfile(
+                fr_identifier,
+                stdlib_fn.fn_id,
+                [
+                    VlFnParamTypeProfile(x.name, self.lower_vl_type(x.vl_type))
+                    for x in stdlib_fn.fn_params
+                ],
+                self.lower_vl_type(stdlib_fn.fn_return_type),
+                stdlib_fn.overload_profile(),
+                0,
+            )
         )
 
     # Lowering
@@ -733,76 +731,144 @@ class Lowerer:
         """
         # TODO
 
-    def lower_function_call_expr(self, expr: vl_ast.FunctionCallExprNode) -> ExprNode:
-        if isinstance(expr.callee, vl_ast.MemberAccessExprNode):
-            # special pathway just for method calls
-            # this avoids us needing an internal compiler type for 'function'
-            # because Veclang doesn't have first class functions
-            callee = expr.callee
-            target_lowered = self.lower_expr(callee.target)
-            vl_type = target_lowered.vl_type
-            for method in vl_type.get_methods():
-                if method.name != callee.name.name:
-                    continue
-                arguments: list[ExprNode] = [
-                    self.lower_expr(x) for x in expr.arguments.arguments
-                ]
-                if len(arguments) != len(method.arg_types):
+    def lower_method_call_expr(self, expr: vl_ast.FunctionCallExprNode) -> ExprNode:
+        """
+        Special pathway just for method calls
+        this avoids us needing an internal compiler type for 'function'
+        because Veclang doesn't have first class functions
+        """
+        if not isinstance(expr.callee, vl_ast.MemberAccessExprNode):
+            raise FatalCompileError("IE: unreachable")
+
+        callee = expr.callee
+        target_lowered = self.lower_expr(callee.target)
+        vl_type = target_lowered.vl_type
+        for method in vl_type.get_methods():
+            if method.name != callee.name.name:
+                continue
+            arguments: list[ExprNode] = [
+                self.lower_expr(x) for x in expr.arguments.arguments
+            ]
+            if len(arguments) != len(method.arg_types):
+                self.add_diagnostic(
+                    "E110",
+                    f"Method '{vl_type.to_vl_type_str()}.{expr.callee.name}' expected "
+                    f"{len(method.arg_types)} arguments, got {len(arguments)}",
+                    expr.position_info,
+                )
+            for idx, (argument, parameter_type_str) in enumerate(
+                zip(arguments, method.arg_types)
+            ):
+                if argument.vl_type.to_vl_type_str() != parameter_type_str:
                     self.add_diagnostic(
-                        "E110",
-                        f"Function '{expr.callee.name}' expected {len(method.arg_types)} arguments, got {len(arguments)}",
+                        "E111",
+                        f"Method '{vl_type.to_vl_type_str()}.{expr.callee.name}' expects argument #{idx} "
+                        f"to be type {parameter_type_str}, got {argument.vl_type.to_vl_type_str()}",
                         expr.position_info,
                     )
-                for idx, (argument, parameter_type_str) in enumerate(
-                    zip(arguments, method.arg_types)
-                ):
-                    if argument.vl_type.to_vl_type_str() != parameter_type_str:
-                        self.add_diagnostic(
-                            "E111",
-                            f"Function '{expr.callee.name}' expects argument #{idx} "
-                            f"to be type {parameter_type_str}, got {argument.vl_type.to_vl_type_str()}",
-                            expr.position_info,
-                        )
 
-                return BuiltinFunctionCallExprNode(
-                    method.fn_id,
-                    [target_lowered],
-                    self.lower_vl_type(method.return_type),
-                    None,
-                    expr.position_info,
-                    is_method=True,
-                )
-            self.add_diagnostic(
-                "E200",
-                f"Unresolved identifier: {vl_type.to_vl_type_str()} has no method '{callee.name.name}'",
+            return BuiltinFunctionCallExprNode(
+                method.fn_id,
+                [target_lowered],
+                self.lower_vl_type(method.return_type),
+                None,
                 expr.position_info,
+                is_method=True,
             )
-            raise FatalCompileError()
-
-        elif isinstance(expr.callee, vl_ast.IdentifierNode):
-            fr_identifier = expr.callee.name
-
-        elif isinstance(expr.callee, vl_ast.ScopedIdentifierNode):
-            fr_identifier = expr.callee.fully_resolve()
-
-        else:
-            self.add_diagnostic(
-                "E113",
-                f"Calling non-callable expression '{type(expr.callee)}'",
-                expr.position_info,
-            )
-            raise FatalCompileError()
-
-        function_data = self.resolve_function_identifier(
-            fr_identifier, expr.position_info
+        self.add_diagnostic(
+            "E200",
+            f"Unresolved identifier: {vl_type.to_vl_type_str()} has no method '{callee.name.name}'",
+            expr.position_info,
         )
+        raise FatalCompileError()
+
+    def lower_imported_function_call_expr(
+        self,
+        expr: vl_ast.FunctionCallExprNode,
+        fr_identifier: str,
+        candidate_fns: list[VlImportedFunctionProfile],
+    ) -> ExprNode:
+        arguments: list[ExprNode] = [
+            self.lower_expr(x) for x in expr.arguments.arguments
+        ]
+
+        if len(candidate_fns) == 1:
+            # do normal checking
+            candidate_fn = candidate_fns[0]
+            if len(arguments) != len(candidate_fn.parameters):
+                self.add_diagnostic(
+                    "E110",
+                    f"Function '{fr_identifier}' expected "
+                    f"{len(candidate_fn.parameters)} arguments, got {len(arguments)}",
+                    expr.position_info,
+                )
+
+            for idx, (argument, parameter) in enumerate(
+                zip(arguments, candidate_fn.parameters)
+            ):
+                if argument.vl_type != parameter.vl_type:
+                    self.add_diagnostic(
+                        "E111",
+                        f"Function '{fr_identifier}' expects argument #{idx} "
+                        f"to be type {parameter.vl_type.to_vl_type_str()}, got {argument.vl_type.to_vl_type_str()}",
+                        expr.position_info,
+                    )
+
+            return BuiltinFunctionCallExprNode(
+                candidate_fn.builtin_fn_id,
+                arguments,
+                candidate_fn.return_type,
+                None,  # no such thing as constexpr function call apart from casts
+                expr.position_info,
+            )
+
+        # now do checking for overloaded fns
+        for candidate_fn in candidate_fns:
+            arguments: list[ExprNode] = [
+                self.lower_expr(x) for x in expr.arguments.arguments
+            ]
+            if len(arguments) != len(candidate_fn.parameters):
+                continue
+
+            matching_arg_types = True
+            for idx, (argument, parameter) in enumerate(
+                zip(arguments, candidate_fn.parameters)
+            ):
+                if argument.vl_type != parameter.vl_type:
+                    matching_arg_types = False
+            if not matching_arg_types:
+                continue
+
+            return BuiltinFunctionCallExprNode(
+                candidate_fn.builtin_fn_id,
+                arguments,
+                candidate_fn.return_type,
+                None,  # no such thing as constexpr function call apart from casts
+                expr.position_info,
+            )
+
+        fn_signature = f"{fr_identifier}({', '.join(x.vl_type.to_vl_type_str() for x in arguments)})"
+        self.add_diagnostic(
+            "E112",
+            f"No definition of function '{fr_identifier}' with overload '{fn_signature}'",
+            expr.position_info,
+        )
+        raise FatalCompileError()
+
+    def lower_userdef_function_call_expr(
+        self,
+        expr: vl_ast.FunctionCallExprNode,
+        fr_identifier: str,
+        candidate_fn: VlUserdefFunctionProfile,
+    ) -> ExprNode:
+        function_data = candidate_fn
         arguments: list[ExprNode] = [
             self.lower_expr(x) for x in expr.arguments.arguments
         ]
         if len(arguments) != len(function_data.parameters):
             self.add_diagnostic(
                 "E110",
-                f"Function {expr.callee.name} expected {len(function_data.parameters)} arguments, got {len(arguments)}",
+                f"Function '{fr_identifier}' expected {len(function_data.parameters)} arguments, got {len(arguments)}",
                 expr.position_info,
             )
 
@@ -812,29 +878,59 @@ class Lowerer:
             if argument.vl_type != parameter.vl_type:
                 self.add_diagnostic(
                     "E111",
-                    f"Function '{expr.callee.name}' expects argument #{idx} "
+                    f"Function '{fr_identifier}' expects argument #{idx} "
                     f"to be type {parameter.vl_type.to_vl_type_str()}, got {argument.vl_type.to_vl_type_str()}",
                     expr.position_info,
                 )
 
-        if isinstance(function_data, VlImportedFunctionProfile):
-            return BuiltinFunctionCallExprNode(
-                function_data.builtin_fn_id,
-                arguments,
-                function_data.return_type,
-                None,  # no such thing as constexpr function call apart from casts
-                expr.position_info,
-            )
-        elif isinstance(function_data, VlUserdefFunctionProfile):
-            return UserdefFunctionCallExprNode(
-                function_data.userdef_fn_idx,
-                arguments,
-                function_data.return_type,
-                None,
-                expr.position_info,
-            )
+        return UserdefFunctionCallExprNode(
+            function_data.userdef_fn_idx,
+            arguments,
+            function_data.return_type,
+            None,
+            expr.position_info,
+        )
+
+    def lower_function_call_expr(self, expr: vl_ast.FunctionCallExprNode) -> ExprNode:
+        if isinstance(expr.callee, vl_ast.MemberAccessExprNode):
+            return self.lower_method_call_expr(expr)
+
+        elif isinstance(expr.callee, vl_ast.IdentifierNode):
+            fr_identifier = expr.callee.name
+
+        elif isinstance(expr.callee, vl_ast.ScopedIdentifierNode):
+            fr_identifier = expr.callee.fully_resolve()
+
         else:
-            raise FatalCompileError("IE: unknown function_data type")
+            self.add_diagnostic(
+                "E114",
+                f"Calling non-callable expression '{type(expr.callee)}'",
+                expr.position_info,
+            )
+            raise FatalCompileError()
+
+        if fr_identifier in self.userdef_functions:
+            return self.lower_userdef_function_call_expr(
+                expr, fr_identifier, self.userdef_functions[fr_identifier]
+            )
+
+        candidate_fns = []
+        for scope in reversed(self.scopes):
+            for function in scope.imported_functions:
+                if function.fr_identifier == fr_identifier:
+                    function.ref_read_count += 1
+                    candidate_fns.append(function)
+        if candidate_fns:
+            return self.lower_imported_function_call_expr(
+                expr, fr_identifier, candidate_fns
+            )
+
+        self.add_diagnostic(
+            "E200",
+            f"Unresolved function identifier '{fr_identifier}'",
+            expr.position_info,
+        )
+        raise FatalCompileError()
 
     def lower_cast_expr(self, expr: vl_ast.CastExprNode) -> BuiltinFunctionCallExprNode:
         argument = self.lower_expr(expr.argument)
@@ -1556,7 +1652,7 @@ class Lowerer:
         expr_lowered = self.lower_expr(stmt.value)
         if expr_lowered.vl_type != ret_type_or_none:
             self.add_diagnostic(
-                "E112",
+                "E113",
                 f"Expected return type of '{ret_type_or_none.to_vl_type_str()}', "
                 f"got type '{expr_lowered.vl_type.to_vl_type_str()}'",
                 stmt.position_info,

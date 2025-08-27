@@ -17,6 +17,9 @@ class StdlibFunction:
     fn_return_type: VlTypeStr
     fn_id: int
 
+    def overload_profile(self) -> tuple:
+        return tuple([self.fn_name] + [x.vl_type for x in self.fn_params])
+
 
 @dataclasses.dataclass
 class StdlibConstexpr:
@@ -42,15 +45,22 @@ class StdlibNamespace:
 
     def check(self) -> None:
         used_identifiers = set()
-        identifiers = [x.fn_name for x in self.functions] + [
-            x.constexpr_name for x in self.constexprs
-        ]
-        for identifier in identifiers:
-            if identifier in used_identifiers:
+        used_overload_profiles = set()
+
+        for fn in self.functions:
+            used_identifiers.add(fn.fn_name)
+            if fn.overload_profile() in used_overload_profiles:
                 raise ValueError(
-                    f"IE: identifier '{identifier}' declared multiple times in stdlib namespace '{self.namespace}'"
+                    f"IE: Function with overload profile '{fn.overload_profile()}' already declared"
                 )
-            used_identifiers.add(identifier)
+            used_overload_profiles.add(fn.overload_profile())
+
+        for ce in self.constexprs:
+            if ce.constexpr_name in used_identifiers:
+                raise ValueError(
+                    f"IE: identifier '{ce.constexpr_name}' already declared"
+                )
+            used_identifiers.add(ce.constexpr_name)
 
     def get_identifier(
         self, identifier: str

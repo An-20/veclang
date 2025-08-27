@@ -25,6 +25,7 @@ DiagnosticCode = typing.Literal[
     "E111",
     "E112",
     "E113",
+    "E114",
     "E120",
     "E121",
     "E122",

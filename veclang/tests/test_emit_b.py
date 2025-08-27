@@ -7,8 +7,11 @@ from veclang.backend.bc_compiler.vl_disassembler import disassemble_vl_program
 from veclang.backend.bc_common.py.vl_sedf import VlSEDF
 from veclang.common import CompilerFlags
 
+
 COMPILER_FLAGS: CompilerFlags = CompilerFlags(64)
-PROGRAM_STR = """
+
+
+PROGRAM_A_STR = """
 <generate_img>
 fn mandelbrot(
     x: int,
@@ -30,23 +33,82 @@ fn mandelbrot(
     return [0, 0, 0];
 }
 """
-parsed, diagnostics = parse(PROGRAM_STR, COMPILER_FLAGS)
-if diagnostics:
-    raise ValueError(f"Error when parsing: {diagnostics}")
-print_ast(parsed)
 
-hir, diagnostics = lower(parsed, COMPILER_FLAGS)
-if not hir:
-    raise ValueError(f"Error when lowering: {diagnostics}")
-elif diagnostics:
-    print("Diagnostics emitted during lowering:")
-    for d in diagnostics:
-        print(d)
-print_hir(hir)
 
-bytecode, diagnostics = emit(hir, COMPILER_FLAGS)
-if diagnostics:
-    raise ValueError(f"Error when emitting: {diagnostics}")
-print(disassemble_vl_program(bytecode))
+PROGRAM_B_STR = """
+print(17 + 6);
+print(42.0 + 3.0);
+print(1232 + 5i);
+print("Hello, world!");
+"""
 
-VlSEDF.dump("outmandle.sedf", bytecode)
+
+PROGRAM_C_STR = """
+fn fac(n: int) -> int {
+    if (n <= 1) {
+        return 1;
+    }
+    return fac(n - 1) * n;
+}
+
+fn fib(n: int) -> int {
+    if (n <= 2) { return 1; }
+    return fib(n - 1) + fib(n - 2);
+}
+
+print(fac(10));
+print(fib(10));
+"""
+
+
+PROGRAM_D_STR = """
+for (x: int in 0:10) {
+    print(x);
+}
+for (x: int in 0:10:-2) {
+    print(x);
+}
+"""
+
+
+DEBUG: bool = False
+
+
+def util_test_emit(program_str: str):
+    parsed, diagnostics = parse(program_str, COMPILER_FLAGS)
+    if diagnostics:
+        raise ValueError(f"Error when parsing: {diagnostics}")
+    if DEBUG:
+        print_ast(parsed)
+
+    hir, diagnostics = lower(parsed, COMPILER_FLAGS)
+    if not hir:
+        raise ValueError(f"Error when lowering: {diagnostics}")
+    elif diagnostics and DEBUG:
+        print("Diagnostics emitted during lowering:")
+        for d in diagnostics:
+            print(d)
+    if DEBUG:
+        print_hir(hir)
+
+    bytecode, diagnostics = emit(hir, COMPILER_FLAGS)
+    if diagnostics:
+        raise ValueError(f"Error when emitting: {diagnostics}")
+    if DEBUG:
+        print(disassemble_vl_program(bytecode))
+
+
+def test_emit_a():
+    util_test_emit(PROGRAM_A_STR)
+
+
+def test_emit_b():
+    util_test_emit(PROGRAM_B_STR)
+
+
+def test_emit_c():
+    util_test_emit(PROGRAM_C_STR)
+
+
+def test_emit_d():
+    util_test_emit(PROGRAM_D_STR)

@@ -94,8 +94,6 @@ RESERVED_KEYWORDS = [
     "null",
     "int",
     "uint",
-    "long",
-    "ulong",
     "bool",
     "real",
     "complex",
@@ -105,6 +103,7 @@ RESERVED_KEYWORDS = [
     "mat2",
     "mat3",
     "mat4",
+    "str",
 ]
 IDENTIFIER_REGEX = (
     r"\b(?!" + r"\b|".join(RESERVED_KEYWORDS) + r"\b)[a-zA-Z_][a-zA-Z_0-9]*"

@@ -104,6 +104,8 @@ Various elements of Veclang functionality are implemented by calling **builtin f
 
 When the AST is lowered to a HIR, type casts, methods, and property calls are all converted into function call HIR nodes to simplify the compilation process.
 
+Only builtin functions support function overloading.
+
 #### User-defined Functions
 User-defined functions are resolved at the HIR lowering stage. Function declarations are hoisted to the top of a Veclang program, and each function is assigned an index in declaration order before the HIR is properly lowered. This allows functions to call other functions which have not yet been declared, or call themselves. When the HIR is lowered, this `userdef_fn_idx` is stored and later emitted.
 
@@ -504,9 +506,11 @@ E110: Function `<>` expects `<>` arguments, not `<>` arguments
 ###### E111
 E111: Function `<>` expects argument #`<>` to be type `<>`, not `<>`
 ###### E112
-E112: Expected return type of `<>`, got type `<>`
+E112: No definition of function `<>` with overload `<>`
 ###### E113
-E113: Calling non-callable expression
+E113: Expected return type of `<>`, got type `<>`
+###### E114
+E114: Calling non-callable expression
 ###### E120
 E120: `if` statement condition should be type `bool`, got type `<>`
 ###### E121

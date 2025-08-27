@@ -5,7 +5,7 @@ from veclang.tests.test_bc_interpreter_common import compile_vl
 PROGRAM_STR = """
 fn main() -> int {
     for (x: int in 0:-10:-2) {
-        printi(x);
+        print(x);
     }
     return 0;
 }

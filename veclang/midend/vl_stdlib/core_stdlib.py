@@ -10,28 +10,28 @@ VlCoreStdlib = StdlibNamespace(
     "Core standard library for Veclang, automatically imported into the global namespace",
     [
         StdlibFunction(
-            "printi",
+            "print",
             "Prints an integer",
             [StdlibFnParam("x", "int")],
             "null",
             0x0000,
         ),
         StdlibFunction(
-            "printr",
+            "print",
             "Prints a real",
             [StdlibFnParam("x", "real")],
             "null",
             0x0001,
         ),
         StdlibFunction(
-            "printc",
+            "print",
             "Prints a complex",
             [StdlibFnParam("x", "complex")],
             "null",
             0x0002,
         ),
         StdlibFunction(
-            "prints",
+            "print",
             "Prints a str",
             [StdlibFnParam("x", "str")],
             "null",

@@ -1,5 +1,3 @@
-import timeit
-
 from veclang.frontend.parser.vl_parser import parse
 from veclang.frontend.parser.vl_ast_io import print_ast
 from veclang.midend.hir import lower

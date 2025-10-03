@@ -7,7 +7,8 @@ from veclang.midend.vl_stdlib.vl_stdlib_types import (
 
 VlReplStdlib = StdlibNamespace(
     "repl",
-    "Standard library for Veclang REPLs, automatically imported into the global namespace",
+    "Standard library for Veclang REPLs, automatically imported into the global namespace "
+    "(not designed for normal use)",
     [
         StdlibFunction(
             "repl_printi",

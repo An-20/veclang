@@ -101,19 +101,19 @@ class Stdlib:
                 out_lines.append(f"#### Constants")
                 for constexpr in namespace.constexprs:
                     out_lines.append(
-                        f"###### `{constexpr.constexpr_name}` (`{ns}::{constexpr.constexpr_name}`)"
+                        f"###### `{constexpr.constexpr_name} ({ns}::{constexpr.constexpr_name})`"
                     )
                     out_lines.append(
                         f"`{constexpr.constexpr_name}: {constexpr.constexpr_value.to_vl_type_str()}`"
                     )
                     out_lines.append(f"`value: {constexpr.constexpr_value.underlying}`")
-                    out_lines.append(f"{constexpr.constexpr_doc}\n")
+                    out_lines.append(f"{constexpr.constexpr_doc.strip('.')}.\n")
 
             if namespace.functions:
                 out_lines.append(f"#### Functions")
                 for function in namespace.functions:
                     out_lines.append(
-                        f"###### `{function.fn_name}` (`{ns}::{function.fn_name}`)"
+                        f"###### `{function.fn_name} ({ns}::{function.fn_name})`"
                     )
                     # form function signature
                     out_lines.append(
@@ -121,6 +121,6 @@ class Stdlib:
                         f" -> {function.fn_return_type}`"
                     )
                     out_lines.append(f"`builtin_idx: 0x{function.fn_id:02x}`")
-                    out_lines.append(f"{function.fn_doc}\n")
+                    out_lines.append(f"{function.fn_doc.strip('.')}.\n")
 
         return "\n".join(out_lines)

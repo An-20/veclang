@@ -76,6 +76,13 @@ VlMathStdlib = StdlibNamespace(
             "real",
             0x00F8,
         ),
+        StdlibFunction(
+            "cos",
+            "Returns the cosine of an angle, in radians",
+            [StdlibFnParam("x", "real")],
+            "real",
+            0x00F9,
+        ),
     ],
     [
         StdlibConstexpr(

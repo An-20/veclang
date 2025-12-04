@@ -1,7 +1,7 @@
 # Veclang
 This is the Veclang repo, where all Veclang development happens. This repository contains:
 - `veclang/`: the Veclang compiler and interpreters
-- `lab/`: VKSL LAB, a web-based Veclang IDE - docs [here](lab/README.md)
+- `lab/`: [VKSL LAB](https://lab.vksl.uk), a web-based Veclang IDE - docs [here](lab/README.md)
 - `sutoris/`: a 'build system' for Veclang
 
 #### Sutoris
@@ -14,8 +14,9 @@ As detailed in VKSL LAB [docs](lab/README.md), LAB requires several different pa
 
 Veclang code is compiled to Veclang bytecode by the compiler. Veclang bytecode is then run by the Veclang interpreter. There are different interpreters for different platforms:
 - **Veclang for x86**, or `bc_interpreter` is the 'standard' Veclang interpreter implementation in C++, for running on desktop x86 platforms.
-- **Veclang for Web**, `bc_interpreter_wasm`, is a variant of `bc_interpreter` compiled to WebAssembly using Emscripten (and is the interpreter used in VKSL LAB).
-- **Veclang for CUDA**, or `cu_interpreter` is a interpreter designed for running Veclang code simultaneously across many GPU cores. It has very little code in common with `bc_interpreter`, and is still in development.
+- **Veclang for Web**, `bc_interpreter_wasm`, is a variant of `bc_interpreter` compiled to WebAssembly using Emscripten (and is the interpreter used in [VKSL LAB](https://lab.vksl.uk)).
+
+The long-term plan for Veclang is to become a 'proper' compiled language by using LLVM.
 
 ## Variables, constants, and constexpr
 There are three type qualifiers in Veclang:

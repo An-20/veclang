@@ -4,6 +4,8 @@ This is the Veclang repo, where all Veclang development happens. This repository
 - `lab/`: [VKSL LAB](https://lab.vksl.uk), a web-based Veclang IDE - docs [here](lab/README.md)
 - `sutoris/`: a 'build system' for Veclang
 
+This repository also contains a copy of the excellent [Python Lex-Yacc library](https://github.com/dabeaz/ply) in `veclang/frontend/ply`, with some modifications detailed in the respective files.
+
 #### Sutoris
 As detailed in VKSL LAB [docs](lab/README.md), LAB requires several different parts of Veclang to be built for the Web. `sutoris` contains scripts to:
 - Compress the Veclang compiler to a `.zip` which can then be executed in browser by Pyscript.

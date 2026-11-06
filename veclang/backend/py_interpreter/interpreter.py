@@ -3,6 +3,7 @@ A standalone tree-walk interpreter for a basic subset of the Veclang language
 written in about 4 hours.
 """
 
+import time
 import typing
 
 import io
@@ -60,7 +61,7 @@ from veclang.frontend.parser.vl_ast import (
     ContinueStmtNode,
 )
 
-from veclang.frontend.parser.vl_parser import parse
+from veclang.frontend.parser.vl_parser import parse, CompilerFlags
 
 
 import abc
@@ -932,9 +933,9 @@ def eval_img(res_x: int, res_y: int, state: InterpreterState, output_fp: str) ->
                             raise ValueError(
                                 "Image generating function should return type Vec3"
                             )
-                        r = max(min(out.value[0].value, 255), 0)
-                        g = max(min(out.value[1].value, 255), 0)
-                        b = max(min(out.value[2].value, 255), 0)
+                        r = max(min(out.value[0], 255), 0)
+                        g = max(min(out.value[1], 255), 0)
+                        b = max(min(out.value[2], 255), 0)
                         arr[y][x] = [r, g, b]
 
                     except Exception as e:
@@ -951,30 +952,37 @@ if __name__ == "__main__":
     print("\n" * 10, "VECLANG 2.0 REPL ('exit' to exit)")
     state: InterpreterState = create_new_state()
 
-    eval_full(
-        parse(
-            """
-<generate_img>
-fn mandlebrot(
-    x: int,
-    y: int,
-    res_x: int,
-    res_y: int
-) -> vec3 {
-    const ITERATIONS: int = 50;
-    const THRESHOLD: real = 10.0;
-    let c: complex = x / res_x + (y / res_y) * 1i;
-    let z: complex = 0;
-    for (_: int in 0:ITERATIONS) {
-        if (z.re * z.re + z.im * z.im > THRESHOLD) {
-            return [0, 0, 0];
+    program = """
+    <generate_img>
+    fn mandlebrot(
+        x: int,
+        y: int,
+        res_x: int,
+        res_y: int
+    ) -> vec3 {
+        const ITERATIONS: int = 50;
+        const THRESHOLD: real = 10.0;
+        let c: complex = x / res_x + (y / res_y) * 1i;
+        let z: complex = 0;
+        for (_: int in 0:ITERATIONS) {
+            if (z.re * z.re + z.im * z.im > THRESHOLD) {
+                return [0, 0, 0];
+            }
+            z = z * z + c;
         }
-        z = z * z + c;
+        return [255, 255, 255];
     }
-    return [255, 255, 255];
-}
-    """
-        ),
+        """
+
+    parsed, diagnostics = parse(
+        program,
+        CompilerFlags(32)
+    )
+    if diagnostics:
+        print(diagnostics)
+
+    eval_full(
+        parsed,
         state,
     )
 
@@ -986,11 +994,15 @@ fn mandlebrot(
                 break
 
             with io.StringIO() as buf, redirect_stdout(buf):
-                ast_node = parse(s)
+                ast_node, diagnostics = parse(s, CompilerFlags(32))
+                if diagnostics:
+                    print(diagnostics)
                 output = buf.getvalue()
 
             if ast_node is None:
-                ast_node = parse(s + ";")
+                ast_node, diagnostics = parse(s + ";", CompilerFlags(32))
+                if diagnostics:
+                    print(diagnostics)
 
             if ast_node is None:
                 print(output)
@@ -1010,7 +1022,10 @@ fn mandlebrot(
             state["in_loop"] = False
             state["loop_break"] = False
 
+    start_time = time.time()
     eval_img(255, 255, state, "out.png")
+    end_time = time.time()
+    print(f"Image generation time: {end_time - start_time} seconds")
 
 """
 <generate_img>
